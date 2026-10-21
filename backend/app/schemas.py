@@ -1,7 +1,7 @@
 """Request models. Responses are plain dicts built by the service modules."""
 
 from datetime import date
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -59,3 +59,16 @@ class CleanOptions(BaseModel):
 
     remove_duplicates: bool = False
     merge_label_variants: bool = False
+
+
+class SavedNarrative(BaseModel):
+    """AI commentary the user chose to keep with a saved report (as returned by /api/narrative)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str = Field(max_length=50)
+    model: str = Field(max_length=100)
+    text: str = Field(max_length=8_000)
+    generated_at: str = Field(max_length=50)
+    disclaimer: str = Field(max_length=1_000)
+    shared_payload: dict[str, Any]

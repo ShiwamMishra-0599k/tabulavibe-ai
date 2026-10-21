@@ -1,12 +1,14 @@
 import { ChartNoAxesColumn } from 'lucide-react'
-import type { AnalysisResult, Narrative, Profile } from '../lib/types'
+import type { AnalysisResult, Issue, Narrative, Profile } from '../lib/types'
 import { formatCount, formatPercent, LOCALE } from '../lib/format'
 import { chartTitle, type ChartKind } from '../lib/charts'
 import { ChartView, KpiCards, ResultsTable } from './Dashboard'
 import { NarrativeText } from './AiNarrative'
 
 interface Props {
-  profile: Profile
+  /** Dataset summary and issues: from the live profile, or from a saved report. */
+  dataset: Profile['dataset']
+  issues: Issue[]
   result: AnalysisResult
   narrative: Narrative | null
   chartKind: ChartKind
@@ -24,10 +26,9 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 /** Management-report layout. Printed via the browser (Print → Save as PDF). */
-export function ReportView({ profile, result, narrative, chartKind, measureKey, preparedAt }: Props) {
-  const { dataset } = profile
+export function ReportView({ dataset, issues, result, narrative, chartKind, measureKey, preparedAt }: Props) {
   const filters = result.spec.filters
-  const warnings = profile.issues.filter((i) => i.severity === 'warning')
+  const warnings = issues.filter((i) => i.severity === 'warning')
   return (
     <article id="report" className="mx-auto grid w-full max-w-4xl gap-8 overflow-hidden rounded-3xl border border-line bg-surface shadow-float print:rounded-none print:border-0 print:shadow-none">
       <header className="brand-gradient relative px-6 py-8 text-white sm:px-10 print:border-b print:border-line print:bg-none print:px-0 print:text-ink">

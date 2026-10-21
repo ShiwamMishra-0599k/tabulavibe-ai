@@ -7,32 +7,39 @@ import {
   Eye,
   FileDown,
   FileSpreadsheet,
+  FolderOpen,
+  LogIn,
+  LogOut,
   Monitor,
   Moon,
   Printer,
   RotateCcw,
   Stethoscope,
   Sun,
-  LogIn,
   type LucideIcon,
 } from 'lucide-react'
 import { AiNarrative } from './components/AiNarrative'
 import { AnalysisBuilder } from './components/AnalysisBuilder'
+import { SignUpPage } from './components/SignUpPage'
 import { Dashboard } from './components/Dashboard'
 import { DataPreview } from './components/DataPreview'
+import { GitHubStars } from './components/GitHubStars'
 import { QualityReport } from './components/QualityReport'
 import { ReportView } from './components/ReportView'
+import { ReportsList, SavedReportPage, SaveReportCard } from './components/SavedReports'
 import { SignInDialog } from './components/SignInDialog'
 import { Alert, Button, IconChip, Skeleton, Spinner, Toggle } from './components/ui'
 import { Hero, UploadPanel } from './components/UploadPanel'
 import { api, ApiError, saveBlob } from './lib/api'
-import type { ChartKind } from './lib/charts'
+import { useAuth, type Auth } from './lib/auth'
+import { chartTitle, type ChartKind } from './lib/charts'
 import { formatCount } from './lib/format'
 import { defaultSpec } from './lib/spec'
 import { useTheme, type ThemeChoice } from './lib/theme'
-import type { AnalysisResult, AnalysisSpec, AppConfig, Narrative, Profile, SampleInfo } from './lib/types'
+import type { Account, AnalysisResult, AnalysisSpec, AppConfig, Narrative, Profile, ReportSummary, SampleInfo, SavedReport } from './lib/types'
 
 type Tab = 'preview' | 'quality' | 'analyze' | 'report'
+type View = 'workspace' | 'sign-up' | 'reports' | 'saved'
 const ORDER: Tab[] = ['preview', 'quality', 'analyze', 'report']
 
 function message(error: unknown): string {
@@ -63,6 +70,40 @@ function ThemeToggle() {
           <Icon aria-hidden className="size-4" />
         </button>
       ))}
+    </div>
+  )
+}
+
+function AccountMenu({ auth, account, onReports, onSignOut }: { auth: Auth; account: Account | null; onReports: () => void; onSignOut: () => void }) {
+  if (auth.state.status !== 'signed-in') return null
+  const user = auth.state.session.user
+  const meta = (user.user_metadata ?? {}) as Record<string, string | undefined>
+  const name = account?.full_name || meta.full_name || meta.name || user.email || 'Account'
+  const avatar = account?.avatar_url || meta.avatar_url
+  return (
+    <div className="flex items-center gap-2">
+      <Button size="sm" variant="soft" icon={FolderOpen} onClick={onReports}>
+        My reports
+      </Button>
+      <div className="flex items-center gap-2 rounded-xl border border-line bg-surface py-1 pl-1 pr-1 lg:pr-2" title={user.email ?? undefined}>
+        {avatar ? (
+          <img src={avatar} alt="" referrerPolicy="no-referrer" className="size-7 rounded-lg object-cover" />
+        ) : (
+          <span aria-hidden className="grid size-7 place-items-center rounded-lg brand-gradient text-xs font-bold text-white">
+            {name.slice(0, 1).toUpperCase()}
+          </span>
+        )}
+        <span className="hidden max-w-32 truncate text-sm font-medium text-ink lg:block">{name}</span>
+        <button
+          type="button"
+          onClick={onSignOut}
+          aria-label="Sign out"
+          title="Sign out"
+          className="grid size-7 place-items-center rounded-lg text-ink-muted transition hover:bg-surface-2 hover:text-ink"
+        >
+          <LogOut aria-hidden className="size-4" />
+        </button>
+      </div>
     </div>
   )
 }
@@ -102,6 +143,15 @@ export default function App() {
   const [exportMerge, setExportMerge] = useState(false)
   const resultsRef = useRef<HTMLDivElement>(null)
 
+  const auth = useAuth(config)
+  const signedIn = auth.state.status === 'signed-in'
+  const storageOn = !!config?.storage?.enabled && auth.state.status !== 'disabled'
+  const [requestedView, setView] = useState<View>('workspace')
+  const [accountState, setAccountState] = useState<{ userId: string; account: Account } | null>(null)
+  const [reports, setReports] = useState<ReportSummary[] | null>(null)
+  const [reportsError, setReportsError] = useState<string | null>(null)
+  const [savedReport, setSavedReport] = useState<SavedReport | null>(null)
+
   useEffect(() => {
     Promise.all([api.config(), api.samples()])
       .then(([cfg, list]) => {
@@ -111,12 +161,81 @@ export default function App() {
       .catch((e) => setServerError(message(e)))
   }, [])
 
+  // Once signed in, the sign-up page is never shown; the TabulaVibe profile feeds the header.
+  const view: View = requestedView === 'sign-up' && signedIn ? 'workspace' : requestedView
+  const userId = auth.state.status === 'signed-in' ? auth.state.session.user.id : null
+  const account = accountState && accountState.userId === userId ? accountState.account : null
+  const { token } = auth
+  useEffect(() => {
+    if (!userId) return
+    token()
+      .then((t) => api.account(t))
+      .then((a) => setAccountState({ userId, account: a }))
+      .catch(() => undefined) // the header falls back to the provider's name and picture
+  }, [userId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function openSignUp() {
+    setSignInOpen(false)
+    setView('sign-up')
+    window.scrollTo({ top: 0 })
+  }
+
+  async function openReports() {
+    setView('reports')
+    setSavedReport(null)
+    setReports(null)
+    setReportsError(null)
+    window.scrollTo({ top: 0 })
+    try {
+      setReports(await api.listReports(await auth.token()))
+    } catch (e) {
+      setReportsError(message(e))
+    }
+  }
+
+  async function openReport(id: string) {
+    setReportsError(null)
+    try {
+      setSavedReport(await api.getReport(await auth.token(), id))
+      setView('saved')
+      window.scrollTo({ top: 0 })
+    } catch (e) {
+      setReportsError(message(e))
+    }
+  }
+
+  async function deleteReport(id: string) {
+    try {
+      await api.deleteReport(await auth.token(), id)
+      setReports((list) => list?.filter((r) => r.id !== id) ?? null)
+    } catch (e) {
+      setReportsError(message(e))
+    }
+  }
+
+  async function saveReport(title: string) {
+    if (!file || !result) return
+    try {
+      await api.saveReport(await auth.token(), file, result.spec, title.trim(), narrative)
+    } catch (e) {
+      throw new Error(message(e))
+    }
+  }
+
+  async function signOut() {
+    await auth.signOut()
+    setReports(null)
+    setSavedReport(null)
+    setView('workspace')
+  }
+
   function goTo(next: Tab) {
     setTab(next)
     window.scrollTo({ top: 0 })
   }
 
   function reset() {
+    setView('workspace')
     setFile(null)
     setProfile(null)
     setSpec(null)
@@ -278,14 +397,31 @@ export default function App() {
                 </Button>
               </>
             )}
-            <Button size="sm" variant="secondary" icon={LogIn} onClick={() => setSignInOpen(true)}>
-              Sign in
-            </Button>
+            {!signedIn && (
+              <>
+                <Button size="sm" variant="secondary" icon={LogIn} onClick={() => setSignInOpen(true)}>
+                  Sign in
+                </Button>
+                {storageOn && (
+                  <Button size="sm" variant="primary" className="hidden sm:inline-flex" onClick={openSignUp}>
+                    Sign up
+                  </Button>
+                )}
+              </>
+            )}
+            <AccountMenu auth={auth} account={account} onReports={openReports} onSignOut={signOut} />
+            <GitHubStars />
             <ThemeToggle />
           </div>
         </div>
       </header>
-      <SignInDialog open={signInOpen} onClose={() => setSignInOpen(false)} />
+      <SignInDialog
+        open={signInOpen && !signedIn}
+        onClose={() => setSignInOpen(false)}
+        onSignIn={storageOn ? auth.signIn : undefined}
+        onCreateAccount={storageOn ? openSignUp : undefined}
+        hasOpenWork={!!profile}
+      />
 
       <main className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:py-8">
         {serverError && (
@@ -301,7 +437,13 @@ export default function App() {
           </div>
         )}
 
-        {!profile && (
+        {view === 'sign-up' && (
+          <SignUpPage onSignUp={auth.signIn} onSignInInstead={() => setSignInOpen(true)} onBack={() => setView('workspace')} hasOpenWork={!!profile} />
+        )}
+        {view === 'reports' && <ReportsList reports={reports} error={reportsError} onOpen={openReport} onDelete={deleteReport} onNew={reset} />}
+        {view === 'saved' && savedReport && <SavedReportPage report={savedReport} onBack={openReports} />}
+
+        {view === 'workspace' && !profile && (
           <>
             <Hero />
             {busy === 'upload' ? (
@@ -322,7 +464,7 @@ export default function App() {
           </>
         )}
 
-        {profile && spec && (
+        {view === 'workspace' && profile && spec && (
           <div className="grid gap-6">
             <nav aria-label="Workflow steps" className="print:hidden">
               <div role="tablist" className="grid grid-cols-4 gap-2 sm:gap-3">
@@ -449,7 +591,16 @@ export default function App() {
                       </div>
                     )}
                   </section>
-                  <ReportView profile={profile} result={result} narrative={narrative} chartKind={chartKind} measureKey={measureKey} preparedAt={analysedAt} />
+                  <SaveReportCard
+                    key={`${analysedAt.getTime()}-${measureKey}`}
+                    available={storageOn}
+                    signedIn={signedIn}
+                    defaultTitle={chartTitle(result, measureKey)}
+                    hasNarrative={!!narrative}
+                    onSave={saveReport}
+                    onSignIn={() => setSignInOpen(true)}
+                  />
+                  <ReportView dataset={profile.dataset} issues={profile.issues} result={result} narrative={narrative} chartKind={chartKind} measureKey={measureKey} preparedAt={analysedAt} />
                 </div>
               )}
             </div>
@@ -458,7 +609,8 @@ export default function App() {
       </main>
 
       <footer className="mx-auto max-w-7xl px-4 pb-10 pt-4 text-center text-xs text-ink-muted print:hidden">
-        TabulaVibe AI is a demonstration tool. Uploaded files are processed in memory and not stored. Sample data is synthetic.
+        TabulaVibe AI is a demonstration tool. Uploaded files are processed in memory and never stored; only reports you choose to save are kept in
+        your account. Sample data is synthetic.
       </footer>
     </div>
   )

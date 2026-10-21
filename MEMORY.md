@@ -12,19 +12,21 @@ look and feel, see `DESIGN.md`.
 | Item | Value |
 |---|---|
 | Owner | Shiwam Mishra (GitHub `ShiwamMishra-0599k`) |
+| Collaborator | Shashank Chaubey (GitHub `shashank-chaubey`): floating navbar, sign-in dialog (2026-10-21) |
 | Purpose | Portfolio project for AI/data engineering roles **and** the foundation for a freelance "dashboards and reporting" service for small businesses (India-first) |
 | Repository | https://github.com/ShiwamMishra-0599k/tabulavibe-ai (public) |
 | Local path | `C:\Users\swath\projects\tabulavibe-ai` |
 | Budget rule | ₹0 software and infrastructure cost wherever possible; never claim "free forever" |
 | Status | Local app complete and tested; AWS deployment prepared, **not deployed** (no AWS CLI, SAM or credentials) |
-| Version | 0.1.0 (UI v2 "calm confidence" design, 2026-10-21) |
+| Version | 0.3.0 (Supabase accounts + saved reports, 2026-10-21) |
 
 ## 2. Non-negotiable product rules
 
 1. **Python computes every number.** The frontend only formats; the LLM only describes aggregates.
    Even display figures like data health (`valid_cell_pct`, `valid_pct`) come from the backend.
 2. **Report, never silently fix.** Missing and invalid values are excluded *and counted*. Cleaning (dedupe, label merging) is opt-in and announced.
-3. **Store nothing.** The browser re-sends the file with each request; no database, no sessions, no upload storage.
+3. **Never store uploads or rows.** The browser re-sends the file with each request. The only persistence is
+   optional Supabase: `profiles` and `reports` (aggregates only), private per user via RLS.
 4. **AI is optional and off by default.** It gets aggregates only, its output is labelled, and the exact payload is shown to the user.
 5. **Safe uploads:** extension *and* content checks, macro and zip-bomb rejection, formulas never evaluated, limits enforced while streaming.
 6. **No Claude/AI attribution in git metadata.** No `Co-Authored-By: Claude` trailers. Shiwam asked for this on 2026-10-21.
@@ -33,9 +35,19 @@ look and feel, see `DESIGN.md`.
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-10-21 | Host on **Vercel** (Services: one project, one domain) instead of AWS for now | Shiwam asked for Vercel via GitHub; same origin removes CORS; Hobby is free but non-commercial only |
+| 2026-10-21 | On Vercel: upload limit **3.5 MB** by default | Vercel caps request *and* response bodies at 4.5 MB; cleaned CSVs can be slightly larger than the upload |
+| 2026-10-21 | Runtime deps duplicated in `pyproject.toml` (test enforces equality) | `vercel dev` installed the backend from pyproject (egg-info appeared), so deps must be there; sample files declared as package data |
+| 2026-10-21 | Navbar **GitHub star badge** fetched by the backend (cached 10 min), not the browser | Privacy (visitors never contact GitHub, like the self-hosted font) and stays far under GitHub's 60 req/h unauthenticated limit |
+| 2026-10-21 | Shashank's **sign-in dialog** is the sign-in UI; the full page is **sign-up** only | Shashank's contribution was built on first (Shiwam's request); dialog = quick sign-in, page = explains benefits for new users |
+| 2026-10-21 | **Supabase** for accounts + saved reports; sign-in with **Google and GitHub** only (OAuth, PKCE) | Shiwam asked for a database, sign-in/sign-up pages and Gmail/GitHub profiles; OAuth means no passwords to store |
+| 2026-10-21 | Save **reports only** (aggregates), not files or rows | Shiwam's choice; keeps the privacy promise and the 500 MB free DB |
+| 2026-10-21 | Backend writes **as the user** (anon key + user JWT → PostgREST → RLS); service-role key refused at startup | No privileged secret on the server; a backend bug cannot leak other users' rows |
+| 2026-10-21 | Backend **recalculates** before saving | Stored figures always come from Python, never from the client |
+| 2026-10-21 | Supabase URL/anon key served by `/api/config`, supabase-js lazy-loaded | One place to configure; no rebuild; main bundle stays ~207 kB gzip |
 | 2026-10-21 | **UI v2 redesign**: Inter, indigo→violet brand, lucide icons, top 4-step stepper, suggested analyses, data-health ring, light/dark toggle, skeletons | Shiwam found v1 "boring"; the goal was modern, captivating and user-friendly without losing clarity |
 | 2026-10-21 | Stepper moved from a left sidebar to a **full-width top bar** | The sidebar squeezed the Analyse page at 1280 px (clipped KPI values, truncated dropdowns) |
-| 2026-10-21 | Phones: header **not sticky** below `sm`; stepper is a 4-column grid | A sticky header covered tapped elements; a sideways-scrolling tab strip overlapped (found by Playwright on Pixel 7) |
+| 2026-10-21 | Phones: header **not sticky** below `sm` (superseded 2026-10-21 by Shashank's floating header, sticky everywhere; E2E on Pixel 7 still passes); stepper is a 4-column grid | A sticky header covered tapped elements; a sideways-scrolling tab strip overlapped (found by Playwright on Pixel 7) |
 | 2026-10-21 | Data health = **% of cells present and valid**, computed server-side | Honest, definable metric; keeps "Python computes every number" |
 | 2026-10-21 | Switch = styled **native checkbox** (`.switch`) | Hidden-input switches broke keyboard, screen-reader and Playwright behaviour |
 | 2026-10-21 | Inter **self-hosted** (`@fontsource-variable/inter`) | No third-party font requests (privacy, offline) |
@@ -59,6 +71,8 @@ look and feel, see `DESIGN.md`.
 | 2026-10-21 | Claude co-author trailers removed; repo recreated to clear the cached contributor list |
 | 2026-10-21 | `docs/TECHNICAL_REFERENCE.md` (+ PDF) reverse-engineered from the code; 10 findings (F1–F10) |
 | 2026-10-21 | UI v2 redesign; `DESIGN.md` and `MEMORY.md` added |
+| 2026-10-21 | Shashank pushed the floating navbar (`4faf22d`) and sign-in dialog (`c390ec6`) to `main` |
+| 2026-10-21 | v0.3.0: Supabase accounts (Google/GitHub), profiles, saved reports; 136 pytest, 26 Vitest; GitHub star badge |
 
 ## 5. Conventions
 
@@ -85,6 +99,8 @@ look and feel, see `DESIGN.md`.
 - **GitHub contributors cache:** rewriting history does not refresh the sidebar quickly. Recreating the repo did.
 - **Fixture maths:** two "test failures" during development were errors in the hand calculations (West had 1 row, not 2). Re-check the fixture before blaming the code.
 - **lucide-react v1** renamed icons (`ChartColumn`, `TriangleAlert`, `LoaderCircle`). Check names against the package before using them.
+- **OAuth redirect reloads the page:** the in-memory file is lost on sign-in. The sign-in page warns when a file is open.
+- **Shell heredocs:** long multi-line Python heredocs in Bash sometimes fail to parse here. Write the script to the scratchpad and run it.
 - **Print:** browsers drop background colours, so white-on-gradient headers need `print:` overrides.
 
 ## 7. Open items
@@ -92,8 +108,10 @@ look and feel, see `DESIGN.md`.
 | Item | Priority | Notes |
 |---|---|---|
 | Fix F10 (500 responses without CORS headers) | **High before AWS** | See TECHNICAL_REFERENCE §14 |
-| Deploy to AWS | Waiting on Shiwam | Install AWS CLI + SAM, non-root credentials, check Free/Paid plan, follow `docs/DEPLOYMENT.md` |
+| Create Supabase project + enable Google/GitHub providers | **Waiting on Shiwam** | Follow `docs/SUPABASE_SETUP.md`; then live-test sign-in and saving |
+| Import the repo in Vercel and verify the live URL + security headers | **Waiting on Shiwam** | `docs/DEPLOYMENT_VERCEL.md` |
+| Deploy to AWS | Optional (Vercel chosen) | Install AWS CLI + SAM, non-root credentials, check Free/Paid plan, follow `docs/DEPLOYMENT.md` |
 | Live-test Gemini | Optional | Needs a key from an AI Studio project **without billing** |
 | Fix F1–F9 | Low–medium | Filter options vs. label merging (F2) is the most user-visible |
-| Saved report templates | Next feature | Export/import `AnalysisSpec` JSON; no backend change needed |
+| Report templates | Next feature | Re-apply a saved report's `spec` to a new file |
 | Code-split Recharts | Low | Bundle is a single chunk (~200 kB gzipped) |

@@ -1,12 +1,14 @@
-"""TabulaVibe AI API. Stateless: every request carries its own file and nothing is stored."""
+"""TabulaVibe AI API. Every request carries its own file. Uploads are never stored; only reports a
+signed-in user chooses to save are written to Supabase (aggregated results, no raw rows)."""
 
 from __future__ import annotations
 
 import logging
 import time
 from typing import Annotated, Any
+from uuid import UUID
 
-from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -18,10 +20,12 @@ from .analysis import filter_options, run_analysis
 from .config import Settings, get_settings
 from .errors import AppError, DataError
 from .export import cleaned_csv, results_csv
+from .github import StarCounter, repo_info
 from .ingest import load_table
 from .profiling import Dataset, build_dataset, build_profile, duplicate_row_count
 from .samples import SAMPLES, SAMPLES_DIR, list_samples
-from .schemas import AnalysisSpec, CleanOptions
+from .schemas import AnalysisSpec, CleanOptions, SavedNarrative
+from .storage import AuthRequiredError, ReportStore, StorageDisabledError, build_record, get_store
 
 logger = logging.getLogger("tabulavibe")
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -54,12 +58,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.dependency_overrides[get_settings] = lambda: settings
     app.state.rate_limiter = RateLimiter(settings.ai_requests_per_minute)
+    app.state.star_counter = StarCounter()
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.origins,
-        allow_methods=["GET", "POST"],
-        allow_headers=["Content-Type"],
+        allow_methods=["GET", "POST", "DELETE"],
+        allow_headers=["Content-Type", "Authorization"],
         expose_headers=["Content-Disposition", "X-Rows-Exported", "X-Duplicates-Removed", "X-Labels-Merged"],
         max_age=600,
     )
@@ -135,7 +140,19 @@ def _register_routes(app: FastAPI) -> None:
                 "provider": provider.name if provider else None,
                 "model": provider.model if provider else None,
             },
+            # Public values the browser needs for Supabase sign-in (the anon key is public by design).
+            "storage": {
+                "enabled": settings.storage_enabled,
+                "supabase_url": settings.supabase_url if settings.storage_enabled else None,
+                "supabase_anon_key": settings.supabase_anon_key.strip()
+                if settings.storage_enabled and settings.supabase_anon_key
+                else None,
+            },
         }
+
+    @app.get("/api/github")
+    def github(request: Request, settings: SettingsDep) -> dict[str, Any]:
+        return repo_info(settings.github_repo, request.app.state.star_counter)
 
     @app.get("/api/samples")
     def samples() -> list[dict[str, str]]:
@@ -208,10 +225,67 @@ def _register_routes(app: FastAPI) -> None:
         }
         return generate_narrative(provider, build_payload(result, quality))
 
+    @app.get("/api/account")
+    def account(store: StoreDep, token: TokenDep) -> dict[str, Any]:
+        return store.account(token)
+
+    @app.post("/api/reports", status_code=201)
+    def save_report(
+        settings: SettingsDep,
+        store: StoreDep,
+        token: TokenDep,
+        file: UploadFile = File(...),
+        spec: str = Form(..., max_length=20_000),
+        title: str = Form(..., max_length=200),
+        narrative: str | None = Form(None, max_length=40_000),
+    ) -> dict[str, Any]:
+        clean_title = " ".join(title.split())
+        if not clean_title:
+            raise DataError("invalid_request", "Give the report a title.")
+        parsed = _parse_json_field(AnalysisSpec, spec, "spec")
+        saved_narrative = _parse_json_field(SavedNarrative, narrative, "narrative").model_dump() if narrative else None
+        # Recalculate from the file so stored figures always come from the backend.
+        ds = _load(file, settings)
+        profile = build_profile(ds, file.filename)
+        result = run_analysis(ds, parsed, settings.max_groups)
+        return store.create(token, build_record(clean_title, profile, result, saved_narrative))
+
+    @app.get("/api/reports")
+    def list_reports(store: StoreDep, token: TokenDep) -> list[dict[str, Any]]:
+        return store.list(token)
+
+    @app.get("/api/reports/{report_id}")
+    def get_report(report_id: UUID, store: StoreDep, token: TokenDep) -> dict[str, Any]:
+        return store.get(token, str(report_id))
+
+    @app.delete("/api/reports/{report_id}", status_code=204)
+    def delete_report(report_id: UUID, store: StoreDep, token: TokenDep) -> Response:
+        store.delete(token, str(report_id))
+        return Response(status_code=204)
+
 
 def get_narrative_provider(settings: SettingsDep):
     """FastAPI dependency so tests can swap in fake providers."""
     return get_provider(settings)
+
+
+def get_report_store(settings: SettingsDep) -> ReportStore:
+    """FastAPI dependency so tests can swap in a fake Supabase transport."""
+    store = get_store(settings)
+    if store is None:
+        raise StorageDisabledError()
+    return store
+
+
+def get_access_token(authorization: Annotated[str | None, Header(max_length=8_192)] = None) -> str:
+    scheme, _, token = (authorization or "").partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        raise AuthRequiredError()
+    return token.strip()
+
+
+StoreDep = Annotated[ReportStore, Depends(get_report_store)]
+TokenDep = Annotated[str, Depends(get_access_token)]
 
 
 app = create_app()

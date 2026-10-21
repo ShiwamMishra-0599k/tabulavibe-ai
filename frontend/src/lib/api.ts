@@ -1,4 +1,4 @@
-import type { AnalysisResult, AnalysisSpec, AppConfig, Narrative, Profile, SampleInfo } from './types'
+import type { Account, AnalysisResult, AnalysisSpec, AppConfig, Narrative, Profile, RepoInfo, ReportSummary, SampleInfo, SavedReport } from './types'
 
 // Empty in development: Vite proxies /api to the local backend.
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
@@ -49,6 +49,11 @@ function form(file: File, fields: Record<string, unknown> = {}): FormData {
   return data
 }
 
+/** Headers for endpoints that act on the signed-in user's own data. */
+function authed(token: string, init: RequestInit = {}): RequestInit {
+  return { ...init, headers: { ...init.headers, Authorization: `Bearer ${token}` } }
+}
+
 export interface DownloadedFile {
   blob: Blob
   filename: string
@@ -62,6 +67,7 @@ function filenameFrom(response: Response, fallback: string): string {
 
 export const api = {
   config: async (): Promise<AppConfig> => (await request('/api/config')).json(),
+  github: async (): Promise<RepoInfo> => (await request('/api/github')).json(),
   samples: async (): Promise<SampleInfo[]> => (await request('/api/samples')).json(),
   async sampleFile(sample: SampleInfo): Promise<File> {
     const response = await request(`/api/samples/${encodeURIComponent(sample.id)}`)
@@ -84,6 +90,18 @@ export const api = {
   async exportResults(file: File, spec: AnalysisSpec): Promise<DownloadedFile> {
     const response = await request('/api/export/results', { method: 'POST', body: form(file, { spec }) })
     return { blob: await response.blob(), filename: filenameFrom(response, 'results.csv'), headers: response.headers }
+  },
+  account: async (token: string): Promise<Account> => (await request('/api/account', authed(token))).json(),
+  listReports: async (token: string): Promise<ReportSummary[]> => (await request('/api/reports', authed(token))).json(),
+  getReport: async (token: string, id: string): Promise<SavedReport> =>
+    (await request(`/api/reports/${encodeURIComponent(id)}`, authed(token))).json(),
+  async saveReport(token: string, file: File, spec: AnalysisSpec, title: string, narrative: Narrative | null): Promise<ReportSummary> {
+    const body = form(file, narrative ? { spec, narrative } : { spec })
+    body.append('title', title)
+    return (await request('/api/reports', authed(token, { method: 'POST', body }))).json()
+  },
+  async deleteReport(token: string, id: string): Promise<void> {
+    await request(`/api/reports/${encodeURIComponent(id)}`, authed(token, { method: 'DELETE' }))
   },
 }
 

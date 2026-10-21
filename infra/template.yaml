@@ -28,6 +28,14 @@ Parameters:
   GeminiModel:
     Type: String
     Default: gemini-3.5-flash-lite
+  SupabaseUrl:
+    Type: String
+    Default: ''
+    Description: Optional. Supabase project URL (https://<ref>.supabase.co) for sign-in and saved reports. Empty disables them.
+  SupabaseAnonKey:
+    Type: String
+    Default: ''
+    Description: Optional. The Supabase anon/publishable key (public by design). Never the service-role/secret key.
   LogRetentionDays:
     Type: Number
     Default: 7
@@ -48,7 +56,7 @@ Resources:
   ApiFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Description: TabulaVibe AI FastAPI backend (stateless)
+      Description: TabulaVibe AI FastAPI backend (no uploads stored)
       CodeUri: build/api/
       Handler: app.lambda_handler.handler
       LoggingConfig:
@@ -60,6 +68,8 @@ Resources:
           TABULAVIBE_AI_PROVIDER: !Ref AiProvider
           TABULAVIBE_GEMINI_API_KEY: !Ref GeminiApiKey
           TABULAVIBE_GEMINI_MODEL: !Ref GeminiModel
+          TABULAVIBE_SUPABASE_URL: !Ref SupabaseUrl
+          TABULAVIBE_SUPABASE_ANON_KEY: !Ref SupabaseAnonKey
       FunctionUrlConfig:
         # Public HTTPS endpoint. CORS is enforced by the application (explicit origin list),
         # so Function URL CORS is intentionally not configured to avoid duplicate headers.

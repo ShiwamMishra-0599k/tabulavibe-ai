@@ -12,10 +12,26 @@
                                                                            ai.py         optional narrative (aggregates only)
 ```
 
-**Stateless by design.** The server never stores uploads. The browser keeps the selected `File` and
+**Uploads are never stored.** The server never stores uploads. The browser keeps the selected `File` and
 re-sends it with each request (`/profile`, `/analyze`, `/export/*`, `/narrative`). The server re-parses it
-each time (well under a second for files within the limits). This avoids a database, object storage or
+each time (well under a second for files within the limits). This avoids object storage and server
 sessions, and makes "we do not retain your data" literally true.
+
+**Optional accounts and saved reports (v0.3).** When `TABULAVIBE_SUPABASE_URL`/`_ANON_KEY` are set:
+
+```
+ Browser ── signInWithOAuth (Google | GitHub, PKCE) ──▶ Supabase Auth ──▶ trigger creates public.profiles row
+    │  access token (JWT)
+    ▼
+ POST /api/reports (file + spec + title, Authorization: Bearer <user JWT>)
+    FastAPI: re-profile + re-run analysis (Python stays the source of truth)
+    storage.py ── PostgREST (apikey = anon key, Authorization = user JWT) ──▶ public.reports  (RLS: own rows only)
+```
+
+The backend holds no privileged key: the anon/publishable key is public, PostgREST verifies the user's
+JWT, and RLS policies (`auth.uid() = user_id`) do the authorisation. Reports are immutable (no UPDATE policy).
+Stored: title, file name, counts, spec, aggregated result, quality summary, optional AI narrative. Never rows.
+supabase-js is lazy-loaded in the browser and only used for sign-in. Schema: `supabase/migrations/`.
 
 ## Repository layout
 

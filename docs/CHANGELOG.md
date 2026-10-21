@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.3.0 — 2026-10-21 (accounts and saved reports)
+
+### Contributions by Shashank Chaubey (`shashank-chaubey`), built on first
+- `4faf22d` **Floating navigation bar:** a rounded, glass "pill" header that stays visible on every screen size.
+- `c390ec6` **Sign-in button and dialog** with "Continue with Google" / "Continue with GitHub" (+ Vitest test).
+  v0.3.0 wires this dialog to Supabase Auth; without Supabase it keeps the original "available after OAuth is configured" preview.
+
+### Added
+- Optional **Supabase** integration (off until `TABULAVIBE_SUPABASE_URL` and `TABULAVIBE_SUPABASE_ANON_KEY` are set).
+- **Sign in** (Shashank's dialog, now live) and a full **Sign up page**, both with Google (Gmail) and GitHub (Supabase Auth, PKCE). A `profiles` row is created by a database trigger on first sign-in.
+- **Save report** card on the Report step, **My reports** page (open, print, two-step delete) and a saved-report viewer that needs no file.
+- Endpoints: `GET /api/account`, `POST/GET /api/reports`, `GET/DELETE /api/reports/{id}`. Saving recalculates from the file on the server.
+- `supabase/migrations/20261021000000_profiles_and_reports.sql`: tables, RLS policies (own rows only), grants, signup trigger.
+- **GitHub badge** in the navbar: GitHub logo + live star count, linking to the repo. The backend fetches the public count (`GET /api/github`, no token) and caches it for 10 minutes, so browsers never call GitHub. Hidden if `TABULAVIBE_GITHUB_REPO` is empty; shows no count if GitHub is unreachable.
+- **Vercel deployment:** `vercel.json` (Services: `web` = Vite build, `api` = FastAPI on Python 3.14; `/api/*` → api, rest → web), `backend/.python-version`, runtime dependencies and sample package data in `backend/pyproject.toml`, and `docs/DEPLOYMENT_VERCEL.md`. On Vercel (`VERCEL=1`) the backend defaults to production mode and a 3.5 MB upload limit (4.5 MB body cap). Verified locally with `vercel dev -L`.
+- `docs/SUPABASE_SETUP.md`: step-by-step project, provider and `.env` setup.
+- Safety: the backend refuses service-role / `sb_secret_` keys and non-HTTPS Supabase URLs; database error bodies are never echoed or logged.
+- SAM template parameters `SupabaseUrl` and `SupabaseAnonKey`.
+- Tests: 15 pytest (fake Supabase with RLS semantics) + 13 pytest (GitHub stars, caching, failures); 4 Vitest (sign-in dialog, sign-up page, save/list/open/delete) + 2 Vitest (GitHub badge).
+
+### Changed
+- `ReportView` takes `dataset` + `issues` (so saved reports render without a profile).
+- CORS allows `DELETE` and the `Authorization` header.
+- supabase-js is loaded on demand (separate 54 kB gzip chunk); the main bundle stays at 207 kB gzip.
+
 ## 0.2.0 — 2026-10-21 (UI v2 "calm confidence")
 
 ### Added

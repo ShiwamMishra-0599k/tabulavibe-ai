@@ -2,11 +2,12 @@
 
 An end-to-end business analytics web app built with **FastAPI**, **pandas**, **React + TypeScript** and
 optional **Google Gemini** commentary. It turns ordinary CSV and Excel files into a data-quality report,
-an interactive KPI dashboard, downloadable CSV exports and a print-ready management report, with no
-database and no paid services required.
+an interactive KPI dashboard, downloadable CSV exports and a print-ready management report. No paid
+services are required. Optional **Supabase** accounts (sign up with Google/Gmail or GitHub) let users save
+reports and reopen them later.
 
-> ⚠️ TabulaVibe AI is a demonstration tool. Files are processed in memory and never stored, but do not
-> upload confidential or regulated data.
+> ⚠️ TabulaVibe AI is a demonstration tool. Files are processed in memory and never stored (saved reports
+> keep only aggregated results), but do not upload confidential or regulated data.
 
 ## 🚀 Features
 
@@ -22,6 +23,8 @@ database and no paid services required.
 - 🌗 Modern, responsive UI with light/dark themes, a 4-step guided workflow and accessible controls (see [DESIGN.md](DESIGN.md))
 - 🧹 Opt-in cleaning: exclude duplicate rows; merge `North` / `north` style label variants
 - 📤 Exports: results CSV, cleaned-data CSV (safe from spreadsheet formula injection), printable report (save as PDF)
+- 👤 Optional accounts: sign up / sign in with **Google (Gmail) or GitHub** via Supabase Auth; a profile is created on first sign-in
+- 💾 **My reports:** save a report (figures, chart data, quality notes, AI commentary) to Supabase Postgres, reopen, print or delete it. Row Level Security keeps every user's reports private
 - ✍️ Optional AI commentary: Gemini summarises the already-calculated results and never sees raw rows
 - 📡 REST API built with FastAPI, ready for AWS Lambda (Function URL) + S3 / CloudFront
 
@@ -34,7 +37,9 @@ database and no paid services required.
 | Backend | FastAPI 0.156, Uvicorn, Pydantic 2 / pydantic-settings |
 | Data processing | pandas 3.0, NumPy, openpyxl (Excel), python-multipart |
 | Optional LLM | Google Gemini over REST (`httpx`, no SDK) |
-| Cloud (prepared) | AWS SAM: Lambda (python3.14, arm64) + Function URL, S3 + CloudFront, AWS Budgets |
+| Optional accounts & database | Supabase: Auth (Google + GitHub OAuth, PKCE) and Postgres with Row Level Security; backend talks to its REST API with `httpx`; `@supabase/supabase-js` (lazy-loaded) in the browser |
+| Hosting | **Vercel** (Services: Vite frontend + FastAPI Python function, one domain) |
+| Cloud (alternative) | AWS SAM: Lambda (python3.14, arm64) + Function URL, S3 + CloudFront, AWS Budgets |
 | Lambda adapter | Mangum |
 | Testing | pytest, Vitest + Testing Library, Playwright (uses installed Chrome) |
 | Quality | ruff, oxlint, tsc, cfn-lint, pip-audit, npm audit |
@@ -64,7 +69,9 @@ database and no paid services required.
 ↓ [ Exports ] ├─ Results CSV ├─ Cleaned CSV └─ Printable report (browser)
 ↓ [ Optional Gemini Narrative: aggregates only ] ↓ [ JSON / CSV responses ]
 
-The server is **stateless**. Nothing is stored; the browser re-sends the file with each request.
+Uploads are **never stored**; the browser re-sends the file with each request. Only when a signed-in user
+chooses **Save report** does the backend recalculate the results and write them (aggregates only) to Supabase,
+using that user's own access token, so Row Level Security applies.
 Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## 🧾 FastAPI Endpoints
@@ -73,6 +80,7 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 |---|---|
 | `GET /api/health` | Health check and version |
 | `GET /api/config` | Upload limits and whether AI is enabled (never exposes the key) |
+| `GET /api/github` | Repo link and star count for the navbar badge (server-side, cached 10 min) |
 | `GET /api/samples` | List the synthetic sample datasets |
 | `GET /api/samples/{id}` | Download a sample file |
 | `POST /api/profile` | Preview, column profiles, data-quality issues and suggested measures/dimensions |
@@ -80,6 +88,9 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | `POST /api/export/results` | Download the calculated results as CSV |
 | `POST /api/export/cleaned` | Download the standardised (cleaned) data as CSV |
 | `POST /api/narrative` | Optional AI commentary (returns 503 when AI is disabled) |
+| `GET /api/account` | Signed-in user's TabulaVibe profile (Bearer token) |
+| `POST /api/reports` | Recalculate from the file and save a report (Bearer token) |
+| `GET /api/reports` · `GET /api/reports/{id}` · `DELETE /api/reports/{id}` | List, open and delete your own saved reports |
 
 Interactive API docs: `http://localhost:8000/api/docs` (disabled in production).
 
@@ -190,6 +201,22 @@ Before enabling it, note:
 - On Gemini's free tier, prompts may be used to improve Google's products. That is why only aggregated figures are sent, and the UI shows the exact payload.
 - If the provider fails or hits its quota, the rest of the app keeps working.
 
+## 👤 Optional Accounts & Saved Reports (Supabase)
+
+Off until configured. Full walkthrough: [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md).
+
+1. Create a free Supabase project and run [`supabase/migrations/…_profiles_and_reports.sql`](supabase/migrations/) in the SQL Editor.
+2. Enable the **Google** and **GitHub** providers (OAuth client IDs/secrets live only in Supabase).
+3. Add to `backend/.env`:
+
+```
+TABULAVIBE_SUPABASE_URL=https://<project-ref>.supabase.co
+TABULAVIBE_SUPABASE_ANON_KEY=<publishable / anon key>
+```
+
+The anon key is public by design. The backend refuses the service-role/secret key, never stores files or
+rows, and every query runs as the signed-in user.
+
 ## 🧪 Libraries & Services Used
 
 ✅ Successfully Integrated:
@@ -198,12 +225,14 @@ Before enabling it, note:
 - openpyxl (read-only, no formula evaluation)
 - Recharts
 - Google Gemini via REST (optional)
+- Supabase Auth + Postgres with Row Level Security (optional)
 - Mangum (FastAPI → AWS Lambda)
 - Playwright with the system Chrome (no browser download)
 
 ❌ Not Used / Dropped:
 
-- **Database / file storage:** not needed. The stateless design keeps the "we don't store your data" promise.
+- **File storage / raw-row tables:** not needed. Only aggregated saved reports go to the database, which keeps the "we don't store your data" promise.
+- **Supabase service-role key on the server:** unnecessary and dangerous; user tokens + RLS are enough.
 - **API Gateway:** a Lambda Function URL costs nothing extra.
 - **AWS Lambda Web Adapter:** adds a second process and slower cold starts compared with Mangum.
 - **Gemini Python SDK:** plain REST is easier to mock and adds no dependency.
@@ -228,12 +257,20 @@ Before enabling it, note:
 - Rate-limited, and the exact payload is shown to the user.
 
 🛑 **Privacy:**
-- Files are processed in memory and never stored.
+- Files are processed in memory and never stored. Saved reports hold aggregates only and are private to their owner (RLS).
 - File names and cell values are never logged.
 - CORS uses an explicit origin list.
 - Secrets live only in environment variables.
 
-## ☁️ Deployment (AWS)
+## ▲ Deployment (Vercel, from GitHub)
+
+[`vercel.json`](vercel.json) deploys the whole app as **one Vercel project on one domain** using Vercel Services:
+`/api/*` runs FastAPI as a Python 3.14 function and everything else is the Vite build on Vercel's CDN. Import
+the GitHub repo at <https://vercel.com/new> and press Deploy; no settings or environment variables are needed.
+On Vercel the backend switches to production mode and a 3.5 MB upload limit automatically (Vercel caps request
+and response bodies at 4.5 MB). Step by step, limits and costs: [docs/DEPLOYMENT_VERCEL.md](docs/DEPLOYMENT_VERCEL.md).
+
+## ☁️ Deployment (AWS, alternative)
 
 Infrastructure as code is ready in `infra/` (SAM template, `deploy.ps1`).
 - The template passes `cfn-lint`.
@@ -257,9 +294,9 @@ Infrastructure as code is ready in `infra/` (SAM template, `deploy.ps1`).
 
 ## 📈 Future Enhancements
 
-- 💾 Saved report templates: re-apply the same analysis to next month's file in one click
+- 💾 Report templates: re-apply a saved report's analysis to next month's file in one click
 - 📑 Multi-sheet Excel support and joining two files
-- 🔐 Optional authentication and CloudFront + WAF rate limiting for the public API
+- 🔐 CloudFront + WAF rate limiting for the public API
 - 📊 Period-over-period comparisons (this month vs last month) on KPI cards
 - ⚡ Code-split the chart library to shrink the first page load
 - 🧪 Live-test the Gemini integration with a free-tier key
@@ -271,7 +308,9 @@ Infrastructure as code is ready in `infra/` (SAM template, `deploy.ps1`).
 - [MEMORY.md](MEMORY.md): project memory: decisions, history, conventions, lessons learned
 - [docs/TECHNICAL_REFERENCE.md](docs/TECHNICAL_REFERENCE.md): in-depth technical reference
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): design, API, data rules, security
+- [docs/DEPLOYMENT_VERCEL.md](docs/DEPLOYMENT_VERCEL.md): Vercel deployment from GitHub
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md): AWS plan, costs, checklist
+- [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md): accounts (Google/GitHub) and saved reports
 - [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md): what is done, verified and pending
 - [docs/CHANGELOG.md](docs/CHANGELOG.md)
 
@@ -281,6 +320,9 @@ This project is for educational and demo purposes. All sample data is synthetic.
 review the terms of third-party services (e.g. Google Gemini API, AWS).
 
 ## 🤝 Contributions
+
+- **Shiwam Mishra** ([@ShiwamMishra-0599k](https://github.com/ShiwamMishra-0599k)): author and maintainer
+- **Shashank Chaubey** ([@shashank-chaubey](https://github.com/shashank-chaubey)): floating navigation bar and sign-in dialog
 
 Pull requests and discussions are welcome! Feel free to fork and adapt it for client reporting, small-business
 dashboards or internal analytics tools.

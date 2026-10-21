@@ -19,7 +19,7 @@ _Version 2 ("calm confidence"), introduced 2026-10-21. The source of truth for t
 | Logo mark | Bar-chart glyph (`ChartNoAxesColumn`) in a rounded square filled with the brand gradient |
 | Brand gradient | `linear-gradient(135deg, var(--accent), var(--accent-2))`: indigo `#4f46e5` → violet `#7c3aed` (dark: `#818cf8` → `#a78bfa`) |
 | Text gradient | indigo → violet → sky (`#0ea5e9`), used once per screen at most (hero headline) |
-| Voice | Plain, specific, reassuring: "Nothing has been changed in your data", "Files are never stored" |
+| Voice | Plain, specific, reassuring: "Nothing has been changed in your data", "Files are never stored", "Only you can see your reports" |
 
 ## 3. Colour tokens
 

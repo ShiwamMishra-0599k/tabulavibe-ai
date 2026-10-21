@@ -1,8 +1,32 @@
 [project]
 name = "tabulavibe-backend"
-version = "0.2.0"
+version = "0.3.0"
 description = "TabulaVibe AI API: CSV/XLSX profiling, KPI analysis and exports"
 requires-python = ">=3.13"
+# Runtime dependencies. Keep identical to requirements.txt (tests/test_packaging.py checks this).
+dependencies = [
+    "fastapi==0.156.3",
+    "starlette==1.9.0",
+    "pydantic==2.14.1",
+    "pydantic-settings==2.16.1",
+    "pandas==3.0.6",
+    "numpy==2.5.4",
+    "openpyxl==3.1.5",
+    "python-multipart==0.0.32",
+    "httpx==0.28.1",
+    "mangum==0.22.0",
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+# Installed as a package on Vercel: ship only `app`, including the sample datasets it serves.
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.setuptools.package-data]
+app = ["samples/*.csv", "samples/*.xlsx"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

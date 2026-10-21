@@ -34,3 +34,8 @@ Thumbs.db
 .vscode/
 .idea/
 *.log
+
+# Vercel CLI and Python packaging artefacts
+.vercel/
+backend/build/
+*.egg-info/

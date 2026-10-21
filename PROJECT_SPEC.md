@@ -77,12 +77,18 @@ name). The product is called **TabulaVibe AI**.
 - No stack traces in responses; no raw data or file names in logs.
 - Explicit CORS origins; no credentials in code; `.env` never committed.
 
-## 6. Out of scope (MVP)
-User accounts, saved projects, databases, file storage, scheduled reports, emailing/sharing results,
+## 6. Accounts and saved reports (added in v0.3)
+Optional. Users sign up / sign in with Google (Gmail) or GitHub through Supabase Auth; a profile is created on
+first sign-in. Signed-in users can save a report (aggregated results, settings, quality summary, optional AI
+commentary), list, open, print and delete their own reports. Uploaded files and rows are never stored. Each
+user sees only their own data (Postgres Row Level Security). Every other feature works without an account.
+
+## 7. Out of scope
+File storage, re-analysing a saved report without the file, editing saved reports, team sharing, scheduled reports, emailing/sharing results,
 multi-sheet or joined datasets, pivot tables, forecasting, custom formulas, PDF generation on the server,
 custom domains. This tool is **not** certified for confidential, regulated or high-risk data.
 
-## 7. Milestones and acceptance criteria
+## 8. Milestones and acceptance criteria
 
 | Milestone | Acceptance criteria |
 |---|---|

@@ -11,6 +11,15 @@ export interface AppConfig {
     supported_extensions: string[]
   }
   ai: { enabled: boolean; provider: string | null; model: string | null }
+  /** Optional saved reports and sign-in (Supabase). The anon key is public by design. */
+  storage?: { enabled: boolean; supabase_url: string | null; supabase_anon_key: string | null }
+}
+
+export interface RepoInfo {
+  repo: string | null
+  url: string | null
+  /** null when GitHub could not be reached; the badge then shows no count. */
+  stars: number | null
 }
 
 export interface SampleInfo {
@@ -141,4 +150,31 @@ export interface Narrative {
   generated_at: string
   disclaimer: string
   shared_payload: Record<string, unknown>
+}
+
+export interface Account {
+  id: string
+  email: string | null
+  full_name: string | null
+  avatar_url: string | null
+  provider: string | null
+  created_at: string
+}
+
+export interface ReportSummary {
+  id: string
+  title: string
+  source_name: string
+  source_type: 'csv' | 'xlsx'
+  row_count: number
+  column_count: number
+  created_at: string
+}
+
+export interface SavedReport extends ReportSummary {
+  spec: AnalysisSpec
+  result: AnalysisResult
+  quality: { dataset: Profile['dataset']; issues: Issue[] }
+  narrative: Narrative | null
+  app_version: string
 }

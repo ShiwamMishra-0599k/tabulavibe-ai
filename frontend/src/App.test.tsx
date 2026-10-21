@@ -34,6 +34,24 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Continue with GitHub' })).toBeInTheDocument()
   })
 
+  it('shows the GitHub logo with the star count from the backend', async () => {
+    mockServer({
+      '/api/github': () => jsonResponse({ repo: 'ShiwamMishra-0599k/tabulavibe-ai', url: 'https://github.com/ShiwamMishra-0599k/tabulavibe-ai', stars: 1234 }),
+    })
+    render(<App />)
+    const link = await screen.findByRole('link', { name: 'TabulaVibe AI on GitHub, 1,234 stars' })
+    expect(link).toHaveAttribute('href', 'https://github.com/ShiwamMishra-0599k/tabulavibe-ai')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(link).toHaveTextContent('1.2K')
+  })
+
+  it('hides the GitHub badge when the repo is not configured or unreachable', async () => {
+    mockServer({ '/api/github': () => jsonResponse({ repo: null, url: null, stars: null }) })
+    render(<App />)
+    await screen.findByRole('button', { name: 'Load sample: Retail sales (CSV)' })
+    expect(screen.queryByRole('link', { name: /on GitHub/ })).not.toBeInTheDocument()
+  })
+
   it('walks through sample → preview → quality → analysis → report', async () => {
     const user = userEvent.setup()
     mockServer()

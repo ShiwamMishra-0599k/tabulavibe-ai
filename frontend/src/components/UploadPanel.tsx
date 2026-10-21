@@ -34,7 +34,7 @@ export function Hero() {
     <div className="animate-rise mx-auto max-w-3xl py-6 text-center sm:py-10">
       <div className="mb-5 flex flex-wrap justify-center gap-2">
         <Badge tone="accent" icon={Sparkles}>
-          Free · No sign-up
+          Free · Sign-up optional
         </Badge>
         <Badge tone="good" icon={Lock}>
           Files are never stored

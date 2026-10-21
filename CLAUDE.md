@@ -22,7 +22,9 @@ Ports 8000/5173 may already be in use on the author's machine. Use `--port 8010`
 
 - All numbers come from `backend/app/analysis.py`. The frontend formats values but never calculates them, and the AI only summarises them.
 - Never silently change user data. Detect and report it; any cleaning is opt-in and stated in notes, headers and the report.
-- Keep the server stateless. Do not add storage, a database or sessions without updating the spec.
+- Never store uploads or raw rows. The only persistence is Supabase (`profiles`, `reports`: aggregates only), via
+  `app/storage.py`, using the user's own token and RLS. Never use the service-role key. Schema changes go in a new
+  file in `supabase/migrations/`. Accounts stay optional: everything else must work with Supabase unset.
 - New calculations need tests with hand-computed expected values (see `tests/conftest.py`).
 - User-facing error messages go through `DataError`/`AppError`. Never return stack traces.
 - Never log file contents, file names or cell values.
