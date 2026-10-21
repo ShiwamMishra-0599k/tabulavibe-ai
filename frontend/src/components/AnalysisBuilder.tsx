@@ -66,7 +66,8 @@ export function AnalysisBuilder({ profile, spec, onChange, onRun, onApplySuggest
   }
 
   return (
-    <div className="grid gap-4">
+    // min-w-0: stay inside the 340 px sidebar column instead of growing to fit long labels.
+    <div className="grid min-w-0 gap-4">
       {suggestions.length > 0 && (
         <section className="animate-rise gradient-border rounded-2xl p-4 shadow-card" aria-labelledby={`${id}-sugg`}>
           <h2 id={`${id}-sugg`} className="flex items-center gap-2 text-sm font-semibold text-ink">
@@ -88,9 +89,9 @@ export function AnalysisBuilder({ profile, spec, onChange, onRun, onApplySuggest
                     <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent-text transition group-hover:brand-gradient group-hover:text-white">
                       <Icon aria-hidden className="size-4" />
                     </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold text-ink">{s.title}</span>
-                      <span className="block truncate text-xs text-ink-muted">{s.description}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block break-words text-sm font-semibold leading-snug text-ink">{s.title}</span>
+                      <span className="mt-0.5 block break-words text-xs leading-snug text-ink-muted">{s.description}</span>
                     </span>
                   </button>
                 </li>

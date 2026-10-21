@@ -11,6 +11,9 @@
 - Streaming progress (NDJSON) with a live phase timeline.
 - Tests: 18 statistics (hand-computed), 33 workflow, 14 Gemini (scripted API), 8 API; 5 Vitest; 1 Playwright journey (desktop + mobile).
 
+### Fixed
+- Analyse step: the "Suggested for your data" panel no longer overlaps the dashboard when suggestion labels are long (e.g. "Compare total Amount (INR) across Repeat Customer"). The sidebar keeps its 340 px column and labels wrap instead of overflowing.
+
 ### Changed
 - **Larger uploads:** CSV up to 100 MB (was 4 MB), Excel up to 20 MB, 2,000,000 rows (was 100,000), 200 columns (was 60), 20,000,000 cells (was 2,000,000). Limits were chosen from measurements (peak memory ≈ 14× the CSV size; Excel reads ~10× slower than CSV). Files over 25 MB are processed one at a time (503 `server_busy` otherwise). The Excel zip-bomb guard scales with the Excel limit. Vercel stays at 3.5 MB (platform cap) and the AWS template pins 4 MB. The upload panel shows both limits and suggests CSV for large Excel files.
 - Dependency: SciPy 1.18.1. Vercel `maxDuration` 300 s for the API function.
