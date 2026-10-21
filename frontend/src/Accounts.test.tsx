@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
+import { api, setAccessTokenProvider } from './lib/api'
 import type { AuthState } from './lib/auth'
 import { config, jsonResponse, profile, result } from './test/fixtures'
 
@@ -16,6 +17,7 @@ vi.mock('./lib/auth', () => ({
 }))
 
 const storageConfig = { ...config, storage: { enabled: true, supabase_url: 'https://demo.supabase.co', supabase_anon_key: 'sb_publishable_x' } }
+const lockedConfig = { ...config, storage: { ...storageConfig.storage, sign_in_required: true } }
 const summary = { id: '7c0c2f52-0000-4000-8000-000000000001', title: 'Revenue by region', source_name: 'sales.csv', source_type: 'csv', row_count: 10, column_count: 7, created_at: '2026-10-21T10:00:00Z' }
 const signedIn = (): AuthState => ({
   status: 'signed-in',
@@ -51,7 +53,7 @@ function mockServer(cfg: unknown = storageConfig) {
   return calls
 }
 
-const authHeader = (init?: RequestInit) => (init?.headers as Record<string, string> | undefined)?.Authorization
+const authHeader = (init?: RequestInit) => new Headers(init?.headers).get('Authorization')
 
 beforeEach(() => {
   authMock.state = { status: 'signed-out' }
@@ -59,6 +61,46 @@ beforeEach(() => {
 })
 
 describe('Accounts and saved reports', () => {
+  it('locks uploads and samples until the user signs in, when the server requires it', async () => {
+    const user = userEvent.setup()
+    const calls = mockServer(lockedConfig)
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Sign in to upload your data' })).toBeInTheDocument()
+    expect(screen.getByText('Free · Sign in with Google or GitHub')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Upload CSV or XLSX file')).not.toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Load sample: Retail sales (CSV)' })).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: 'Sign in to upload' }))
+    expect(screen.getByRole('dialog', { name: 'Sign in' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Close sign in dialog' }))
+    await user.click(screen.getByRole('button', { name: 'Create an account' }))
+    expect(screen.getByRole('heading', { name: 'Create your TabulaVibe account' })).toBeInTheDocument()
+    expect(calls.some((c) => c.url === '/api/profile')).toBe(false)
+  })
+
+  it('unlocks uploads once signed in', async () => {
+    authMock.state = signedIn()
+    const user = userEvent.setup()
+    mockServer(lockedConfig)
+    render(<App />)
+    expect(await screen.findByLabelText('Upload CSV or XLSX file')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Sign in to upload your data' })).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Load sample: Retail sales (CSV)' }))
+    expect(await screen.findByText('First 2 of 10 rows')).toBeInTheDocument()
+  })
+
+  it("sends the signed-in user's token with uploads, and nothing when signed out", async () => {
+    const calls = mockServer()
+    const file = new File(['a,b\n1,2\n'], 'x.csv', { type: 'text/csv' })
+    setAccessTokenProvider(async () => 'fresh-token')
+    await api.profile(file)
+    setAccessTokenProvider(null)
+    await api.profile(file)
+    const [withToken, without] = calls.filter((c) => c.url === '/api/profile')
+    expect(new Headers(withToken.init?.headers).get('Authorization')).toBe('Bearer fresh-token')
+    expect(new Headers(without.init?.headers).has('Authorization')).toBe(false)
+  })
+
   it('keeps the sign-in dialog as a preview when the server has no database configured', async () => {
     const user = userEvent.setup()
     mockServer(config)

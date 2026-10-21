@@ -96,11 +96,21 @@ def save(client: TestClient, data: bytes, token: str = "token-alice", **fields):
 
 def test_config_exposes_only_public_supabase_values(storage_client):
     cfg = storage_client.get("/api/config").json()
-    assert cfg["storage"] == {"enabled": True, "supabase_url": "https://demo.supabase.co", "supabase_anon_key": ANON_KEY}
+    assert cfg["storage"] == {
+        "enabled": True,
+        "supabase_url": "https://demo.supabase.co",
+        "supabase_anon_key": ANON_KEY,
+        "sign_in_required": False,
+    }
 
 
 def test_storage_disabled_by_default(client, sales_bytes):
-    assert client.get("/api/config").json()["storage"] == {"enabled": False, "supabase_url": None, "supabase_anon_key": None}
+    assert client.get("/api/config").json()["storage"] == {
+        "enabled": False,
+        "supabase_url": None,
+        "supabase_anon_key": None,
+        "sign_in_required": False,
+    }
     res = client.get("/api/reports", headers=auth())
     assert res.status_code == 503
     assert res.json()["error"]["code"] == "storage_disabled"

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Session, SupabaseClient } from '@supabase/supabase-js'
-import { ApiError } from './api'
+import { ApiError, setAccessTokenProvider } from './api'
 import type { AppConfig } from './types'
 
 /**
@@ -66,6 +66,17 @@ export function useAuth(config: AppConfig | null) {
       unsubscribe()
     }
   }, [url, anonKey])
+
+  // While signed in, every API request carries a fresh access token (supabase-js refreshes it).
+  const signedInUser = session?.user.id ?? null
+  useEffect(() => {
+    if (!signedInUser || !url || !anonKey) {
+      setAccessTokenProvider(null)
+      return
+    }
+    setAccessTokenProvider(async () => (await (await loadClient(url, anonKey)).auth.getSession()).data.session?.access_token ?? null)
+    return () => setAccessTokenProvider(null)
+  }, [signedInUser, url, anonKey])
 
   const state: AuthState = !config
     ? { status: 'loading' }

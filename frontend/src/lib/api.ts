@@ -16,10 +16,27 @@ export class ApiError extends Error {
   }
 }
 
+type TokenProvider = () => Promise<string | null>
+let accessToken: TokenProvider | null = null
+
+/** Registered by the auth hook: adds the signed-in user's token to every API request. */
+export function setAccessTokenProvider(provider: TokenProvider | null): void {
+  accessToken = provider
+}
+
+async function withToken(init: RequestInit = {}): Promise<RequestInit> {
+  const headers = new Headers(init.headers)
+  if (!headers.has('Authorization') && accessToken) {
+    const token = await accessToken().catch(() => null)
+    if (token) headers.set('Authorization', `Bearer ${token}`)
+  }
+  return { ...init, headers }
+}
+
 async function request(path: string, init?: RequestInit): Promise<Response> {
   let response: Response
   try {
-    response = await fetch(`${BASE_URL}${path}`, init)
+    response = await fetch(`${BASE_URL}${path}`, await withToken(init))
   } catch {
     throw new ApiError('network_error', 'Could not reach the TabulaVibe server. Check your connection and try again.', 0)
   }

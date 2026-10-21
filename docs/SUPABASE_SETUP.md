@@ -1,103 +1,120 @@
-# Supabase setup: sign-in and saved reports
+# Supabase setup: Google (Gmail) + GitHub sign-in, saved reports, sign-in-only uploads
 
-TabulaVibe works fully without an account. When Supabase is configured, people can also **sign up / sign in
-with Google (Gmail) or GitHub** and **save reports** to reopen later. This guide connects a Supabase project
-in about 20 minutes. All steps are done in your own browser accounts; nothing here is automated.
+When Supabase is configured, people **sign up / sign in with Google (Gmail) or GitHub**, can **save
+reports**, and (with `TABULAVIBE_REQUIRE_SIGN_IN=true`) **must be signed in to upload or analyse files**.
+The backend enforces this on every upload/analysis endpoint (`401` without a valid session); the website
+only mirrors it.
 
-> Checked against supabase.com on 2026-10-21. Dashboard menus move around; follow the closest match.
+All steps happen in your own accounts. Client secrets are pasted **only into Supabase**, never into
+TabulaVibe, the repo, Vercel or a chat.
+
+> Checked against supabase.com docs on 2026-10-21. Dashboard menus move around; follow the closest match.
+
+## Values you will need
+
+| Name | Value |
+|---|---|
+| Live site | `https://tabulavibe-ai.vercel.app` |
+| Local site | `http://localhost:5180` |
+| Supabase callback | `https://<project-ref>.supabase.co/auth/v1/callback` (shown in step 3.1) |
 
 ## What gets stored
 
 | Table | Contents | Who can read it |
 |---|---|---|
-| `profiles` | Name, email, avatar URL and provider (`google`/`github`) from the sign-in provider. Created automatically on first sign-in. | The account owner only |
+| `profiles` | Name, email, avatar URL and provider (`google`/`github`). Created automatically on first sign-in | The account owner only |
 | `reports` | Report title, file name, row/column counts, analysis settings, **aggregated** results, data-quality summary, optional AI commentary | The account owner only |
 
-Uploaded files and their rows are **never stored**. Row Level Security (RLS) enforces "own rows only" inside
-the database. The backend uses only the public anon/publishable key plus the signed-in user's own access token,
-so it cannot read anyone else's data even if it had a bug.
+Uploaded files and their rows are **never stored**. Row Level Security (RLS) enforces "own rows only" in the
+database, and the backend uses only the public anon/publishable key plus the user's own access token.
 
-## Cost (Free plan, as listed on supabase.com/pricing on 2026-10-21)
-
-500 MB database per project, 50,000 monthly active users, 5 GB egress, up to 2 active free projects.
-**Free projects pause after one week without activity.** Restore them from the dashboard. A saved report is
-typically 5–50 kB, so 500 MB holds many thousands. Do not add a payment method if the ₹0 budget must hold.
+**Cost (Free plan, supabase.com/pricing, 2026-10-21):** 500 MB database, 50,000 monthly active users, 5 GB
+egress, up to 2 active free projects. **Free projects pause after one week without activity** (restore from the
+dashboard). Do not add a payment method if the ₹0 budget must hold.
 
 ## 1. Create the project
 
-1. Sign in at <https://supabase.com/dashboard> (you already use GitHub for this) → **New project**.
-2. Name `tabulavibe`. Set a strong database password and save it in your password manager; TabulaVibe never needs it.
-3. Region: **South Asia (Mumbai)** for Indian users. Plan: **Free**.
+1. <https://supabase.com/dashboard> → **New project**. Name `tabulavibe`, a strong database password (keep it in
+   your password manager; TabulaVibe never needs it), region **South Asia (Mumbai)**, plan **Free**.
 
 ## 2. Create the tables
 
-1. **SQL Editor → New query**.
-2. Paste the whole of [`supabase/migrations/20261021000000_profiles_and_reports.sql`](../supabase/migrations/20261021000000_profiles_and_reports.sql) → **Run**.
-   It is safe to run again.
-3. Check **Table Editor**: `profiles` and `reports` exist, and both show **RLS enabled**.
+1. **SQL Editor → New query** → paste all of
+   [`supabase/migrations/20261021000000_profiles_and_reports.sql`](../supabase/migrations/20261021000000_profiles_and_reports.sql) → **Run**.
+2. **Table Editor**: `profiles` and `reports` exist and both show **RLS enabled**.
 
-## 3. Turn on GitHub sign-in
+## 3. GitHub sign-in
 
-1. Supabase: **Authentication → Sign In / Providers → GitHub**. Copy the **Callback URL**
-   (`https://<project-ref>.supabase.co/auth/v1/callback`).
-2. GitHub: <https://github.com/settings/developers> → **OAuth Apps → New OAuth App**.
+1. Supabase: **Authentication → Sign In / Providers → GitHub** → copy the **Callback URL**.
+2. GitHub: <https://github.com/settings/developers> → **OAuth Apps → New OAuth App**:
    - Application name: `TabulaVibe AI`
-   - Homepage URL: `http://localhost:5180` (change it after deployment)
-   - Authorization callback URL: the Supabase callback URL from step 1
-3. **Register application → Generate a new client secret**.
-4. Back in Supabase, enable GitHub, paste the **Client ID** and **Client Secret** → **Save**.
-   The secret lives only in Supabase. Never put it in TabulaVibe's `.env`.
+   - Homepage URL: `https://tabulavibe-ai.vercel.app`
+   - Authorization callback URL: the Supabase callback URL
+   - Leave "Enable Device Flow" off → **Register application**
+3. **Generate a new client secret**. Copy the **Client ID** and the secret.
+4. Supabase GitHub provider: **Enable**, paste Client ID + Client Secret → **Save**.
 
-## 4. Turn on Google (Gmail) sign-in
+## 4. Google (Gmail) sign-in
 
-1. <https://console.cloud.google.com> → create or select a project (no billing needed).
-2. **Google Auth Platform → Branding**: app name `TabulaVibe AI`, your support email. Audience: **External**.
-   While the app is in *Testing*, add your Gmail address(es) under **Audience → Test users**.
-3. **Data Access (Scopes)**: add `openid` (email and profile are included by default). No sensitive scopes.
-4. **Clients → Create client → Web application**.
-   - Authorized JavaScript origins: `http://localhost:5180`
+1. <https://console.cloud.google.com> → create a project `tabulavibe` (no billing needed).
+2. **Google Auth Platform → Branding**: app name `TabulaVibe AI`, your support email, developer contact email.
+   Don't upload a logo (a logo triggers Google's verification review).
+3. **Audience**: User type **External**. To let *any* Gmail user sign in, click **Publish app** (with only the
+   basic scopes below no review is needed). While it stays in *Testing*, only addresses under **Test users** can sign in.
+4. **Data Access**: add the scope `openid` (`email` and `profile` are included by default). Nothing else.
+5. **Clients → Create client → Web application**, name `TabulaVibe web`:
+   - Authorized JavaScript origins: `https://tabulavibe-ai.vercel.app` and `http://localhost:5180`
    - Authorized redirect URIs: the Supabase callback URL from step 3.1
-5. Copy the **Client ID** and **Client Secret** → Supabase **Authentication → Sign In / Providers → Google**,
-   enable it, paste both → **Save**.
+6. Copy the **Client ID** and **Client Secret** → Supabase **Authentication → Sign In / Providers → Google**:
+   **Enable**, paste both → **Save**.
 
-## 5. Allow TabulaVibe's address
+## 5. Allowed addresses
 
-Supabase: **Authentication → URL Configuration**
+Supabase **Authentication → URL Configuration**:
 
-- Site URL: `http://localhost:5180`
-- Redirect URLs: add `http://localhost:5180/**` (later also your CloudFront URL, e.g. `https://dxxxx.cloudfront.net/**`)
+- Site URL: `https://tabulavibe-ai.vercel.app`
+- Redirect URLs: `https://tabulavibe-ai.vercel.app/**` and `http://localhost:5180/**`
 
-## 6. Connect the backend
+## 6. Connect TabulaVibe
 
-1. Supabase: **Project Settings → API Keys**. Copy the **Project URL** and the **publishable** key
-   (`sb_publishable_…`; on older projects, the legacy `anon` key).
-2. Edit `backend/.env` (gitignored; create it from `.env.example`):
+From Supabase **Project Settings → API Keys** copy the **Project URL** and the **publishable** key
+(`sb_publishable_…`, or the legacy `anon` key). Both are public by design. **Never** use the
+`service_role` / `sb_secret_…` key: it bypasses RLS, and the backend refuses to start with it.
 
-   ```ini
-   TABULAVIBE_ALLOWED_ORIGINS=http://localhost:5180,http://127.0.0.1:5180
-   TABULAVIBE_SUPABASE_URL=https://<project-ref>.supabase.co
-   TABULAVIBE_SUPABASE_ANON_KEY=<publishable or anon key>
-   ```
+**Live site (Vercel → Project `tabulavibe-ai` → Settings → Environment Variables, Production + Preview):**
 
-   **Never** use the `service_role` / `sb_secret_…` key: it bypasses RLS. The backend refuses to start with it.
-3. Restart the backend. `GET /api/config` now shows `"storage": {"enabled": true, …}` and the header shows
-   **Sign in / Sign up**.
+```ini
+TABULAVIBE_SUPABASE_URL=https://<project-ref>.supabase.co
+TABULAVIBE_SUPABASE_ANON_KEY=<publishable key>
+TABULAVIBE_REQUIRE_SIGN_IN=true
+```
 
-## 7. Try it
+Then redeploy (Deployments → ⋯ → Redeploy, or push to `main`).
 
-1. Open <http://localhost:5180> → **Sign up** → **Sign up with Google** (or GitHub) → approve.
-2. You return signed in; your name appears in the header and a row appears in `profiles`.
-3. Load a sample → Analyse → **Run analysis** → **Report & export** → **Save to my reports**.
-4. **My reports** lists it; open it, print it, delete it.
+**Local (`backend/.env`, gitignored):** the same three lines plus
+`TABULAVIBE_ALLOWED_ORIGINS=http://localhost:5180,http://127.0.0.1:5180`. Restart the backend.
+
+`TABULAVIBE_REQUIRE_SIGN_IN=true` without the Supabase URL and key makes the backend **refuse to start**, so a
+missing setting can never silently leave uploads open.
+
+## 7. Check it
+
+1. Open the site signed out: the upload area says **Sign in to upload your data** and samples are locked.
+   `curl -X POST https://tabulavibe-ai.vercel.app/api/profile -F file=@any.csv` returns `401 auth_required`.
+2. **Sign up** → **Sign up with Google** (or GitHub) → approve. You return signed in; your name and picture
+   appear in the header and a row appears in `profiles`.
+3. Upload a file or load a sample → Analyse → Report → **Save to my reports** → **My reports**.
+4. **Sign out**: the open file closes and uploads lock again.
 
 ## Troubleshooting
 
 | Symptom | Fix |
 |---|---|
-| No Sign in button | `TABULAVIBE_SUPABASE_URL`/`_ANON_KEY` not set, or backend not restarted |
+| Sign-in dialog says "available after OAuth is configured" | Supabase variables not set on this deployment, or not redeployed |
 | `redirect_uri_mismatch` (Google) | The Google client's redirect URI must be exactly the Supabase callback URL |
-| Google says "access blocked" / "app not verified" | Add your Gmail address as a test user (step 4.2) |
-| After sign-in you land on the wrong address | Add the address to Supabase **Redirect URLs** (step 5) |
-| "Your sign-in has expired" | Sign out and in again; check the project is not paused |
-| "No TabulaVibe profile exists" | The SQL in step 2 was not run (it also creates profiles for existing accounts) |
-| Saving fails with HTTP 404 from the database | The `reports` table is missing: run step 2 |
+| Google: "access blocked" / "app not verified" | Publish the app (step 4.3) or add the address as a test user |
+| GitHub: "redirect_uri is not associated with this application" | The OAuth app's callback URL must be exactly the Supabase callback URL |
+| After sign-in you land on the wrong site | Add that site to Supabase **Redirect URLs** (step 5) |
+| "Your sign-in has expired" | Sign out and in again; check the Supabase project isn't paused |
+| "No TabulaVibe profile exists" | Run the SQL from step 2 (it also back-fills existing accounts) |
+| Backend won't start: `REQUIRE_SIGN_IN=true needs …` | Add the Supabase URL and key, or set `TABULAVIBE_REQUIRE_SIGN_IN=false` |

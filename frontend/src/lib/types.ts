@@ -12,7 +12,7 @@ export interface AppConfig {
   }
   ai: { enabled: boolean; provider: string | null; model: string | null }
   /** Optional saved reports and sign-in (Supabase). The anon key is public by design. */
-  storage?: { enabled: boolean; supabase_url: string | null; supabase_anon_key: string | null }
+  storage?: { enabled: boolean; supabase_url: string | null; supabase_anon_key: string | null; sign_in_required?: boolean }
 }
 
 export interface RepoInfo {

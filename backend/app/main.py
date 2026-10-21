@@ -17,6 +17,7 @@ from pydantic import BaseModel, ValidationError
 from . import __version__
 from .ai import AIDisabledError, RateLimiter, build_payload, generate_narrative, get_provider
 from .analysis import filter_options, run_analysis
+from .auth import SignedInUser
 from .config import Settings, get_settings
 from .errors import AppError, DataError
 from .export import cleaned_csv, results_csv
@@ -147,6 +148,7 @@ def _register_routes(app: FastAPI) -> None:
                 "supabase_anon_key": settings.supabase_anon_key.strip()
                 if settings.storage_enabled and settings.supabase_anon_key
                 else None,
+                "sign_in_required": settings.require_sign_in,
             },
         }
 
@@ -166,20 +168,24 @@ def _register_routes(app: FastAPI) -> None:
         return FileResponse(SAMPLES_DIR / sample["file"], media_type=sample["media_type"], filename=sample["file"])
 
     @app.post("/api/profile")
-    def profile(settings: SettingsDep, file: UploadFile = File(...)) -> dict[str, Any]:
+    def profile(settings: SettingsDep, user: SignedInUser, file: UploadFile = File(...)) -> dict[str, Any]:
         ds = _load(file, settings)
         result = build_profile(ds, file.filename)
         result["filter_options"] = filter_options(ds)
         return result
 
     @app.post("/api/analyze")
-    def analyze(settings: SettingsDep, file: UploadFile = File(...), spec: str = Form(..., max_length=20_000)) -> dict[str, Any]:
+    def analyze(
+        settings: SettingsDep, user: SignedInUser, file: UploadFile = File(...), spec: str = Form(..., max_length=20_000)
+    ) -> dict[str, Any]:
         parsed = _parse_json_field(AnalysisSpec, spec, "spec")
         ds = _load(file, settings)
         return run_analysis(ds, parsed, settings.max_groups)
 
     @app.post("/api/export/cleaned")
-    def export_cleaned(settings: SettingsDep, file: UploadFile = File(...), options: str = Form("{}", max_length=2_000)):
+    def export_cleaned(
+        settings: SettingsDep, user: SignedInUser, file: UploadFile = File(...), options: str = Form("{}", max_length=2_000)
+    ):
         parsed = _parse_json_field(CleanOptions, options, "options")
         ds = _load(file, settings)
         text, summary = cleaned_csv(ds, parsed.remove_duplicates, parsed.merge_label_variants)
@@ -195,7 +201,7 @@ def _register_routes(app: FastAPI) -> None:
         )
 
     @app.post("/api/export/results")
-    def export_results(settings: SettingsDep, file: UploadFile = File(...), spec: str = Form(..., max_length=20_000)):
+    def export_results(settings: SettingsDep, user: SignedInUser, file: UploadFile = File(...), spec: str = Form(..., max_length=20_000)):
         parsed = _parse_json_field(AnalysisSpec, spec, "spec")
         ds = _load(file, settings)
         result = run_analysis(ds, parsed, settings.max_groups)
@@ -209,13 +215,15 @@ def _register_routes(app: FastAPI) -> None:
     def narrative(
         request: Request,
         settings: SettingsDep,
+        user: SignedInUser,
         file: UploadFile = File(...),
         spec: str = Form(..., max_length=20_000),
         provider=Depends(get_narrative_provider),
     ) -> dict[str, Any]:
         if provider is None:
             raise AIDisabledError()
-        request.app.state.rate_limiter.check(request.client.host if request.client else "unknown")
+        # Per user when signed in (several users can share one IP), otherwise per client IP.
+        request.app.state.rate_limiter.check(f"user:{user.id}" if user else (request.client.host if request.client else "unknown"))
         parsed = _parse_json_field(AnalysisSpec, spec, "spec")
         ds = _load(file, settings)
         result = run_analysis(ds, parsed, settings.max_groups)
@@ -234,6 +242,7 @@ def _register_routes(app: FastAPI) -> None:
         settings: SettingsDep,
         store: StoreDep,
         token: TokenDep,
+        user: SignedInUser,
         file: UploadFile = File(...),
         spec: str = Form(..., max_length=20_000),
         title: str = Form(..., max_length=200),

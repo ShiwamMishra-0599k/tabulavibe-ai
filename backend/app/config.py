@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     supabase_url: str | None = None
     supabase_anon_key: str | None = None
     supabase_timeout_seconds: float = Field(10.0, gt=0, le=30)
+    # Require a signed-in Supabase user for every upload and analysis request. Needs Supabase above:
+    # the backend refuses to start with this on and Supabase unset (fail closed, never silently open).
+    require_sign_in: bool = False
 
     # Public GitHub repository ("owner/name") whose star count the navigation bar shows. Empty hides it.
     github_repo: str = "ShiwamMishra-0599k/tabulavibe-ai"
@@ -52,6 +55,8 @@ class Settings(BaseSettings):
             self.supabase_url = url
         if self.supabase_anon_key and _is_privileged_key(self.supabase_anon_key.strip()):
             raise ValueError("TABULAVIBE_SUPABASE_ANON_KEY must be the anon/publishable key, not the service-role/secret key")
+        if self.require_sign_in and not (self.supabase_url and self.supabase_anon_key):
+            raise ValueError("TABULAVIBE_REQUIRE_SIGN_IN=true needs TABULAVIBE_SUPABASE_URL and TABULAVIBE_SUPABASE_ANON_KEY")
         return self
 
     @model_validator(mode="after")

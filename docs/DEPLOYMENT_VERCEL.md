@@ -74,6 +74,7 @@ npx vercel@65.0.0 deploy --prod
 | Variable | When |
 |---|---|
 | `TABULAVIBE_SUPABASE_URL`, `TABULAVIBE_SUPABASE_ANON_KEY` | Turn on sign-in and saved reports (see [SUPABASE_SETUP.md](SUPABASE_SETUP.md)) |
+| `TABULAVIBE_REQUIRE_SIGN_IN=true` | Only signed-in users can upload or analyse (needs the two Supabase variables) |
 | `TABULAVIBE_AI_PROVIDER=gemini`, `TABULAVIBE_GEMINI_API_KEY` | Turn on AI commentary (mark the key as **Sensitive**) |
 | `TABULAVIBE_GITHUB_REPO` | Change or hide (empty) the navbar star badge |
 

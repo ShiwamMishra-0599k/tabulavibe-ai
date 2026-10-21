@@ -15,11 +15,11 @@ _Last updated: 2026-10-21 (v0.3.0: Supabase accounts and saved reports)_
 
 | Check | Result |
 |---|---|
-| Backend `pytest` | 142 passed |
+| Backend `pytest` | 168 passed |
 | Backend `ruff check` / `ruff format --check` | clean |
 | Frontend `tsc -b` | clean |
 | Frontend `oxlint` | 0 warnings, 0 errors |
-| Frontend `vitest run` | 26 passed |
+| Frontend `vitest run` | 29 passed |
 | Frontend `vite build` | OK (main JS 207 kB gzipped + lazy supabase-js chunk 54 kB gzipped; Inter Latin font 48 kB; Vite warns about chunk size) |
 | Playwright E2E (Chrome, desktop + Pixel 7 viewport, light + dark) | 8 passed |
 | `cfn-lint infra/template.yaml` | clean |

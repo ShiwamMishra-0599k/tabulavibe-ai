@@ -35,6 +35,8 @@ look and feel, see `DESIGN.md`.
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-10-21 | **Uploads require sign-in** (`TABULAVIBE_REQUIRE_SIGN_IN`), enforced server-side via Supabase `/auth/v1/user` (60 s cache by token hash) | Shiwam's request. Server-side so it can't be bypassed; `/auth/v1/user` needs no extra JWT library and rejects signed-out sessions; fails closed if Supabase is missing |
+| 2026-10-21 | OAuth credentials are created **by Shiwam** in GitHub/Google/Supabase | Client secrets must never pass through Claude, code, Vercel or chat; GitHub OAuth apps can't be created by API anyway |
 | 2026-10-21 | Host on **Vercel** (Services: one project, one domain) instead of AWS for now | Shiwam asked for Vercel via GitHub; same origin removes CORS; Hobby is free but non-commercial only |
 | 2026-10-21 | On Vercel: upload limit **3.5 MB** by default | Vercel caps request *and* response bodies at 4.5 MB; cleaned CSVs can be slightly larger than the upload |
 | 2026-10-21 | Runtime deps duplicated in `pyproject.toml` (test enforces equality) | `vercel dev` installed the backend from pyproject (egg-info appeared), so deps must be there; sample files declared as package data |
@@ -102,6 +104,7 @@ look and feel, see `DESIGN.md`.
 - **lucide-react v1** renamed icons (`ChartColumn`, `TriangleAlert`, `LoaderCircle`). Check names against the package before using them.
 - **OAuth redirect reloads the page:** the in-memory file is lost on sign-in. The sign-in page warns when a file is open.
 - **Shell heredocs:** long multi-line Python heredocs in Bash sometimes fail to parse here. Write the script to the scratchpad and run it.
+- **Low memory on this PC (~8 GB):** parallel Playwright + leftover dev servers starved the backend and E2E timed out. Stop old servers and use `--workers=1`.
 - **Vercel CLI edits files:** `vercel link` appended `.vercel` and `.env*` to `.gitignore` (the latter would hide `.env.example`) and wrote a token to `.env.local`. Revert the `.gitignore` edit; `.env.local` is already ignored by `.env.*`.
 - **Print:** browsers drop background colours, so white-on-gradient headers need `print:` overrides.
 
@@ -110,7 +113,7 @@ look and feel, see `DESIGN.md`.
 | Item | Priority | Notes |
 |---|---|---|
 | Fix F10 (500 responses without CORS headers) | **High before AWS** | See TECHNICAL_REFERENCE §14 |
-| Create Supabase project + enable Google/GitHub providers | **Waiting on Shiwam** | Follow `docs/SUPABASE_SETUP.md`; then live-test sign-in and saving |
+| Create Supabase project + Google/GitHub OAuth | **Waiting on Shiwam** | `docs/SUPABASE_SETUP.md` steps 1–5; then Claude sets the 3 Vercel env vars and live-tests |
 | Deploy to AWS | Optional (Vercel chosen) | Install AWS CLI + SAM, non-root credentials, check Free/Paid plan, follow `docs/DEPLOYMENT.md` |
 | Live-test Gemini | Optional | Needs a key from an AI Studio project **without billing** |
 | Fix F1–F9 | Low–medium | Filter options vs. label merging (F2) is the most user-visible |

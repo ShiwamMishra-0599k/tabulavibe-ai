@@ -8,6 +8,7 @@
   v0.3.0 wires this dialog to Supabase Auth; without Supabase it keeps the original "available after OAuth is configured" preview.
 
 ### Added
+- **Sign-in-only uploads** (`TABULAVIBE_REQUIRE_SIGN_IN=true`): every upload/analysis/export/AI endpoint needs a valid Supabase session, checked by the backend with Supabase Auth (`/auth/v1/user`, verified tokens cached 60 s by hash). Signed-out visitors see "Sign in to upload your data" and locked samples; signing out closes the open file. Refuses to start if enabled without Supabase. AI rate limit is per user when signed in.
 - Optional **Supabase** integration (off until `TABULAVIBE_SUPABASE_URL` and `TABULAVIBE_SUPABASE_ANON_KEY` are set).
 - **Sign in** (Shashank's dialog, now live) and a full **Sign up page**, both with Google (Gmail) and GitHub (Supabase Auth, PKCE). A `profiles` row is created by a database trigger on first sign-in.
 - **Save report** card on the Report step, **My reports** page (open, print, two-step delete) and a saved-report viewer that needs no file.
@@ -19,7 +20,7 @@
 - `docs/SUPABASE_SETUP.md`: step-by-step project, provider and `.env` setup.
 - Safety: the backend refuses service-role / `sb_secret_` keys and non-HTTPS Supabase URLs; database error bodies are never echoed or logged.
 - SAM template parameters `SupabaseUrl` and `SupabaseAnonKey`.
-- Tests: 15 pytest (fake Supabase with RLS semantics) + 13 pytest (GitHub stars, caching, failures); 4 Vitest (sign-in dialog, sign-up page, save/list/open/delete) + 2 Vitest (GitHub badge).
+- Tests: 26 pytest (sign-in enforcement on every data endpoint, token cache, outages, fail-closed config) + 15 pytest (fake Supabase with RLS semantics) + 13 pytest (GitHub stars, caching, failures); 3 Vitest (locked/unlocked uploads, token on requests); 4 Vitest (sign-in dialog, sign-up page, save/list/open/delete) + 2 Vitest (GitHub badge).
 
 ### Changed
 - `ReportView` takes `dataset` + `issues` (so saved reports render without a profile).

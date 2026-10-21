@@ -146,6 +146,8 @@ export default function App() {
   const auth = useAuth(config)
   const signedIn = auth.state.status === 'signed-in'
   const storageOn = !!config?.storage?.enabled && auth.state.status !== 'disabled'
+  const signInRequired = !!config?.storage?.sign_in_required
+  const uploadsLocked = signInRequired && !signedIn
   const [requestedView, setView] = useState<View>('workspace')
   const [accountState, setAccountState] = useState<{ userId: string; account: Account } | null>(null)
   const [reports, setReports] = useState<ReportSummary[] | null>(null)
@@ -224,6 +226,7 @@ export default function App() {
 
   async function signOut() {
     await auth.signOut()
+    if (signInRequired) reset() // the open file belongs to the signed-in session
     setReports(null)
     setSavedReport(null)
     setView('workspace')
@@ -445,7 +448,7 @@ export default function App() {
 
         {view === 'workspace' && !profile && (
           <>
-            <Hero />
+            <Hero signInRequired={signInRequired} />
             {busy === 'upload' ? (
               <div className="grid gap-4 rounded-3xl border border-line bg-surface p-8 shadow-card">
                 <Spinner label="Reading and checking your file…" />
@@ -459,7 +462,14 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <UploadPanel config={config} samples={samples} busy={busy !== null} onFile={loadFile} onSample={loadSample} />
+              <UploadPanel
+                config={config}
+                samples={samples}
+                busy={busy !== null || auth.state.status === 'loading'}
+                onFile={loadFile}
+                onSample={loadSample}
+                locked={uploadsLocked ? { onSignIn: () => setSignInOpen(true), onSignUp: openSignUp } : undefined}
+              />
             )}
           </>
         )}

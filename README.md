@@ -25,7 +25,8 @@ reports and reopen them later.
 - 🌗 Modern, responsive UI with light/dark themes, a 4-step guided workflow and accessible controls (see [DESIGN.md](DESIGN.md))
 - 🧹 Opt-in cleaning: exclude duplicate rows; merge `North` / `north` style label variants
 - 📤 Exports: results CSV, cleaned-data CSV (safe from spreadsheet formula injection), printable report (save as PDF)
-- 👤 Optional accounts: sign up / sign in with **Google (Gmail) or GitHub** via Supabase Auth; a profile is created on first sign-in
+- 👤 Accounts: sign up / sign in with **Google (Gmail) or GitHub** via Supabase Auth; a profile is created on first sign-in
+- 🔐 Optional **sign-in-only uploads** (`TABULAVIBE_REQUIRE_SIGN_IN=true`), enforced by the backend on every upload and analysis request
 - 💾 **My reports:** save a report (figures, chart data, quality notes, AI commentary) to Supabase Postgres, reopen, print or delete it. Row Level Security keeps every user's reports private
 - ✍️ Optional AI commentary: Gemini summarises the already-calculated results and never sees raw rows
 - 📡 REST API built with FastAPI, ready for AWS Lambda (Function URL) + S3 / CloudFront
