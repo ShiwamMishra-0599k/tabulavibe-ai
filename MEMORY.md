@@ -74,7 +74,7 @@ look and feel, see `DESIGN.md`.
 | 2026-10-21 | `docs/TECHNICAL_REFERENCE.md` (+ PDF) reverse-engineered from the code; 10 findings (F1–F10) |
 | 2026-10-21 | UI v2 redesign; `DESIGN.md` and `MEMORY.md` added |
 | 2026-10-21 | Shashank pushed the floating navbar (`4faf22d`) and sign-in dialog (`c390ec6`) to `main` |
-| 2026-10-21 | **Deployed to Vercel**: https://tabulavibe-ai.vercel.app (all live checks + 8 E2E passed). Every push to `main` now auto-deploys (confirmed with `12a2e53`) |
+| 2026-10-21 | **Deployed to Vercel**: https://tabulavibe-ai.vercel.app (all live checks + 8 E2E passed). Auto-deploy on push is **not reliable yet**: `815a004` and `1b8b641` did not deploy; deploys were triggered via the Vercel API from GitHub `main`. Fix: install the Vercel GitHub App on the repo |
 | 2026-10-21 | v0.3.0: Supabase accounts (Google/GitHub), profiles, saved reports; 136 pytest, 26 Vitest; GitHub star badge |
 
 ## 5. Conventions
@@ -113,6 +113,7 @@ look and feel, see `DESIGN.md`.
 | Item | Priority | Notes |
 |---|---|---|
 | Fix F10 (500 responses without CORS headers) | **High before AWS** | See TECHNICAL_REFERENCE §14 |
+| Install the Vercel GitHub App on `tabulavibe-ai` (auto-deploy) | **Waiting on Shiwam** | https://github.com/apps/vercel → Configure → Only select repositories |
 | Create Supabase project + Google/GitHub OAuth | **Waiting on Shiwam** | `docs/SUPABASE_SETUP.md` steps 1–5; then Claude sets the 3 Vercel env vars and live-tests |
 | Deploy to AWS | Optional (Vercel chosen) | Install AWS CLI + SAM, non-root credentials, check Free/Paid plan, follow `docs/DEPLOYMENT.md` |
 | Live-test Gemini | Optional | Needs a key from an AI Studio project **without billing** |
