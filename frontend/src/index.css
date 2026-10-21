@@ -171,11 +171,9 @@ body {
   background-attachment: fixed;
 }
 
-/* Keep scrolled-to content clear of the sticky header (sticky from the sm breakpoint). */
-@media (min-width: 40rem) {
-  html {
-    scroll-padding-top: 5.5rem;
-  }
+/* Keep scrolled-to content clear of the floating sticky navigation. */
+html {
+  scroll-padding-top: 6rem;
 }
 
 .tabular {

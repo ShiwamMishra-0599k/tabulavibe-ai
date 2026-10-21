@@ -249,8 +249,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
-      <header className="z-30 border-b border-line bg-glass backdrop-blur-xl sm:sticky sm:top-0 print:hidden">
-        <div className="mx-auto flex min-h-16 max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-2">
+      <header className="sticky top-3 z-30 mx-auto w-[calc(100%-2rem)] max-w-7xl print:hidden">
+        <div className="flex min-h-16 flex-wrap items-center justify-between gap-3 rounded-[2rem] border border-line bg-glass px-4 py-2 shadow-float backdrop-blur-xl sm:px-5">
           <div className="flex items-center gap-3">
             <span aria-hidden className="grid size-9 place-items-center rounded-xl brand-gradient text-white shadow-[0_8px_20px_-8px_rgb(79_70_229/0.8)]">
               <ChartNoAxesColumn className="size-5" />
