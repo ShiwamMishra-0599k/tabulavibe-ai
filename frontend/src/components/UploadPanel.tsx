@@ -139,7 +139,10 @@ export function UploadPanel({ config, samples, busy, onFile, onSample, locked }:
             {limits && (
               <ul className="flex flex-wrap justify-center gap-2" aria-label="Upload limits">
                 <li>
-                  <Badge>Up to {limits.max_upload_mb} MB</Badge>
+                  <Badge>CSV up to {limits.max_upload_mb} MB</Badge>
+                </li>
+                <li>
+                  <Badge>Excel up to {limits.max_xlsx_mb ?? limits.max_upload_mb} MB</Badge>
                 </li>
                 <li>
                   <Badge>{formatCount(limits.max_rows)} rows</Badge>

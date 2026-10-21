@@ -42,7 +42,7 @@
       "entrypoint": "app.main:app",
       "functions": {
         "app/main.py": {
-          "maxDuration": 30,
+          "maxDuration": 300,
           "excludeFiles": "{tests/**,scripts/**,.venv/**,.pytest_cache/**,.ruff_cache/**,**/__pycache__/**,requirements-dev.txt}"
         }
       }

@@ -34,7 +34,7 @@ name). The product is called **TabulaVibe AI**.
 
 ### A. Upload
 - `.csv` and `.xlsx` only; extension **and** content are checked (client `Content-Type` is ignored).
-- Limits (configurable): 4 MB, 100,000 rows, 60 columns, 2,000,000 cells.
+- Limits (configurable): CSV 100 MB, Excel 20 MB, 2,000,000 rows, 200 columns, 20,000,000 cells; files over 25 MB are processed one at a time. Vercel: 3.5 MB (platform cap); AWS Lambda: 4 MB.
 - Rejected: `.xls`, `.xlsm`/macro workbooks, binary data, archives disguised as CSV, empty and header-only files.
 - Excel: first worksheet only; formulas are never evaluated (cached values only).
 - Processing is in memory per request; nothing is persisted.

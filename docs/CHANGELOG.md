@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.0 — 2026-10-22 (AI analyst: the analytics workflow)
+
+### Added
+- **AI analyst** (step 5, `POST /api/agent/run`): runs the owner's 9-phase analytics workflow (business understanding → data understanding → problem discovery → preparation → EDA → validation → dashboard → quality checks → handover) with code-enforced phase gates. See `docs/AGENT_WORKFLOW.md`.
+- Gemini analyst (free tier, function calling): plans questions and hypotheses, chooses the statistics, words the findings. Python computes every number; findings whose numbers cannot be matched to cited evidence are sent back for correction or flagged.
+- Rules-based analyst: completes the same workflow without AI, and takes over if Gemini fails (quota, timeout, step budget); the report says which ran.
+- 13 analysis tools with SciPy statistics (Welch's t-test, ANOVA, Alexander–Govern, Kruskal–Wallis, chi-square, Pearson/Spearman, PCA, OLS, trends with partial-period handling), Holm correction and independent recalculation of totals.
+- Dashboard pages: Overview, Data quality, Univariate (histogram, box plot), Bivariate, Multivariate (correlation heatmap, PCA), Insights (cards answering the seven questions), Plan & method; "Explore in Analyse" drill-down; handover download (.md).
+- Streaming progress (NDJSON) with a live phase timeline.
+- Tests: 18 statistics (hand-computed), 33 workflow, 14 Gemini (scripted API), 8 API; 5 Vitest; 1 Playwright journey (desktop + mobile).
+
+### Changed
+- **Larger uploads:** CSV up to 100 MB (was 4 MB), Excel up to 20 MB, 2,000,000 rows (was 100,000), 200 columns (was 60), 20,000,000 cells (was 2,000,000). Limits were chosen from measurements (peak memory ≈ 14× the CSV size; Excel reads ~10× slower than CSV). Files over 25 MB are processed one at a time (503 `server_busy` otherwise). The Excel zip-bomb guard scales with the Excel limit. Vercel stays at 3.5 MB (platform cap) and the AWS template pins 4 MB. The upload panel shows both limits and suggests CSV for large Excel files.
+- Dependency: SciPy 1.18.1. Vercel `maxDuration` 300 s for the API function.
+- Tests (pytest and Playwright) ignore the developer's `backend/.env` (`TABULAVIBE_ENV_FILE=""`).
+
 ## 0.3.0 — 2026-10-21 (accounts and saved reports)
 
 ### Contributions by Shashank Chaubey (`shashank-chaubey`), built on first

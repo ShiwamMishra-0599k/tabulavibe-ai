@@ -59,6 +59,31 @@ async function request(path: string, init?: RequestInit): Promise<Response> {
   return response
 }
 
+/** Reads an NDJSON response line by line as it arrives (falls back to the whole body where streaming is unavailable). */
+export async function streamRequest(path: string, init: RequestInit, onLine: (line: string) => void): Promise<void> {
+  const response = await request(path, init)
+  const reader = response.body?.getReader()
+  if (!reader) {
+    for (const line of (await response.text()).split('\n')) if (line.trim()) onLine(line)
+    return
+  }
+  const decoder = new TextDecoder()
+  let buffer = ''
+  for (;;) {
+    const { done, value } = await reader.read()
+    buffer += decoder.decode(value, { stream: !done })
+    let newline = buffer.indexOf('\n')
+    while (newline >= 0) {
+      const line = buffer.slice(0, newline).trim()
+      buffer = buffer.slice(newline + 1)
+      if (line) onLine(line)
+      newline = buffer.indexOf('\n')
+    }
+    if (done) break
+  }
+  if (buffer.trim()) onLine(buffer.trim())
+}
+
 function form(file: File, fields: Record<string, unknown> = {}): FormData {
   const data = new FormData()
   data.append('file', file, file.name)

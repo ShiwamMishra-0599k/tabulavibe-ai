@@ -3,7 +3,9 @@ signed-in user chooses to save are written to Supabase (aggregated results, no r
 
 from __future__ import annotations
 
+import json
 import logging
+import threading
 import time
 from typing import Annotated, Any
 from uuid import UUID
@@ -11,10 +13,12 @@ from uuid import UUID
 from fastapi import Depends, FastAPI, File, Form, Header, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, ValidationError
 
 from . import __version__
+from .agent.gemini import GeminiAnalyst
+from .agent.workflow import BusinessContext, RulesAnalyst, run_workflow
 from .ai import AIDisabledError, RateLimiter, build_payload, generate_narrative, get_provider
 from .analysis import filter_options, run_analysis
 from .auth import SignedInUser
@@ -59,6 +63,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.dependency_overrides[get_settings] = lambda: settings
     app.state.rate_limiter = RateLimiter(settings.ai_requests_per_minute)
+    app.state.agent_limiter = RateLimiter(
+        settings.agent_runs_per_minute, "Too many analyses in a short time. Please wait a minute and try again.", "agent_rate_limited"
+    )
     app.state.star_counter = StarCounter()
 
     app.add_middleware(
@@ -102,10 +109,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     return app
 
 
+_large_file_slot = threading.BoundedSemaphore(1)
+
+
 def _load(file: UploadFile, settings: Settings) -> Dataset:
     content = file.file.read(settings.max_upload_bytes + 1)
-    table = load_table(file.filename, content, settings)
-    return build_dataset(table)
+    if len(content) <= settings.large_file_bytes:
+        return build_dataset(load_table(file.filename, content, settings))
+    # Large files peak at roughly 14x their size in memory: process one at a time.
+    if not _large_file_slot.acquire(blocking=False):
+        raise AppError("server_busy", "Another large file is being processed right now. Please try again in a moment.", 503)
+    try:
+        return build_dataset(load_table(file.filename, content, settings))
+    finally:
+        _large_file_slot.release()
 
 
 def _parse_json_field(model: type[BaseModel], raw: str, field: str):
@@ -131,6 +148,7 @@ def _register_routes(app: FastAPI) -> None:
         return {
             "limits": {
                 "max_upload_mb": settings.max_upload_mb,
+                "max_xlsx_mb": min(settings.max_xlsx_mb, settings.max_upload_mb),
                 "max_rows": settings.max_rows,
                 "max_columns": settings.max_columns,
                 "max_cells": settings.max_cells,
@@ -139,6 +157,10 @@ def _register_routes(app: FastAPI) -> None:
             "ai": {
                 "enabled": provider is not None,
                 "provider": provider.name if provider else None,
+                "model": provider.model if provider else None,
+            },
+            "agent": {
+                "mode": "ai" if provider is not None else "rules",
                 "model": provider.model if provider else None,
             },
             # Public values the browser needs for Supabase sign-in (the anon key is public by design).
@@ -233,6 +255,40 @@ def _register_routes(app: FastAPI) -> None:
         }
         return generate_narrative(provider, build_payload(result, quality))
 
+    @app.post("/api/agent/run")
+    def agent_run(
+        request: Request,
+        settings: SettingsDep,
+        user: SignedInUser,
+        file: UploadFile = File(...),
+        context: str = Form("{}", max_length=4_000),
+        factory=Depends(get_agent_factory),
+    ):
+        """Run the analytics workflow (phases 0-8). Streams NDJSON progress events, then the report."""
+        parsed = _parse_json_field(BusinessContext, context, "context")
+        ds = _load(file, settings)
+        request.app.state.agent_limiter.check(f"user:{user.id}" if user else (request.client.host if request.client else "unknown"))
+        analyst, fallback = factory(parsed)
+        name = file.filename
+
+        def stream():
+            try:
+                for event in run_workflow(ds, name, parsed, analyst, fallback, settings.agent_deadline_seconds):
+                    yield json.dumps(event, ensure_ascii=False, default=_json_default) + "\n"
+            except Exception as exc:  # noqa: BLE001 - the status line is already sent; report the failure in-stream
+                logger.exception("Agent run failed: %s", type(exc).__name__)
+                yield (
+                    json.dumps(
+                        {
+                            "type": "error",
+                            "error": {"code": "agent_failed", "message": "The analysis stopped unexpectedly. Please try again."},
+                        }
+                    )
+                    + "\n"
+                )
+
+        return StreamingResponse(stream(), media_type="application/x-ndjson", headers={"X-Accel-Buffering": "no"})
+
     @app.get("/api/account")
     def account(store: StoreDep, token: TokenDep) -> dict[str, Any]:
         return store.account(token)
@@ -276,6 +332,32 @@ def _register_routes(app: FastAPI) -> None:
 def get_narrative_provider(settings: SettingsDep):
     """FastAPI dependency so tests can swap in fake providers."""
     return get_provider(settings)
+
+
+def _json_default(value: Any) -> Any:
+    item = getattr(value, "item", None)  # numpy scalars
+    return item() if callable(item) else str(value)
+
+
+def get_agent_factory(settings: SettingsDep):
+    """FastAPI dependency: builds (analyst, fallback) for a run. Overridden in tests."""
+
+    def make(context: BusinessContext):
+        rules = RulesAnalyst(context)
+        key = settings.gemini_api_key.get_secret_value() if settings.gemini_api_key else ""
+        if settings.ai_provider == "gemini" and key:
+            ai = GeminiAnalyst(
+                key,
+                settings.gemini_model,
+                context,
+                timeout=max(settings.ai_timeout_seconds, 30),
+                max_steps=settings.agent_max_steps,
+                deadline_seconds=settings.agent_deadline_seconds,
+            )
+            return ai, rules
+        return rules, None
+
+    return make
 
 
 def get_report_store(settings: SettingsDep) -> ReportStore:

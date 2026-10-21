@@ -15,10 +15,12 @@ import {
   Printer,
   RotateCcw,
   Stethoscope,
+  Sparkles,
   Sun,
   type LucideIcon,
 } from 'lucide-react'
 import { AiNarrative } from './components/AiNarrative'
+import { AgentView } from './components/agent/AgentView'
 import { AnalysisBuilder } from './components/AnalysisBuilder'
 import { SignUpPage } from './components/SignUpPage'
 import { Dashboard } from './components/Dashboard'
@@ -30,6 +32,7 @@ import { ReportsList, SavedReportPage, SaveReportCard } from './components/Saved
 import { SignInDialog } from './components/SignInDialog'
 import { Alert, Button, IconChip, Skeleton, Spinner, Toggle } from './components/ui'
 import { Hero, UploadPanel } from './components/UploadPanel'
+import { EMPTY_CONTEXT, runAgent, type AgentEvent, type AgentReport, type BusinessContext } from './lib/agent'
 import { api, ApiError, saveBlob } from './lib/api'
 import { useAuth, type Auth } from './lib/auth'
 import { chartTitle, type ChartKind } from './lib/charts'
@@ -38,9 +41,9 @@ import { defaultSpec } from './lib/spec'
 import { useTheme, type ThemeChoice } from './lib/theme'
 import type { Account, AnalysisResult, AnalysisSpec, AppConfig, Narrative, Profile, ReportSummary, SampleInfo, SavedReport } from './lib/types'
 
-type Tab = 'preview' | 'quality' | 'analyze' | 'report'
+type Tab = 'preview' | 'quality' | 'analyze' | 'report' | 'agent'
 type View = 'workspace' | 'sign-up' | 'reports' | 'saved'
-const ORDER: Tab[] = ['preview', 'quality', 'analyze', 'report']
+const ORDER: Tab[] = ['preview', 'quality', 'analyze', 'report', 'agent']
 
 function message(error: unknown): string {
   if (error instanceof ApiError) return error.details.length ? `${error.message} (${error.details.join('; ')})` : error.message
@@ -135,12 +138,20 @@ export default function App() {
   const [chartKind, setChartKind] = useState<ChartKind>('bar')
   const [measureKey, setMeasureKey] = useState('')
 
+  const [largeFile, setLargeFile] = useState(false)
   const [busy, setBusy] = useState<null | 'upload' | 'analyze' | 'export-clean' | 'export-results' | 'narrative'>(null)
   const [error, setError] = useState<string | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
   const [exportNotice, setExportNotice] = useState<string | null>(null)
   const [exportDedupe, setExportDedupe] = useState(false)
   const [exportMerge, setExportMerge] = useState(false)
+
+  // AI analyst (workflow phases 0-8)
+  const [agentContext, setAgentContext] = useState<BusinessContext>(EMPTY_CONTEXT)
+  const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([])
+  const [agentRunning, setAgentRunning] = useState(false)
+  const [agentReport, setAgentReport] = useState<AgentReport | null>(null)
+  const [agentError, setAgentError] = useState<string | null>(null)
   const resultsRef = useRef<HTMLDivElement>(null)
 
   const auth = useAuth(config)
@@ -247,15 +258,24 @@ export default function App() {
     setError(null)
     setAiError(null)
     setExportNotice(null)
+    setAgentEvents([])
+    setAgentReport(null)
+    setAgentError(null)
   }
 
   async function loadFile(next: File) {
     reset()
-    const limitMb = config?.limits.max_upload_mb
+    const isExcel = /\.xlsx$/i.test(next.name)
+    const limitMb = isExcel ? (config?.limits.max_xlsx_mb ?? config?.limits.max_upload_mb) : config?.limits.max_upload_mb
     if (limitMb && next.size > limitMb * 1024 * 1024) {
-      setError(`"${next.name}" is larger than the ${limitMb} MB limit.`)
+      setError(
+        isExcel && config && limitMb < config.limits.max_upload_mb
+          ? `"${next.name}" is larger than the ${limitMb} MB limit for Excel files. Save it as CSV to upload up to ${config.limits.max_upload_mb} MB.`
+          : `"${next.name}" is larger than the ${limitMb} MB limit.`,
+      )
       return
     }
+    setLargeFile(next.size > 25 * 1024 * 1024)
     if (!/\.(csv|xlsx)$/i.test(next.name)) {
       setError(`"${next.name}" is not a supported file. Upload a .csv or .xlsx file.`)
       return
@@ -309,6 +329,30 @@ export default function App() {
     } finally {
       setBusy(null)
     }
+  }
+
+  async function startAgent() {
+    if (!file || agentRunning) return
+    setAgentRunning(true)
+    setAgentError(null)
+    setAgentReport(null)
+    setAgentEvents([])
+    try {
+      const report = await runAgent(file, agentContext, (event) => setAgentEvents((list) => [...list, event]))
+      setAgentReport(report)
+    } catch (e) {
+      setAgentError(message(e))
+    } finally {
+      setAgentRunning(false)
+    }
+  }
+
+  /** Drill-down from an insight: open the Analyse step with the finding's analysis (filters and exports live there). */
+  function explore(next: AnalysisSpec) {
+    const full: AnalysisSpec = { ...next, filters: next.filters ?? [], time_grain: next.time_grain ?? 'month', remove_duplicates: next.remove_duplicates ?? false, merge_label_variants: next.merge_label_variants ?? false }
+    setSpec(full)
+    goTo('analyze')
+    void runAnalysis(full)
   }
 
   function applySuggestion(next: AnalysisSpec) {
@@ -368,6 +412,12 @@ export default function App() {
         { id: 'quality', label: 'Data quality', hint: `${profile.dataset.valid_cell_pct}% healthy`, icon: Stethoscope },
         { id: 'analyze', label: 'Analyse', hint: result ? `${result.kpis.length} KPI(s) ready` : 'Build KPIs and charts', icon: ChartColumn },
         { id: 'report', label: 'Report & export', hint: result ? 'Print and download' : 'Run an analysis first', icon: FileDown, disabled: !result },
+        {
+          id: 'agent',
+          label: 'AI analyst',
+          hint: agentRunning ? 'Working…' : agentReport ? `${agentReport.findings.length} insight(s)` : 'Run the full workflow',
+          icon: Sparkles,
+        },
       ]
     : []
   const isDone = (id: Tab) => ORDER.indexOf(id) < ORDER.indexOf(tab) || (id === 'analyze' && !!result && tab !== 'analyze')
@@ -451,7 +501,7 @@ export default function App() {
             <Hero signInRequired={signInRequired} />
             {busy === 'upload' ? (
               <div className="grid gap-4 rounded-3xl border border-line bg-surface p-8 shadow-card">
-                <Spinner label="Reading and checking your file…" />
+                <Spinner label={largeFile ? 'Reading and checking your file… large files can take up to a minute.' : 'Reading and checking your file…'} />
                 <Skeleton className="h-8 w-1/3" />
                 <Skeleton className="h-40" />
                 <div className="grid grid-cols-4 gap-3">
@@ -477,7 +527,7 @@ export default function App() {
         {view === 'workspace' && profile && spec && (
           <div className="grid gap-6">
             <nav aria-label="Workflow steps" className="print:hidden">
-              <div role="tablist" className="grid grid-cols-4 gap-2 sm:gap-3">
+              <div role="tablist" className="grid grid-cols-5 gap-1.5 sm:gap-3">
                 {steps.map((step, i) => {
                   const active = tab === step.id
                   const done = isDone(step.id)
@@ -519,9 +569,31 @@ export default function App() {
             <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="min-w-0">
               {tab === 'preview' && (
                 <div className="animate-rise grid gap-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-accent/30 bg-accent-soft px-4 py-3">
+                    <p className="text-sm text-ink-2">
+                      <span className="font-semibold text-ink">Let the AI analyst do the whole workflow.</span> It profiles the data, registers questions and
+                      hypotheses, runs the statistics, validates every number and builds a dashboard of what it found.
+                    </p>
+                    <Button variant="primary" size="sm" icon={Sparkles} onClick={() => goTo('agent')}>
+                      Open the AI analyst
+                    </Button>
+                  </div>
                   <DataPreview profile={profile} />
                   <NextButton onClick={() => goTo('quality')}>Next: check data quality</NextButton>
                 </div>
+              )}
+              {tab === 'agent' && (
+                <AgentView
+                  config={config}
+                  context={agentContext}
+                  onContext={setAgentContext}
+                  events={agentEvents}
+                  running={agentRunning}
+                  report={agentReport}
+                  error={agentError}
+                  onRun={startAgent}
+                  onExplore={explore}
+                />
               )}
               {tab === 'quality' && (
                 <div className="grid gap-4">

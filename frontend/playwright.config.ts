@@ -13,7 +13,8 @@ const localServers = [
     cwd: '../backend',
     url: `http://127.0.0.1:${API_PORT}/api/health`,
     reuseExistingServer: !process.env.CI,
-    env: { TABULAVIBE_AI_PROVIDER: 'none' },
+    // Ignore the developer's backend/.env (Supabase, sign-in, AI keys) so journeys are reproducible.
+    env: { TABULAVIBE_AI_PROVIDER: 'none', TABULAVIBE_ENV_FILE: '' },
   },
   {
     command: `npx vite --port ${WEB_PORT} --strictPort`,

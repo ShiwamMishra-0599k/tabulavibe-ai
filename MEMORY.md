@@ -18,7 +18,7 @@ look and feel, see `DESIGN.md`.
 | Local path | `C:\Users\swath\projects\tabulavibe-ai` |
 | Budget rule | ₹0 software and infrastructure cost wherever possible; never claim "free forever" |
 | Status | **Live on Vercel: https://tabulavibe-ai.vercel.app** (project `shiwam/tabulavibe-ai`, Hobby). AWS prepared but not used |
-| Version | 0.3.0 (Supabase accounts + saved reports, 2026-10-21) |
+| Version | 0.4.0 (AI analyst: analytics workflow phases 0–8, 2026-10-22) |
 
 ## 2. Non-negotiable product rules
 
@@ -37,6 +37,13 @@ look and feel, see `DESIGN.md`.
 |---|---|---|
 | 2026-10-21 | **Sign-in required switched on** (`TABULAVIBE_REQUIRE_SIGN_IN=true` in Vercel Production/Preview and `backend/.env`) | Shiwam confirmed GitHub/Google sign-in and saving a report work on the live site. Takes effect from the next deployment |
 | 2026-10-21 | Supabase project **`xftrxawqcoygrzohaase`** connected (URL + publishable key in Vercel Production/Preview and `backend/.env`); sign-in required stays **off** until Google/GitHub work | Avoid locking visitors out; buttons check provider status first |
+| 2026-10-22 | Uploads: **CSV 100 MB / Excel 20 MB / 2M rows / 20M cells** locally; Vercel 3.5 MB; AWS 4 MB. 10 GB declined as infeasible | Shiwam asked for 10 GB, then chose "raise within limits". Measured peak memory ≈ 14× CSV size and Excel ~10× slower; serverless body caps (Vercel 4.5 MB) can't change |
+| 2026-10-22 | **AI analyst** follows Shiwam's workflow (verbatim in `backend/app/agent/workflow_prompt.md`); Gemini free tier chosen | Shiwam's product vision: the agent analyses and delivers a KPI dashboard. Gemini chosen for the ₹0 budget |
+| 2026-10-22 | Agent **plans and words; Python computes**; numbers in findings are grounded against cited evidence | Keeps "Python computes every number" and makes LLM hallucinated figures detectable |
+| 2026-10-22 | Phase gates enforced in code (tool access per stage, exit checks per phase) | The workflow's phase-gate rule, made non-optional for the model |
+| 2026-10-22 | Rules-based analyst as default and fallback | AI stays optional (project rule); free-tier quota failures still produce a report |
+| 2026-10-22 | Prices, rates, percentages and scores averaged, never summed (whole-word name hints) | Workflow rule 11 (incorrect aggregation); "duration" once matched "ratio" as a substring |
+| 2026-10-22 | Kept React/Recharts instead of the workflow's suggested Streamlit/Plotly | One product; the analyst's dashboard shares the validated metric engine via "Explore in Analyse" |
 | 2026-10-21 | **Uploads require sign-in** (`TABULAVIBE_REQUIRE_SIGN_IN`), enforced server-side via Supabase `/auth/v1/user` (60 s cache by token hash) | Shiwam's request. Server-side so it can't be bypassed; `/auth/v1/user` needs no extra JWT library and rejects signed-out sessions; fails closed if Supabase is missing |
 | 2026-10-21 | OAuth credentials are created **by Shiwam** in GitHub/Google/Supabase | Client secrets must never pass through Claude, code, Vercel or chat; GitHub OAuth apps can't be created by API anyway |
 | 2026-10-21 | Host on **Vercel** (Services: one project, one domain) instead of AWS for now | Shiwam asked for Vercel via GitHub; same origin removes CORS; Hobby is free but non-commercial only |
@@ -76,6 +83,7 @@ look and feel, see `DESIGN.md`.
 | 2026-10-21 | `docs/TECHNICAL_REFERENCE.md` (+ PDF) reverse-engineered from the code; 10 findings (F1–F10) |
 | 2026-10-21 | UI v2 redesign; `DESIGN.md` and `MEMORY.md` added |
 | 2026-10-21 | Shashank pushed the floating navbar (`4faf22d`) and sign-in dialog (`c390ec6`) to `main` |
+| 2026-10-22 | v0.4.0 AI analyst (Gemini + rules fallback, 13 SciPy tools, phase gates, grounding); 238 pytest, 35 Vitest, 10 E2E |
 | 2026-10-21 | Shiwam installed the **Vercel GitHub App** on `tabulavibe-ai` so pushes to `main` deploy automatically |
 | 2026-10-21 | Supabase live: tables + RLS created (anonymous read/write refused, verified), Google + GitHub providers on (hand-offs verified, no redirect errors); Shiwam signed in and saved a report on the live site |
 | 2026-10-21 | Supabase agent skills (`supabase`, `supabase-postgres-best-practices`) installed in `.claude/skills/` (reviewed: Markdown only) |
@@ -109,6 +117,8 @@ look and feel, see `DESIGN.md`.
 - **lucide-react v1** renamed icons (`ChartColumn`, `TriangleAlert`, `LoaderCircle`). Check names against the package before using them.
 - **OAuth redirect reloads the page:** the in-memory file is lost on sign-in. The sign-in page warns when a file is open.
 - **Shell heredocs:** long multi-line Python heredocs in Bash sometimes fail to parse here. Write the script to the scratchpad and run it.
+- **Shell heredocs mangle backslashes:** `\1`/`\n` in a Bash heredoc became control characters in Python source. Write code containing backslashes with the file tools, not heredocs.
+- **Tests read `backend/.env` unless told not to:** after sign-in was enabled locally, Lambda tests and every Playwright journey failed (uploads locked). Both now set `TABULAVIBE_ENV_FILE=""`.
 - **Low memory on this PC (~8 GB):** parallel Playwright + leftover dev servers starved the backend and E2E timed out. Stop old servers and use `--workers=1`.
 - **Supabase SQL Editor:** runs only the selected text if anything is highlighted. Pasted scripts failed twice (clipboard overwritten, fragment run). Open the file in Notepad, Ctrl+A/Ctrl+C, paste into an empty editor, Run with nothing selected; end scripts with a visible check query.
 - **Supabase CLI login** needs a real terminal (TTY): it fails from Claude Code's `!` prompt. Open a separate PowerShell window.
@@ -123,5 +133,8 @@ look and feel, see `DESIGN.md`.
 | Deploy to AWS | Optional (Vercel chosen) | Install AWS CLI + SAM, non-root credentials, check Free/Paid plan, follow `docs/DEPLOYMENT.md` |
 | Live-test Gemini | Optional | Needs a key from an AI Studio project **without billing** |
 | Fix F1–F9 | Low–medium | Filter options vs. label merging (F2) is the most user-visible |
+| Live-test the Gemini analyst | Needs a key | AI Studio key without billing → `TABULAVIBE_AI_PROVIDER=gemini` + key in Vercel; watch free-tier limits (one run ≈ 10–20 requests) |
+| Save AI analyst reports to My reports | Next | Needs a `kind` column (new migration) |
+| Faster ingest for big files | Optional | Parsing (strings first, Python csv) dominates time and memory; pandas C reader or Polars could cut both, but must keep the hand-checked inference behaviour |
 | Report templates | Next feature | Re-apply a saved report's `spec` to a new file |
 | Code-split Recharts | Low | Bundle is a single chunk (~200 kB gzipped) |

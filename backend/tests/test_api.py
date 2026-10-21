@@ -25,7 +25,8 @@ def test_health_and_config(client):
     assert client.get("/api/health").json()["status"] == "ok"
     cfg = client.get("/api/config").json()
     assert cfg["ai"] == {"enabled": False, "provider": None, "model": None}
-    assert cfg["limits"]["max_upload_mb"] == 4
+    assert (cfg["limits"]["max_upload_mb"], cfg["limits"]["max_xlsx_mb"]) == (100, 20)
+    assert (cfg["limits"]["max_rows"], cfg["limits"]["max_cells"]) == (2_000_000, 20_000_000)
     assert cfg["limits"]["supported_extensions"] == [".csv", ".xlsx"]
 
 
@@ -189,3 +190,17 @@ def test_cleaned_export_can_merge_label_variants(client):
     assert [r[0] for r in read_csv(res.text)] == ["region", "North", "North", "North"]
     plain = client.post("/api/export/cleaned", files=upload(data))
     assert [r[0] for r in read_csv(plain.text)] == ["region", "North", "North", "north"]
+
+
+def test_large_files_are_processed_one_at_a_time(sales_bytes):
+    from app import main
+
+    client = TestClient(create_app(Settings(app_env="test", large_file_mb=0.0001, _env_file=None)))  # ~100 bytes counts as "large"
+    assert client.post("/api/profile", files=upload(sales_bytes)).status_code == 200  # slot free
+    assert main._large_file_slot.acquire(blocking=False)  # simulate another large upload in progress
+    try:
+        res = client.post("/api/profile", files=upload(sales_bytes))
+        assert res.status_code == 503 and res.json()["error"]["code"] == "server_busy"
+    finally:
+        main._large_file_slot.release()
+    assert client.post("/api/profile", files=upload(sales_bytes)).status_code == 200

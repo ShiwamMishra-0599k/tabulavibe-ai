@@ -64,6 +64,14 @@ def load_table(filename: str | None, content: bytes, settings: Settings) -> RawT
         rows = _read_csv(content, settings, notes)
         file_type = "csv"
     else:
+        if len(content) > settings.max_xlsx_bytes:
+            limit = min(settings.max_xlsx_mb, settings.max_upload_mb)
+            raise DataError(
+                "file_too_large",
+                f"Excel files are limited to {limit:g} MB because they are slow to read. "
+                f"Save the sheet as CSV to upload up to {settings.max_upload_mb:g} MB.",
+                413,
+            )
         rows, sheet_name = _read_xlsx(content, settings, notes)
         file_type = "xlsx"
 
@@ -159,7 +167,9 @@ def _read_xlsx(content: bytes, settings: Settings, notes: list[str]) -> tuple[li
         raise DataError("content_mismatch", "This file does not contain a valid .xlsx workbook.", 415)
     if any(name.lower().endswith("vbaproject.bin") for name in names):
         raise DataError("macros_not_allowed", "Workbooks containing macros are not accepted. Save a copy without macros.", 415)
-    if len(infos) > _MAX_XLSX_ENTRIES or sum(i.file_size for i in infos) > _MAX_XLSX_UNCOMPRESSED:
+    # Zip-bomb guard: real workbooks expand about 8-9x; allow 12x the Excel limit (at least 120 MB).
+    max_uncompressed = max(_MAX_XLSX_UNCOMPRESSED, 12 * settings.max_xlsx_bytes)
+    if len(infos) > _MAX_XLSX_ENTRIES or sum(i.file_size for i in infos) > max_uncompressed:
         raise DataError("file_too_large", "The workbook expands to more data than is allowed.", 413)
 
     from openpyxl import load_workbook

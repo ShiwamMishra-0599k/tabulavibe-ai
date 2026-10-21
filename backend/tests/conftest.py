@@ -1,6 +1,10 @@
 import io
+import os
 
-import pytest
+# Must run before any app module is imported: ignore the developer's backend/.env.
+os.environ["TABULAVIBE_ENV_FILE"] = ""
+
+import pytest  # noqa: E402
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
 

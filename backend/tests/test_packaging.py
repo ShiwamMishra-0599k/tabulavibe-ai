@@ -45,7 +45,7 @@ def test_vercel_config_routes_api_to_fastapi_and_the_rest_to_the_frontend():
 def test_vercel_defaults(monkeypatch):
     monkeypatch.setenv("VERCEL", "1")
     on_vercel = Settings(_env_file=None)
-    assert (on_vercel.max_upload_mb, on_vercel.app_env) == (3.5, "production")
+    assert (on_vercel.max_upload_mb, on_vercel.max_xlsx_mb, on_vercel.app_env) == (3.5, 3.5, "production")
     # Explicit configuration always wins.
     monkeypatch.setenv("TABULAVIBE_MAX_UPLOAD_MB", "2")
     monkeypatch.setenv("TABULAVIBE_APP_ENV", "development")
@@ -56,4 +56,4 @@ def test_vercel_defaults(monkeypatch):
 def test_local_defaults_unchanged(monkeypatch):
     monkeypatch.delenv("VERCEL", raising=False)
     local = Settings(_env_file=None)
-    assert (local.max_upload_mb, local.app_env) == (4.0, "development")
+    assert (local.max_upload_mb, local.max_xlsx_mb, local.app_env) == (100.0, 20.0, "development")

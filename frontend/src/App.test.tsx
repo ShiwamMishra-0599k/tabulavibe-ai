@@ -94,6 +94,17 @@ describe('App', () => {
     expect(calls.some((c) => c.url.includes('/api/profile'))).toBe(false)
   })
 
+  it('applies the smaller Excel limit in the browser and suggests CSV', async () => {
+    const user = userEvent.setup({ applyAccept: false })
+    const calls = mockServer({ '/api/config': () => jsonResponse({ ...config, limits: { ...config.limits, max_upload_mb: 100, max_xlsx_mb: 0.001 } }) })
+    render(<App />)
+    expect(await screen.findByText('CSV up to 100 MB')).toBeInTheDocument()
+    expect(screen.getByText('Excel up to 0.001 MB')).toBeInTheDocument()
+    await user.upload(screen.getByLabelText('Upload CSV or XLSX file'), new File(['x'.repeat(5000)], 'big.xlsx'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('limit for Excel files. Save it as CSV to upload up to 100 MB.')
+    expect(calls.some((c) => c.url.includes('/api/profile'))).toBe(false)
+  })
+
   it('shows the server validation message when a file is rejected', async () => {
     const user = userEvent.setup()
     mockServer({

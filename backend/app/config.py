@@ -11,19 +11,29 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="TABULAVIBE_", env_file=".env", extra="ignore")
+    # TABULAVIBE_ENV_FILE="" disables the .env file (the test suite does this so a developer's local
+    # settings, e.g. Supabase or sign-in, never change test results).
+    model_config = SettingsConfigDict(
+        env_prefix="TABULAVIBE_", env_file=os.environ.get("TABULAVIBE_ENV_FILE", ".env") or None, extra="ignore"
+    )
 
     app_env: Literal["development", "test", "production"] = "development"
     # Comma-separated list of exact origins allowed by CORS. Never use "*".
     allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
-    # Upload limits. 4 MB keeps a base64-encoded multipart body under the 6 MB
-    # AWS Lambda synchronous payload limit.
-    max_upload_mb: float = Field(4.0, gt=0, le=5)
-    max_rows: int = Field(100_000, gt=0)
-    max_columns: int = Field(60, gt=0)
-    max_cells: int = Field(2_000_000, gt=0)
+    # Upload limits. The engine holds the whole file in memory (strings first), measured at about 14x the
+    # CSV size at peak (docs/PROJECT_STATUS.md). Defaults suit an 8 GB machine: 100 MB CSV ≈ 1.8 GB peak and
+    # ~45 s per action. Raise them only on machines with more memory. On Vercel (VERCEL=1) the upload limit
+    # defaults to 3.5 MB (4.5 MB request/response cap); the AWS template sets 4 MB (6 MB Lambda payload).
+    max_upload_mb: float = Field(100.0, gt=0, le=1024)
+    # Excel is read about 10x slower than CSV (openpyxl), so it has its own, smaller limit.
+    max_xlsx_mb: float = Field(20.0, gt=0, le=1024)
+    max_rows: int = Field(2_000_000, gt=0)
+    max_columns: int = Field(200, gt=0)
+    max_cells: int = Field(20_000_000, gt=0)
     max_groups: int = Field(100, gt=0)
+    # Files above this size are processed one at a time, so two large uploads cannot exhaust memory together.
+    large_file_mb: float = Field(25.0, gt=0)
 
     # Optional AI narrative. Disabled unless explicitly configured.
     ai_provider: Literal["none", "gemini"] = "none"
@@ -31,6 +41,12 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-3.5-flash-lite"
     ai_timeout_seconds: float = Field(20.0, gt=0, le=60)
     ai_requests_per_minute: int = Field(5, ge=1)
+
+    # Analytics agent (phases 0-8). Uses Gemini when the AI provider is configured, otherwise the
+    # rules-based analyst. Limits keep one run inside the serverless time limit and the free AI quota.
+    agent_max_steps: int = Field(24, ge=4, le=60)
+    agent_deadline_seconds: float = Field(200, gt=10, le=280)
+    agent_runs_per_minute: int = Field(4, ge=1)
 
     # Optional saved reports (Supabase). Disabled unless both values are set. Use the project's
     # anon/publishable key: it is public by design and Row Level Security protects the data.
@@ -67,6 +83,8 @@ class Settings(BaseSettings):
         if os.environ.get("VERCEL") == "1":
             if "max_upload_mb" not in self.model_fields_set:
                 self.max_upload_mb = 3.5
+            if "max_xlsx_mb" not in self.model_fields_set:
+                self.max_xlsx_mb = 3.5
             if "app_env" not in self.model_fields_set:
                 self.app_env = "production"
         return self
@@ -82,6 +100,14 @@ class Settings(BaseSettings):
     @property
     def max_upload_bytes(self) -> int:
         return int(self.max_upload_mb * 1024 * 1024)
+
+    @property
+    def max_xlsx_bytes(self) -> int:
+        return int(min(self.max_xlsx_mb, self.max_upload_mb) * 1024 * 1024)
+
+    @property
+    def large_file_bytes(self) -> int:
+        return int(self.large_file_mb * 1024 * 1024)
 
 
 def _is_privileged_key(key: str) -> bool:

@@ -97,3 +97,31 @@ test('dark theme and one-click suggestion work end to end', async ({ page }, tes
   await page.reload()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
 })
+
+test('AI analyst runs the full workflow and drills down into Analyse', async ({ page }, testInfo) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Load sample: Retail sales (CSV)' }).click()
+  await page.getByRole('button', { name: 'Open the AI analyst' }).click()
+  await page.getByLabel('What does this data describe?').fill('Online and store sales of a home-goods shop')
+  await page.getByRole('button', { name: 'Run the AI analyst' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Analysis of retail_sales.csv' })).toBeVisible({ timeout: 60_000 })
+  const timeline = page.getByRole('list', { name: 'Workflow phases' })
+  await expect(timeline.getByLabel('Phase 5: Validation and insights, Passed')).toBeVisible()
+  // Same independently verified total as the Analyse journey: ₹16,45,592.43.
+  await expect(page.getByText('16,45,592.43').first()).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('agent-01-overview.png'), fullPage: true })
+
+  await page.getByRole('tab', { name: 'Insights', exact: true }).click()
+  const first = page.getByRole('article', { name: 'Insight F1' })
+  await expect(first).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('agent-02-insights.png'), fullPage: true })
+  await page.getByRole('tab', { name: 'Multivariate', exact: true }).click()
+  await expect(page.getByRole('table', { name: /correlation matrix/i })).toBeVisible()
+
+  await page.getByRole('tab', { name: 'Insights', exact: true }).click()
+  await first.getByRole('button', { name: 'Explore in Analyse' }).click()
+  await expect(page.getByRole('tab', { name: '3. Analyse' })).toHaveAttribute('aria-selected', 'true')
+  // The finding's analysis was re-run by the shared metric engine and charted on the Analyse step.
+  await expect(page.getByRole('img', { name: /chart of sum of revenue/i }).first()).toBeVisible()
+})

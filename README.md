@@ -13,7 +13,7 @@ reports and reopen them later.
 
 ## 🚀 Features
 
-- 📥 Upload `.csv` or `.xlsx` files (up to 4 MB, 100,000 rows, 60 columns), or load a synthetic sample dataset
+- 📥 Upload `.csv` (up to 100 MB) or `.xlsx` (up to 20 MB) files with up to 2 million rows and 200 columns, or load a synthetic sample dataset. The live Vercel site is limited to 3.5 MB by the platform's 4.5 MB request cap
 - 👀 Preview the first 50 rows with the inferred type of every column
 - 🩺 Data-quality report: missing values, invalid values, exact duplicate rows, labels that differ only by case or spacing
 - 🧮 KPI analysis: sum, average, count, minimum and maximum, with a plain-English definition of every number
@@ -25,6 +25,7 @@ reports and reopen them later.
 - 🌗 Modern, responsive UI with light/dark themes, a 4-step guided workflow and accessible controls (see [DESIGN.md](DESIGN.md))
 - 🧹 Opt-in cleaning: exclude duplicate rows; merge `North` / `north` style label variants
 - 📤 Exports: results CSV, cleaned-data CSV (safe from spreadsheet formula injection), printable report (save as PDF)
+- 🤖 **AI analyst**: runs a 9-phase analytics workflow (business understanding → data understanding → problem discovery → preparation → EDA → validation → dashboard → checks → handover) with enforced phase gates. Gemini plans and explains; Python (pandas, SciPy) computes every number, and every figure in a finding is checked against the calculation it cites. Works without AI via a rules-based analyst ([docs/AGENT_WORKFLOW.md](docs/AGENT_WORKFLOW.md))
 - 👤 Accounts: sign up / sign in with **Google (Gmail) or GitHub** via Supabase Auth; a profile is created on first sign-in
 - 🔐 Optional **sign-in-only uploads** (`TABULAVIBE_REQUIRE_SIGN_IN=true`), enforced by the backend on every upload and analysis request
 - 💾 **My reports:** save a report (figures, chart data, quality notes, AI commentary) to Supabase Postgres, reopen, print or delete it. Row Level Security keeps every user's reports private
@@ -38,7 +39,7 @@ reports and reopen them later.
 | Frontend | React 19, TypeScript 6, Vite 8, Tailwind CSS v4, lucide-react icons, Inter (self-hosted) |
 | Charts | Recharts 3 (validated colour palette, light and dark themes) |
 | Backend | FastAPI 0.156, Uvicorn, Pydantic 2 / pydantic-settings |
-| Data processing | pandas 3.0, NumPy, openpyxl (Excel), python-multipart |
+| Data processing | pandas 3.0, NumPy, SciPy 1.18 (statistics), openpyxl (Excel), python-multipart |
 | Optional LLM | Google Gemini over REST (`httpx`, no SDK) |
 | Optional accounts & database | Supabase: Auth (Google + GitHub OAuth, PKCE) and Postgres with Row Level Security; backend talks to its REST API with `httpx`; `@supabase/supabase-js` (lazy-loaded) in the browser |
 | Hosting | **Vercel** (Services: Vite frontend + FastAPI Python function, one domain) |
@@ -91,6 +92,7 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | `POST /api/export/results` | Download the calculated results as CSV |
 | `POST /api/export/cleaned` | Download the standardised (cleaned) data as CSV |
 | `POST /api/narrative` | Optional AI commentary (returns 503 when AI is disabled) |
+| `POST /api/agent/run` | AI analyst: streams phase progress (NDJSON), then the validated report |
 | `GET /api/account` | Signed-in user's TabulaVibe profile (Bearer token) |
 | `POST /api/reports` | Recalculate from the file and save a report (Bearer token) |
 | `GET /api/reports` · `GET /api/reports/{id}` · `DELETE /api/reports/{id}` | List, open and delete your own saved reports |
@@ -287,7 +289,7 @@ Infrastructure as code is ready in `infra/` (SAM template, `deploy.ps1`).
 ## 🚧 Known Challenges
 
 - **Ambiguous dates and numbers:** `03/04/2024` and `1,2` mean different things in different regions. Handled with a fixed format list, a day-first rule and visible notes.
-- **Lambda payload limit:** Lambda caps payloads at 6 MB and base64 adds about 33%, hence the 4 MB upload limit.
+- **Upload size:** the engine keeps the whole file in memory (peak ≈ 14× the CSV size), so a 100 MB CSV needs about 1.8 GB of RAM and ~45 s per action on an 8 GB laptop. Serverless hosts cap request bodies (Vercel 4.5 MB, Lambda 6 MB), hence 3.5 MB on Vercel and 4 MB on AWS. Multi-gigabyte files would need resumable uploads to object storage, a chunked engine (DuckDB/Polars) and a dedicated paid server.
 - **Recharts first-load delay:** Vite re-optimising Recharts on first load made early E2E runs time out. Fixed with `optimizeDeps`.
 - **Windows dev environment:**
   - port conflicts with other local projects
@@ -314,6 +316,7 @@ Infrastructure as code is ready in `infra/` (SAM template, `deploy.ps1`).
 - [docs/DEPLOYMENT_VERCEL.md](docs/DEPLOYMENT_VERCEL.md): Vercel deployment from GitHub
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md): AWS plan, costs, checklist
 - [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md): accounts (Google/GitHub) and saved reports
+- [docs/AGENT_WORKFLOW.md](docs/AGENT_WORKFLOW.md): the AI analyst, its phases, gates, tools and data sharing
 - [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md): what is done, verified and pending
 - [docs/CHANGELOG.md](docs/CHANGELOG.md)
 

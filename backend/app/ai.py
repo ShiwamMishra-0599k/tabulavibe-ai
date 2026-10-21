@@ -110,8 +110,12 @@ def get_provider(settings: Settings) -> NarrativeProvider | None:
 class RateLimiter:
     """Small per-process sliding-window limiter to protect a free AI quota from bursts."""
 
-    def __init__(self, per_minute: int):
+    def __init__(
+        self, per_minute: int, message: str = "Too many AI requests. Please wait a minute and try again.", code: str = "ai_rate_limited"
+    ):
         self.per_minute = per_minute
+        self.message = message
+        self.code = code
         self._hits: dict[str, deque[float]] = {}
         self._lock = threading.Lock()
 
@@ -122,7 +126,7 @@ class RateLimiter:
             while hits and now - hits[0] > 60:
                 hits.popleft()
             if len(hits) >= self.per_minute:
-                raise AIQuotaError("ai_rate_limited", "Too many AI requests. Please wait a minute and try again.")
+                raise AIQuotaError(self.code, self.message)
             hits.append(now)
             if len(self._hits) > 10_000:
                 self._hits.clear()

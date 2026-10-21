@@ -64,6 +64,9 @@ Resources:
       Environment:
         Variables:
           TABULAVIBE_APP_ENV: production
+          # 4 MB keeps a base64-encoded upload under the 6 MB Lambda synchronous payload limit.
+          TABULAVIBE_MAX_UPLOAD_MB: '4'
+          TABULAVIBE_MAX_XLSX_MB: '4'
           TABULAVIBE_ALLOWED_ORIGINS: !Sub https://${FrontendDistribution.DomainName}
           TABULAVIBE_AI_PROVIDER: !Ref AiProvider
           TABULAVIBE_GEMINI_API_KEY: !Ref GeminiApiKey

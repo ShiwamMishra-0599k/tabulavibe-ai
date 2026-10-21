@@ -5,12 +5,16 @@ export type TimeGrain = 'day' | 'week' | 'month' | 'quarter' | 'year'
 export interface AppConfig {
   limits: {
     max_upload_mb: number
+    /** Excel is read ~10x slower than CSV, so it can have a smaller limit. */
+    max_xlsx_mb?: number
     max_rows: number
     max_columns: number
     max_cells: number
     supported_extensions: string[]
   }
   ai: { enabled: boolean; provider: string | null; model: string | null }
+  /** The analytics agent: Gemini when AI is configured, otherwise the rules-based analyst. */
+  agent?: { mode: 'ai' | 'rules'; model: string | null }
   /** Optional saved reports and sign-in (Supabase). The anon key is public by design. */
   storage?: { enabled: boolean; supabase_url: string | null; supabase_anon_key: string | null; sign_in_required?: boolean }
 }

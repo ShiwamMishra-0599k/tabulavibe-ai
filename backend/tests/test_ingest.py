@@ -175,3 +175,17 @@ def test_cell_limit_is_enforced():
     with pytest.raises(DataError) as err:
         load_table("x.csv", b"a,b\n" + b"1,2\n" * 6, small)
     assert err.value.code == "too_many_cells"
+
+
+def test_excel_has_its_own_smaller_limit(settings):
+    content = make_xlsx([["a", "b"], [1, 2]])
+    tight = Settings(max_xlsx_mb=len(content) / 1024 / 1024 / 2, _env_file=None)
+    with pytest.raises(DataError) as err:
+        load_table("book.xlsx", content, tight)
+    assert err.value.code == "file_too_large" and "Save the sheet as CSV" in err.value.message
+    assert load_table("book.xlsx", content, settings).frame.shape == (1, 2)  # default 20 MB limit
+
+
+def test_excel_limit_never_exceeds_the_upload_limit():
+    s = Settings(max_upload_mb=2, max_xlsx_mb=20, _env_file=None)
+    assert s.max_xlsx_bytes == 2 * 1024 * 1024
