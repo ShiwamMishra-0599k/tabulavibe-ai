@@ -9,7 +9,7 @@ _Last updated: 2026-10-21 (v0.3.0: Supabase accounts and saved reports)_
 | M3 GitHub / AWS deployment | **GitHub: done. AWS: prepared, not deployed** | Public repo <https://github.com/ShiwamMishra-0599k/tabulavibe-ai> (pushed and verified 2026-10-21). SAM template passes cfn-lint; the arm64 package was built and invoked in the official Lambda image; deploy script and checklist written. AWS blocker below |
 | Vercel deployment | **Live: <https://tabulavibe-ai.vercel.app>** (2026-10-21) | Project `shiwam/tabulavibe-ai` (Hobby), built from GitHub `main`. Verified live: health, both samples, CSV + XLSX profile, analysis (same totals as local), both CSV exports, 413 above 3.5 MB, docs hidden, security headers, and all 8 Playwright journeys (desktop + Pixel 7) via `E2E_BASE_URL`. See [DEPLOYMENT_VERCEL.md](DEPLOYMENT_VERCEL.md) |
 | M4 Quality and handover | **Done** | See the check results below |
-| v0.3 Accounts + saved reports (Supabase) | **Built and tested locally; not live-tested** | Tested against a fake Supabase REST API that mimics RLS, plus mocked sign-in in Vitest. Builds on Shashank's navbar and sign-in dialog. No Supabase project, OAuth apps or keys exist yet, so no real sign-in or database write has been made. See [SUPABASE_SETUP.md](SUPABASE_SETUP.md) |
+| v0.3 Accounts + saved reports (Supabase) | **Live** (2026-10-21) | Project `xftrxawqcoygrzohaase`: tables and RLS created (anonymous access refused, verified), Google + GitHub providers on (OAuth hand-offs verified). Shiwam signed in and saved a report on the live site. `TABULAVIBE_REQUIRE_SIGN_IN=true` set in Vercel; effective from the next deployment. See [SUPABASE_SETUP.md](SUPABASE_SETUP.md) |
 
 ## Check results (2026-10-21)
 

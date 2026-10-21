@@ -35,6 +35,7 @@ look and feel, see `DESIGN.md`.
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-10-21 | **Sign-in required switched on** (`TABULAVIBE_REQUIRE_SIGN_IN=true` in Vercel Production/Preview and `backend/.env`) | Shiwam confirmed GitHub/Google sign-in and saving a report work on the live site. Takes effect from the next deployment |
 | 2026-10-21 | Supabase project **`xftrxawqcoygrzohaase`** connected (URL + publishable key in Vercel Production/Preview and `backend/.env`); sign-in required stays **off** until Google/GitHub work | Avoid locking visitors out; buttons check provider status first |
 | 2026-10-21 | **Uploads require sign-in** (`TABULAVIBE_REQUIRE_SIGN_IN`), enforced server-side via Supabase `/auth/v1/user` (60 s cache by token hash) | Shiwam's request. Server-side so it can't be bypassed; `/auth/v1/user` needs no extra JWT library and rejects signed-out sessions; fails closed if Supabase is missing |
 | 2026-10-21 | OAuth credentials are created **by Shiwam** in GitHub/Google/Supabase | Client secrets must never pass through Claude, code, Vercel or chat; GitHub OAuth apps can't be created by API anyway |
@@ -75,6 +76,8 @@ look and feel, see `DESIGN.md`.
 | 2026-10-21 | `docs/TECHNICAL_REFERENCE.md` (+ PDF) reverse-engineered from the code; 10 findings (F1–F10) |
 | 2026-10-21 | UI v2 redesign; `DESIGN.md` and `MEMORY.md` added |
 | 2026-10-21 | Shashank pushed the floating navbar (`4faf22d`) and sign-in dialog (`c390ec6`) to `main` |
+| 2026-10-21 | Supabase live: tables + RLS created (anonymous read/write refused, verified), Google + GitHub providers on (hand-offs verified, no redirect errors); Shiwam signed in and saved a report on the live site |
+| 2026-10-21 | Supabase agent skills (`supabase`, `supabase-postgres-best-practices`) installed in `.claude/skills/` (reviewed: Markdown only) |
 | 2026-10-21 | **Deployed to Vercel**: https://tabulavibe-ai.vercel.app (all live checks + 8 E2E passed). Auto-deploy on push is **not reliable yet**: `815a004` and `1b8b641` did not deploy; deploys were triggered via the Vercel API from GitHub `main`. Fix: install the Vercel GitHub App on the repo |
 | 2026-10-21 | v0.3.0: Supabase accounts (Google/GitHub), profiles, saved reports; 136 pytest, 26 Vitest; GitHub star badge |
 
@@ -106,6 +109,8 @@ look and feel, see `DESIGN.md`.
 - **OAuth redirect reloads the page:** the in-memory file is lost on sign-in. The sign-in page warns when a file is open.
 - **Shell heredocs:** long multi-line Python heredocs in Bash sometimes fail to parse here. Write the script to the scratchpad and run it.
 - **Low memory on this PC (~8 GB):** parallel Playwright + leftover dev servers starved the backend and E2E timed out. Stop old servers and use `--workers=1`.
+- **Supabase SQL Editor:** runs only the selected text if anything is highlighted. Pasted scripts failed twice (clipboard overwritten, fragment run). Open the file in Notepad, Ctrl+A/Ctrl+C, paste into an empty editor, Run with nothing selected; end scripts with a visible check query.
+- **Supabase CLI login** needs a real terminal (TTY): it fails from Claude Code's `!` prompt. Open a separate PowerShell window.
 - **Vercel CLI edits files:** `vercel link` appended `.vercel` and `.env*` to `.gitignore` (the latter would hide `.env.example`) and wrote a token to `.env.local`. Revert the `.gitignore` edit; `.env.local` is already ignored by `.env.*`.
 - **Print:** browsers drop background colours, so white-on-gradient headers need `print:` overrides.
 
@@ -115,7 +120,6 @@ look and feel, see `DESIGN.md`.
 |---|---|---|
 | Fix F10 (500 responses without CORS headers) | **High before AWS** | See TECHNICAL_REFERENCE §14 |
 | Install the Vercel GitHub App on `tabulavibe-ai` (auto-deploy) | **Waiting on Shiwam** | https://github.com/apps/vercel → Configure → Only select repositories |
-| Create Supabase project + Google/GitHub OAuth | **Waiting on Shiwam** | `docs/SUPABASE_SETUP.md` steps 1–5; then Claude sets the 3 Vercel env vars and live-tests |
 | Deploy to AWS | Optional (Vercel chosen) | Install AWS CLI + SAM, non-root credentials, check Free/Paid plan, follow `docs/DEPLOYMENT.md` |
 | Live-test Gemini | Optional | Needs a key from an AI Studio project **without billing** |
 | Fix F1–F9 | Low–medium | Filter options vs. label merging (F2) is the most user-visible |

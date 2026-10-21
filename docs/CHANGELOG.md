@@ -16,6 +16,8 @@
 - Endpoints: `GET /api/account`, `POST/GET /api/reports`, `GET/DELETE /api/reports/{id}`. Saving recalculates from the file on the server.
 - `supabase/migrations/20261021000000_profiles_and_reports.sql`: tables, RLS policies (own rows only), grants, signup trigger.
 - **GitHub badge** in the navbar: GitHub logo + live star count, linking to the repo. The backend fetches the public count (`GET /api/github`, no token) and caches it for 10 minutes, so browsers never call GitHub. Hidden if `TABULAVIBE_GITHUB_REPO` is empty; shows no count if GitHub is unreachable.
+- **Supabase connected on the live site:** Google (Gmail) and GitHub sign-in, profiles and saved reports working; sign-in required for uploads enabled in Vercel.
+- Supabase agent skills for Claude Code in `.claude/skills/` (`supabase`, `supabase-postgres-best-practices`).
 - **Live on Vercel:** <https://tabulavibe-ai.vercel.app>. Playwright can target any deployment with `E2E_BASE_URL`.
 - **Vercel deployment:** `vercel.json` (Services: `web` = Vite build, `api` = FastAPI on Python 3.14; `/api/*` → api, rest → web), `backend/.python-version`, runtime dependencies and sample package data in `backend/pyproject.toml`, and `docs/DEPLOYMENT_VERCEL.md`. On Vercel (`VERCEL=1`) the backend defaults to production mode and a 3.5 MB upload limit (4.5 MB body cap). Verified locally with `vercel dev -L`.
 - `docs/SUPABASE_SETUP.md`: step-by-step project, provider and `.env` setup.
