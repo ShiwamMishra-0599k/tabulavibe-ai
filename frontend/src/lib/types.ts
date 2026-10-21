@@ -26,6 +26,7 @@ export interface ColumnProfile {
   role: 'measure' | 'dimension' | 'time' | 'identifier' | 'other'
   missing_count: number
   missing_pct: number
+  valid_pct: number
   invalid_count: number
   invalid_examples: string[]
   unique_count: number
@@ -60,6 +61,8 @@ export interface Profile {
     duplicate_row_count: number
     missing_cell_count: number
     missing_cell_pct: number
+    invalid_cell_count: number
+    valid_cell_pct: number
     empty_rows_skipped: number
   }
   columns: ColumnProfile[]

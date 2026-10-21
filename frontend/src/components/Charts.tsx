@@ -1,17 +1,5 @@
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
+import { useId } from 'react'
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { ResultRow } from '../lib/types'
 import { SERIES } from '../lib/charts'
 import { formatCompact, formatCount, formatNumber } from '../lib/format'
@@ -45,10 +33,10 @@ function ChartTooltip({ active, payload, measureLabel }: TooltipProps) {
   const datum = payload?.[0]?.payload as Datum | undefined
   if (!active || !datum) return null
   return (
-    <div className="rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-sm">
+    <div className="rounded-xl border border-line bg-glass px-3 py-2 text-xs shadow-float backdrop-blur-md">
       <p className="font-semibold text-ink">{datum.group}</p>
-      <p className="tabular text-ink-2">
-        {measureLabel}: <span className="font-medium text-ink">{formatNumber(datum.value)}</span>
+      <p className="tabular mt-0.5 text-ink-2">
+        {measureLabel}: <span className="font-semibold text-ink">{formatNumber(datum.value)}</span>
       </p>
       <p className="tabular text-ink-muted">{formatCount(datum.rows)} rows</p>
     </div>
@@ -59,10 +47,17 @@ const axisTick = { fill: 'var(--ink-muted)', fontSize: 12 }
 
 export function TrendChart({ rows, measureKey, measureLabel, height = 320 }: ChartProps) {
   const data = toData(rows, measureKey)
+  const gradientId = `trend-${useId().replace(/:/g, '')}`
   return (
     <div role="img" aria-label={`Line chart of ${measureLabel} over time`} style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 12, right: 16, bottom: 4, left: 4 }}>
+        <AreaChart data={data} margin={{ top: 12, right: 16, bottom: 4, left: 4 }}>
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={SERIES[0]} stopOpacity={0.22} />
+              <stop offset="100%" stopColor={SERIES[0]} stopOpacity={0} />
+            </linearGradient>
+          </defs>
           <CartesianGrid stroke="var(--line)" vertical={false} />
           <XAxis dataKey="group" tick={axisTick} tickLine={false} axisLine={{ stroke: 'var(--line-strong)' }} minTickGap={16} />
           <YAxis tick={axisTick} tickLine={false} axisLine={false} tickFormatter={formatCompact} width={56} />
@@ -70,19 +65,18 @@ export function TrendChart({ rows, measureKey, measureLabel, height = 320 }: Cha
             content={(props) => <ChartTooltip active={props.active} payload={props.payload} measureLabel={measureLabel} />}
             cursor={{ stroke: 'var(--line-strong)', strokeWidth: 1 }}
           />
-          <Line
+          <Area
             type="linear"
             dataKey="value"
             stroke={SERIES[0]}
             strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
+            fill={`url(#${gradientId})`}
             dot={{ r: 4, fill: SERIES[0], stroke: 'var(--surface)', strokeWidth: 2 }}
             activeDot={{ r: 6, fill: SERIES[0], stroke: 'var(--surface)', strokeWidth: 2 }}
             connectNulls={false}
             isAnimationActive={false}
           />
-        </LineChart>
+        </AreaChart>
       </ResponsiveContainer>
     </div>
   )
@@ -90,22 +84,25 @@ export function TrendChart({ rows, measureKey, measureLabel, height = 320 }: Cha
 
 export function BarComparison({ rows, measureKey, measureLabel }: ChartProps) {
   const data = toData(rows, measureKey).slice(0, MAX_BARS)
-  const height = Math.max(160, data.length * 32 + 40)
+  const height = Math.max(160, data.length * 36 + 40)
   return (
     <div role="img" aria-label={`Bar chart of ${measureLabel} by group`} style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 56, bottom: 4, left: 4 }} barCategoryGap={4}>
+        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 64, bottom: 4, left: 4 }} barCategoryGap={6}>
           <CartesianGrid stroke="var(--line)" horizontal={false} />
           <XAxis type="number" tick={axisTick} tickLine={false} axisLine={false} tickFormatter={formatCompact} />
-          <YAxis type="category" dataKey="group" tick={axisTick} tickLine={false} axisLine={{ stroke: 'var(--line-strong)' }} width={120} />
-          <Tooltip content={(props) => <ChartTooltip active={props.active} payload={props.payload} measureLabel={measureLabel} />} cursor={{ fill: 'var(--surface-2)' }} />
+          <YAxis type="category" dataKey="group" tick={{ ...axisTick, fill: 'var(--ink-2)' }} tickLine={false} axisLine={{ stroke: 'var(--line-strong)' }} width={120} />
+          <Tooltip
+            content={(props) => <ChartTooltip active={props.active} payload={props.payload} measureLabel={measureLabel} />}
+            cursor={{ fill: 'var(--surface-2)', radius: 8 }}
+          />
           <Bar
             dataKey="value"
             fill={SERIES[0]}
             maxBarSize={24}
-            radius={[0, 4, 4, 0]}
+            radius={[0, 6, 6, 0]}
             isAnimationActive={false}
-            label={{ position: 'right', fill: 'var(--ink-2)', fontSize: 12, formatter: (v: unknown) => (typeof v === 'number' ? formatCompact(v) : '') }}
+            label={{ position: 'right', fill: 'var(--ink-2)', fontSize: 12, fontWeight: 600, formatter: (v: unknown) => (typeof v === 'number' ? formatCompact(v) : '') }}
           />
         </BarChart>
       </ResponsiveContainer>
@@ -113,20 +110,22 @@ export function BarComparison({ rows, measureKey, measureLabel }: ChartProps) {
   )
 }
 
-export function ShareChart({ rows, measureKey, measureLabel }: ChartProps) {
+export function ShareChart({ rows, measureKey, measureLabel, total }: ChartProps & { total: number | null }) {
   const data = toData(rows, measureKey)
-  const total = data.reduce((sum, d) => sum + (d.value ?? 0), 0)
+  const sum = data.reduce((acc, d) => acc + (d.value ?? 0), 0)
   return (
-    <div className="grid items-center gap-4 sm:grid-cols-[1fr_1fr]">
-      <div role="img" aria-label={`Donut chart of ${measureLabel} share by group`} style={{ height: 260 }}>
+    <div className="grid items-center gap-6 sm:grid-cols-[1fr_1fr]">
+      <div className="relative" role="img" aria-label={`Donut chart of ${measureLabel} share by group`} style={{ height: 260 }}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}
               dataKey="value"
               nameKey="group"
-              innerRadius="55%"
-              outerRadius="90%"
+              innerRadius="62%"
+              outerRadius="92%"
+              paddingAngle={1.5}
+              cornerRadius={4}
               stroke="var(--surface)"
               strokeWidth={2}
               isAnimationActive={false}
@@ -138,13 +137,21 @@ export function ShareChart({ rows, measureKey, measureLabel }: ChartProps) {
             <Tooltip content={(props) => <ChartTooltip active={props.active} payload={props.payload} measureLabel={measureLabel} />} />
           </PieChart>
         </ResponsiveContainer>
+        {total !== null && (
+          <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
+            <div>
+              <p className="text-xs font-medium text-ink-muted">Total</p>
+              <p className="text-xl font-bold tracking-tight text-ink">{formatCompact(total)}</p>
+            </div>
+          </div>
+        )}
       </div>
-      <ul className="grid gap-1.5 text-sm" aria-label="Legend">
+      <ul className="grid gap-2 text-sm" aria-label="Legend">
         {data.map((d, i) => (
-          <li key={d.group} className="flex items-center gap-2">
-            <span aria-hidden className="size-3 shrink-0 rounded-sm" style={{ background: SERIES[i] }} />
+          <li key={d.group} className="flex items-center gap-2.5 rounded-lg px-2 py-1 hover:bg-surface-2">
+            <span aria-hidden className="size-3 shrink-0 rounded" style={{ background: SERIES[i] }} />
             <span className="min-w-0 flex-1 truncate text-ink">{d.group}</span>
-            <span className="tabular text-ink-2">{total ? `${((100 * (d.value ?? 0)) / total).toFixed(1)}%` : '—'}</span>
+            <span className="tabular font-semibold text-ink-2">{sum ? `${((100 * (d.value ?? 0)) / sum).toFixed(1)}%` : '—'}</span>
           </li>
         ))}
       </ul>

@@ -17,6 +17,9 @@ database and no paid services required.
 - 🗂️ Grouping by category, or by a date column at day / week / month / quarter / year
 - 🔎 Filters on category values and date ranges
 - 📈 Interactive dashboard: KPI cards; line, bar and donut charts (each only where it suits the data); results table
+- 🩺 Data-health score: the share of cells that are present and valid, plus a completeness bar for each column
+- 🪄 One-click suggested analyses built from your columns (e.g. "revenue by month")
+- 🌗 Modern, responsive UI with light/dark themes, a 4-step guided workflow and accessible controls (see [DESIGN.md](DESIGN.md))
 - 🧹 Opt-in cleaning: exclude duplicate rows; merge `North` / `north` style label variants
 - 📤 Exports: results CSV, cleaned-data CSV (safe from spreadsheet formula injection), printable report (save as PDF)
 - ✍️ Optional AI commentary: Gemini summarises the already-calculated results and never sees raw rows
@@ -26,7 +29,7 @@ database and no paid services required.
 
 | Layer | Tech Used |
 |---|---|
-| Frontend | React 19, TypeScript 6, Vite 8, Tailwind CSS v4 |
+| Frontend | React 19, TypeScript 6, Vite 8, Tailwind CSS v4, lucide-react icons, Inter (self-hosted) |
 | Charts | Recharts 3 (validated colour palette, light and dark themes) |
 | Backend | FastAPI 0.156, Uvicorn, Pydantic 2 / pydantic-settings |
 | Data processing | pandas 3.0, NumPy, openpyxl (Excel), python-multipart |
@@ -166,8 +169,8 @@ npm run test:e2e
 
 Latest results (2026-10-21):
 - Backend: 108 pytest tests pass.
-- Frontend: 15 Vitest tests pass.
-- End-to-end: 6 Playwright runs pass.
+- Frontend: 19 Vitest tests pass.
+- End-to-end: 8 Playwright runs pass (desktop + mobile, light + dark).
 - Lint, type checks and `cfn-lint` are clean.
 - `npm audit` and `pip-audit` report 0 known vulnerabilities.
 
@@ -249,7 +252,7 @@ Infrastructure as code is ready in `infra/` (SAM template, `deploy.ps1`).
 - **Windows dev environment:**
   - port conflicts with other local projects
   - Windows Credential Manager supplying the wrong GitHub account
-  - a formatter turning `﻿` escapes into invisible characters (the UTF-8 BOM is now written as `chr(0xFEFF)`)
+  - a formatter turning `U+FEFF` escapes into invisible characters (the UTF-8 BOM is now written as `chr(0xFEFF)`)
 - **Public Function URL:** it has no authentication, so cost safety relies on limits and budget alerts.
 
 ## 📈 Future Enhancements
@@ -264,6 +267,9 @@ Infrastructure as code is ready in `infra/` (SAM template, `deploy.ps1`).
 ## 📚 Documentation
 
 - [PROJECT_SPEC.md](PROJECT_SPEC.md): goals, users, requirements, milestones
+- [DESIGN.md](DESIGN.md): design system: tokens, components, charts, motion, accessibility
+- [MEMORY.md](MEMORY.md): project memory: decisions, history, conventions, lessons learned
+- [docs/TECHNICAL_REFERENCE.md](docs/TECHNICAL_REFERENCE.md): in-depth technical reference
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): design, API, data rules, security
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md): AWS plan, costs, checklist
 - [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md): what is done, verified and pending

@@ -1,19 +1,42 @@
 import { useState } from 'react'
+import { ChartColumn, ChartLine, ChartPie, CircleHelp, Hash, Sigma, Table2, TrendingDown, TrendingUp, ArrowDownToLine, ArrowUpToLine, type LucideIcon } from 'lucide-react'
 import { chartTitle, type ChartKind } from '../lib/charts'
-import type { AnalysisResult } from '../lib/types'
+import type { AnalysisResult, Kpi } from '../lib/types'
 import { formatCount, formatNumber } from '../lib/format'
 import { BarComparison, ShareChart, TrendChart } from './Charts'
-import { Alert, Card, labelClass, selectClass } from './ui'
+import { Alert, Badge, Card, IconChip, labelClass, selectClass } from './ui'
 
+const KPI_ICONS: Record<Kpi['aggregation'], LucideIcon> = {
+  sum: Sigma,
+  mean: TrendingUp,
+  count: Hash,
+  min: ArrowDownToLine,
+  max: ArrowUpToLine,
+}
 
 export function KpiCards({ result }: { result: AnalysisResult }) {
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      {result.kpis.map((k) => (
-        <div key={k.key} className="print-avoid-break rounded-xl border border-line bg-surface p-4">
-          <p className="text-sm text-ink-2">{k.label}</p>
-          <p className="mt-1 text-3xl font-semibold text-ink">{formatNumber(k.value)}</p>
-          <p className="mt-2 text-xs text-ink-muted">{k.definition}</p>
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] gap-3">
+      {result.kpis.map((k, i) => (
+        <div
+          key={k.key}
+          className={`animate-rise print-avoid-break relative overflow-hidden rounded-2xl p-5 shadow-card ${i === 0 ? 'gradient-border' : 'border border-line bg-surface'}`}
+          style={{ animationDelay: `${i * 50}ms` }}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium text-ink-2">{k.label}</p>
+            <IconChip icon={k.column === null ? Hash : KPI_ICONS[k.aggregation]} tone={i === 0 ? 'brand' : 'accent'} size="sm" />
+          </div>
+          <p className="tabular mt-2 break-words text-2xl font-bold tracking-tight text-ink sm:text-3xl">{formatNumber(k.value)}</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <Badge tone="neutral">{formatCount(k.values_used)} values used</Badge>
+            {k.values_excluded > 0 && (
+              <Badge tone="warn" icon={TrendingDown}>
+                {formatCount(k.values_excluded)} excluded
+              </Badge>
+            )}
+          </div>
+          <p className="mt-3 text-xs leading-relaxed text-ink-muted">{k.definition}</p>
         </div>
       ))}
     </div>
@@ -23,15 +46,19 @@ export function KpiCards({ result }: { result: AnalysisResult }) {
 export function ResultsTable({ result }: { result: AnalysisResult }) {
   if (!result.grouping) return null
   return (
-    <div className="overflow-x-auto" tabIndex={0} aria-label="Grouped results table">
+    <div className="overflow-x-auto rounded-xl border border-line" tabIndex={0} aria-label="Grouped results table">
       <table className="w-full border-collapse text-left text-sm">
         <caption className="sr-only">Results grouped by {result.grouping.column}</caption>
-        <thead>
-          <tr className="border-b border-line text-xs text-ink-muted">
-            <th scope="col" className="py-2 pr-3 font-medium">{result.grouping.column}</th>
-            <th scope="col" className="py-2 pr-3 text-right font-medium">Rows</th>
+        <thead className="bg-surface-2">
+          <tr className="text-xs text-ink-muted">
+            <th scope="col" className="px-3 py-2.5 font-medium">
+              {result.grouping.column}
+            </th>
+            <th scope="col" className="px-3 py-2.5 text-right font-medium">
+              Rows
+            </th>
             {result.measures.map((m) => (
-              <th key={m.key} scope="col" className="py-2 pr-3 text-right font-medium">
+              <th key={m.key} scope="col" className="px-3 py-2.5 text-right font-medium">
                 {m.label}
               </th>
             ))}
@@ -39,11 +66,13 @@ export function ResultsTable({ result }: { result: AnalysisResult }) {
         </thead>
         <tbody>
           {result.rows.map((r) => (
-            <tr key={r.group} className="border-b border-line">
-              <th scope="row" className="py-1.5 pr-3 font-medium text-ink">{r.group}</th>
-              <td className="tabular py-1.5 pr-3 text-right text-ink-2">{formatCount(r.row_count)}</td>
+            <tr key={r.group} className="border-t border-line transition-colors hover:bg-accent-soft/40">
+              <th scope="row" className="px-3 py-2 font-semibold text-ink">
+                {r.group}
+              </th>
+              <td className="tabular px-3 py-2 text-right text-ink-2">{formatCount(r.row_count)}</td>
               {result.measures.map((m) => (
-                <td key={m.key} className="tabular py-1.5 pr-3 text-right text-ink">
+                <td key={m.key} className="tabular px-3 py-2 text-right text-ink">
                   {formatNumber(r.values[m.key])}
                 </td>
               ))}
@@ -60,7 +89,11 @@ export function ChartView({ result, kind, measureKey }: { result: AnalysisResult
   if (!result.grouping || result.rows.length === 0) return null
   if (kind === 'table') return <ResultsTable result={result} />
   if (kind === 'line') return <TrendChart rows={result.rows} measureKey={measure.key} measureLabel={measure.label} />
-  if (kind === 'pie') return <ShareChart rows={result.rows} measureKey={measure.key} measureLabel={measure.label} />
+  if (kind === 'pie') {
+    // The donut centre shows the server-calculated KPI for this measure.
+    const total = result.kpis.find((k) => k.key === measure.key)?.value ?? null
+    return <ShareChart rows={result.rows} measureKey={measure.key} measureLabel={measure.label} total={total} />
+  }
   return <BarComparison rows={result.rows} measureKey={measure.key} measureLabel={measure.label} />
 }
 
@@ -71,6 +104,8 @@ interface DashboardProps {
   onChartKind: (kind: ChartKind) => void
   onMeasureKey: (key: string) => void
 }
+
+const KIND_ICONS: Record<ChartKind, LucideIcon> = { line: ChartLine, bar: ChartColumn, pie: ChartPie, table: Table2 }
 
 export function Dashboard({ result, chartKind, measureKey, onChartKind, onMeasureKey }: DashboardProps) {
   const [showWhy, setShowWhy] = useState(false)
@@ -84,14 +119,15 @@ export function Dashboard({ result, chartKind, measureKey, onChartKind, onMeasur
 
   return (
     <div className="grid gap-4">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-2">
-        <span>
-          <strong className="text-ink">{formatCount(result.rows_analyzed)}</strong> of {formatCount(result.row_count)} rows analysed
-        </span>
+      <div className="flex flex-wrap items-center gap-2 text-sm text-ink-2">
+        <Badge tone="accent">
+          {formatCount(result.rows_analyzed)} of {formatCount(result.row_count)} rows analysed
+        </Badge>
         {result.grouping && (
-          <span>
-            {formatCount(result.grouping.total_groups)} group(s) by <strong className="text-ink">{result.grouping.column}</strong>
-          </span>
+          <Badge>
+            {formatCount(result.grouping.total_groups)} group(s) by {result.grouping.column}
+            {result.grouping.time_grain ? ` · ${result.grouping.time_grain}` : ''}
+          </Badge>
         )}
       </div>
       {result.notes.map((n) => (
@@ -103,29 +139,34 @@ export function Dashboard({ result, chartKind, measureKey, onChartKind, onMeasur
 
       {result.grouping && result.rows.length > 0 && (
         <Card
+          className="animate-rise"
           title={chartTitle(result, measureKey)}
           actions={
-            <div role="group" aria-label="Chart type" className="flex rounded-lg border border-line-strong p-0.5">
-              {kinds.map(({ kind, label, disabled }) => (
-                <button
-                  key={kind}
-                  type="button"
-                  disabled={disabled}
-                  aria-pressed={chartKind === kind}
-                  title={disabled ? (result.chart.pie_reason ?? undefined) : undefined}
-                  onClick={() => onChartKind(kind)}
-                  className={`min-h-8 rounded-md px-3 text-sm disabled:cursor-not-allowed disabled:opacity-40 ${
-                    chartKind === kind ? 'bg-accent text-accent-ink' : 'text-ink-2 hover:bg-surface-2'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+            <div role="group" aria-label="Chart type" className="flex rounded-xl bg-surface-2 p-1 ring-1 ring-inset ring-line">
+              {kinds.map(({ kind, label, disabled }) => {
+                const Icon = KIND_ICONS[kind]
+                return (
+                  <button
+                    key={kind}
+                    type="button"
+                    disabled={disabled}
+                    aria-pressed={chartKind === kind}
+                    title={disabled ? (result.chart.pie_reason ?? undefined) : undefined}
+                    onClick={() => onChartKind(kind)}
+                    className={`flex min-h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-35 ${
+                      chartKind === kind ? 'bg-surface text-ink shadow-soft ring-1 ring-line' : 'text-ink-muted hover:text-ink'
+                    }`}
+                  >
+                    <Icon aria-hidden className={`size-3.5 ${chartKind === kind ? 'text-accent' : ''}`} />
+                    {label}
+                  </button>
+                )
+              })}
             </div>
           }
         >
           {result.measures.length > 1 && chartKind !== 'table' && (
-            <div className="mb-3 max-w-xs">
+            <div className="mb-4 max-w-xs">
               <label className={labelClass} htmlFor="chart-measure">
                 Measure shown in chart
               </label>
@@ -139,26 +180,36 @@ export function Dashboard({ result, chartKind, measureKey, onChartKind, onMeasur
             </div>
           )}
           <ChartView result={result} kind={chartKind} measureKey={measureKey} />
-          <div className="mt-3 grid gap-1 text-xs text-ink-muted">
+          <div className="mt-4 grid gap-1 text-xs text-ink-muted">
             {result.chart.notes.map((n) => (
               <p key={n}>{n}</p>
             ))}
             {!result.chart.pie_allowed && result.chart.pie_reason && (
-              <p>
-                <button type="button" className="underline" aria-expanded={showWhy} onClick={() => setShowWhy((v) => !v)}>
+              <div>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 font-medium text-accent-text hover:underline"
+                  aria-expanded={showWhy}
+                  onClick={() => setShowWhy((v) => !v)}
+                >
+                  <CircleHelp aria-hidden className="size-3.5" />
                   Why is the donut chart unavailable?
                 </button>
-                {showWhy && <span className="block pt-1">{result.chart.pie_reason}</span>}
-              </p>
+                {showWhy && <span className="animate-rise mt-1 block rounded-lg bg-surface-2 p-2 text-ink-2">{result.chart.pie_reason}</span>}
+              </div>
             )}
           </div>
         </Card>
       )}
 
-      {result.grouping && result.rows.length === 0 && <Alert kind="info" title="No groups to show">No rows match the selected filters.</Alert>}
+      {result.grouping && result.rows.length === 0 && (
+        <Alert kind="info" title="No groups to show">
+          No rows match the selected filters.
+        </Alert>
+      )}
 
       {result.grouping && chartKind !== 'table' && result.rows.length > 0 && (
-        <Card title="Results table">
+        <Card icon={Table2} title="Results table">
           <ResultsTable result={result} />
         </Card>
       )}

@@ -1,29 +1,79 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import {
+  ArrowRight,
+  ChartColumn,
+  ChartNoAxesColumn,
+  Check,
+  Eye,
+  FileDown,
+  FileSpreadsheet,
+  Monitor,
+  Moon,
+  Printer,
+  RotateCcw,
+  Stethoscope,
+  Sun,
+  type LucideIcon,
+} from 'lucide-react'
 import { AiNarrative } from './components/AiNarrative'
 import { AnalysisBuilder } from './components/AnalysisBuilder'
 import { Dashboard } from './components/Dashboard'
-import type { ChartKind } from './lib/charts'
 import { DataPreview } from './components/DataPreview'
 import { QualityReport } from './components/QualityReport'
 import { ReportView } from './components/ReportView'
-import { Alert, Button, Spinner } from './components/ui'
-import { UploadPanel } from './components/UploadPanel'
+import { Alert, Button, IconChip, Skeleton, Spinner, Toggle } from './components/ui'
+import { Hero, UploadPanel } from './components/UploadPanel'
 import { api, ApiError, saveBlob } from './lib/api'
+import type { ChartKind } from './lib/charts'
 import { formatCount } from './lib/format'
 import { defaultSpec } from './lib/spec'
+import { useTheme, type ThemeChoice } from './lib/theme'
 import type { AnalysisResult, AnalysisSpec, AppConfig, Narrative, Profile, SampleInfo } from './lib/types'
 
 type Tab = 'preview' | 'quality' | 'analyze' | 'report'
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'preview', label: '1. Preview' },
-  { id: 'quality', label: '2. Data quality' },
-  { id: 'analyze', label: '3. Analyse' },
-  { id: 'report', label: '4. Report & export' },
-]
+const ORDER: Tab[] = ['preview', 'quality', 'analyze', 'report']
 
 function message(error: unknown): string {
   if (error instanceof ApiError) return error.details.length ? `${error.message} (${error.details.join('; ')})` : error.message
   return 'Something unexpected went wrong. Please try again.'
+}
+
+const THEMES: { value: ThemeChoice; label: string; icon: LucideIcon }[] = [
+  { value: 'light', label: 'Light theme', icon: Sun },
+  { value: 'system', label: 'System theme', icon: Monitor },
+  { value: 'dark', label: 'Dark theme', icon: Moon },
+]
+
+function ThemeToggle() {
+  const [theme, setTheme] = useTheme()
+  return (
+    <div role="group" aria-label="Colour theme" className="flex rounded-xl bg-surface-2 p-1 ring-1 ring-inset ring-line">
+      {THEMES.map(({ value, label, icon: Icon }) => (
+        <button
+          key={value}
+          type="button"
+          aria-label={label}
+          aria-pressed={theme === value}
+          title={label}
+          onClick={() => setTheme(value)}
+          className={`grid size-8 place-items-center rounded-lg transition ${theme === value ? 'bg-surface text-accent shadow-soft ring-1 ring-line' : 'text-ink-muted hover:text-ink'}`}
+        >
+          <Icon aria-hidden className="size-4" />
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function NextButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <div className="flex justify-end">
+      <Button variant="primary" onClick={onClick}>
+        {children}
+        <ArrowRight aria-hidden className="size-4" />
+      </Button>
+    </div>
+  )
 }
 
 export default function App() {
@@ -47,6 +97,7 @@ export default function App() {
   const [exportNotice, setExportNotice] = useState<string | null>(null)
   const [exportDedupe, setExportDedupe] = useState(false)
   const [exportMerge, setExportMerge] = useState(false)
+  const resultsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     Promise.all([api.config(), api.samples()])
@@ -56,6 +107,11 @@ export default function App() {
       })
       .catch((e) => setServerError(message(e)))
   }, [])
+
+  function goTo(next: Tab) {
+    setTab(next)
+    window.scrollTo({ top: 0 })
+  }
 
   function reset() {
     setFile(null)
@@ -85,7 +141,7 @@ export default function App() {
       setFile(next)
       setProfile(p)
       setSpec(defaultSpec(p))
-      setTab('preview')
+      goTo('preview')
     } catch (e) {
       setError(message(e))
     } finally {
@@ -106,23 +162,33 @@ export default function App() {
     }
   }
 
-  async function runAnalysis() {
-    if (!file || !spec) return
+  async function runAnalysis(override?: AnalysisSpec) {
+    const toRun = override ?? spec
+    if (!file || !toRun) return
     setBusy('analyze')
     setError(null)
     setNarrative(null)
     setAiError(null)
     try {
-      const r = await api.analyze(file, spec)
+      const r = await api.analyze(file, toRun)
       setResult(r)
       setAnalysedAt(new Date())
       setMeasureKey(r.measures[0]?.key ?? '')
       setChartKind(r.chart.recommended === 'line' ? 'line' : 'bar')
+      // On narrow screens the results sit below the builder: bring them into view.
+      if (window.matchMedia?.('(max-width: 1023px)').matches) {
+        requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ block: 'start' }))
+      }
     } catch (e) {
       setError(message(e))
     } finally {
       setBusy(null)
     }
+  }
+
+  function applySuggestion(next: AnalysisSpec) {
+    setSpec(next)
+    void runAnalysis(next)
   }
 
   async function exportCleaned() {
@@ -171,31 +237,50 @@ export default function App() {
     }
   }
 
+  const steps: { id: Tab; label: string; hint: string; icon: LucideIcon; disabled?: boolean }[] = profile
+    ? [
+        { id: 'preview', label: 'Preview', hint: `${formatCount(profile.dataset.row_count)} rows · ${profile.dataset.column_count} columns`, icon: Eye },
+        { id: 'quality', label: 'Data quality', hint: `${profile.dataset.valid_cell_pct}% healthy`, icon: Stethoscope },
+        { id: 'analyze', label: 'Analyse', hint: result ? `${result.kpis.length} KPI(s) ready` : 'Build KPIs and charts', icon: ChartColumn },
+        { id: 'report', label: 'Report & export', hint: result ? 'Print and download' : 'Run an analysis first', icon: FileDown, disabled: !result },
+      ]
+    : []
+  const isDone = (id: Tab) => ORDER.indexOf(id) < ORDER.indexOf(tab) || (id === 'analyze' && !!result && tab !== 'analyze')
+
   return (
     <div className="min-h-screen">
-      <header className="border-b border-line bg-surface print:hidden">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+      <header className="z-30 border-b border-line bg-glass backdrop-blur-xl sm:sticky sm:top-0 print:hidden">
+        <div className="mx-auto flex min-h-16 max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-2">
           <div className="flex items-center gap-3">
-            <span aria-hidden className="grid size-8 place-items-center rounded-lg bg-accent text-sm font-bold text-accent-ink">
-              TV
+            <span aria-hidden className="grid size-9 place-items-center rounded-xl brand-gradient text-white shadow-[0_8px_20px_-8px_rgb(79_70_229/0.8)]">
+              <ChartNoAxesColumn className="size-5" />
             </span>
             <div>
-              <p className="text-base font-semibold leading-tight text-ink">TabulaVibe AI</p>
-              <p className="text-xs text-ink-muted">Spreadsheets to dashboards and reports</p>
+              <p className="text-base font-bold leading-tight tracking-tight text-ink">
+                TabulaVibe <span className="brand-text">AI</span>
+              </p>
+              <p className="hidden text-xs text-ink-muted sm:block">Spreadsheets to dashboards and reports</p>
             </div>
           </div>
-          {profile && (
-            <div className="flex min-w-0 items-center gap-3">
-              <p className="min-w-0 truncate text-sm text-ink-2" title={profile.dataset.file_name}>
-                <span className="font-medium text-ink">{profile.dataset.file_name}</span> · {formatCount(profile.dataset.row_count)} rows
-              </p>
-              <Button onClick={reset}>New file</Button>
-            </div>
-          )}
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            {profile && (
+              <>
+                <div className="hidden min-w-0 items-center gap-2 rounded-xl border border-line bg-surface px-3 py-1.5 md:flex" title={profile.dataset.file_name}>
+                  <FileSpreadsheet aria-hidden className="size-4 shrink-0 text-accent" />
+                  <span className="max-w-48 truncate text-sm font-medium text-ink">{profile.dataset.file_name}</span>
+                  <span className="text-xs text-ink-muted">· {formatCount(profile.dataset.row_count)} rows</span>
+                </div>
+                <Button size="sm" icon={RotateCcw} onClick={reset}>
+                  New file
+                </Button>
+              </>
+            )}
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-7xl gap-4 px-4 py-6">
+      <main className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:py-8">
         {serverError && (
           <Alert kind="error" title="The server is unavailable">
             {serverError}
@@ -211,16 +296,18 @@ export default function App() {
 
         {!profile && (
           <>
-            <div className="py-2">
-              <h1 className="text-2xl font-semibold text-ink sm:text-3xl">Turn a spreadsheet into a clear business dashboard</h1>
-              <p className="mt-2 max-w-2xl text-ink-2">
-                Upload a CSV or Excel file to check its quality, calculate KPIs, explore charts and download a report. Every figure is
-                calculated directly from your data.
-              </p>
-            </div>
+            <Hero />
             {busy === 'upload' ? (
-              <div className="rounded-xl border border-line bg-surface p-10 text-center">
+              <div className="grid gap-4 rounded-3xl border border-line bg-surface p-8 shadow-card">
                 <Spinner label="Reading and checking your file…" />
+                <Skeleton className="h-8 w-1/3" />
+                <Skeleton className="h-40" />
+                <div className="grid grid-cols-4 gap-3">
+                  <Skeleton className="h-16" />
+                  <Skeleton className="h-16" />
+                  <Skeleton className="h-16" />
+                  <Skeleton className="h-16" />
+                </div>
               </div>
             ) : (
               <UploadPanel config={config} samples={samples} busy={busy !== null} onFile={loadFile} onSample={loadSample} />
@@ -229,129 +316,141 @@ export default function App() {
         )}
 
         {profile && spec && (
-          <>
-            <nav aria-label="Workflow steps" className="overflow-x-auto print:hidden">
-              <div role="tablist" className="flex min-w-max gap-1 rounded-xl border border-line bg-surface p-1">
-                {TABS.map((t) => (
-                  <button
-                    key={t.id}
-                    role="tab"
-                    id={`tab-${t.id}`}
-                    aria-selected={tab === t.id}
-                    aria-controls={`panel-${t.id}`}
-                    disabled={t.id === 'report' && !result}
-                    onClick={() => setTab(t.id)}
-                    className={`min-h-10 rounded-lg px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
-                      tab === t.id ? 'bg-accent text-accent-ink' : 'text-ink-2 hover:bg-surface-2'
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
+          <div className="grid gap-6">
+            <nav aria-label="Workflow steps" className="print:hidden">
+              <div role="tablist" className="grid grid-cols-4 gap-2 sm:gap-3">
+                {steps.map((step, i) => {
+                  const active = tab === step.id
+                  const done = isDone(step.id)
+                  return (
+                    <button
+                      key={step.id}
+                      role="tab"
+                      id={`tab-${step.id}`}
+                      aria-label={`${i + 1}. ${step.label}`}
+                      aria-selected={active}
+                      aria-controls={`panel-${step.id}`}
+                      disabled={step.disabled}
+                      onClick={() => goTo(step.id)}
+                      className={`relative flex min-w-0 flex-col items-center gap-1.5 rounded-2xl border p-2 text-center transition disabled:cursor-not-allowed disabled:opacity-45 md:flex-row md:gap-3 md:p-3 md:text-left ${
+                        active ? 'border-transparent bg-surface shadow-card ring-2 ring-accent/60' : 'border-line bg-surface/60 hover:border-line-strong hover:bg-surface'
+                      }`}
+                    >
+                      <span
+                        aria-hidden
+                        className={`grid size-9 shrink-0 place-items-center rounded-xl transition ${
+                          active ? 'brand-gradient text-white' : done ? 'bg-good-soft text-good' : 'bg-surface-2 text-ink-muted'
+                        }`}
+                      >
+                        {done && !active ? <Check className="size-4" /> : <step.icon className="size-4" />}
+                      </span>
+                      <span className="min-w-0">
+                        <span className={`block text-[11px] font-semibold leading-tight sm:text-xs md:text-sm ${active ? 'text-ink' : 'text-ink-2'}`}>
+                          <span className="hidden text-ink-muted md:inline">{i + 1}. </span>
+                          {step.label}
+                        </span>
+                        <span className="hidden truncate text-xs text-ink-muted md:block">{step.hint}</span>
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
             </nav>
 
-            <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
+            <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="min-w-0">
               {tab === 'preview' && (
-                <div className="grid gap-4">
+                <div className="animate-rise grid gap-4">
                   <DataPreview profile={profile} />
-                  <div className="flex justify-end">
-                    <Button variant="primary" onClick={() => setTab('quality')}>
-                      Next: check data quality
-                    </Button>
-                  </div>
+                  <NextButton onClick={() => goTo('quality')}>Next: check data quality</NextButton>
                 </div>
               )}
               {tab === 'quality' && (
                 <div className="grid gap-4">
                   <QualityReport profile={profile} />
-                  <div className="flex justify-end">
-                    <Button variant="primary" onClick={() => setTab('analyze')}>
-                      Next: analyse
-                    </Button>
-                  </div>
+                  <NextButton onClick={() => goTo('analyze')}>Next: analyse</NextButton>
                 </div>
               )}
               {tab === 'analyze' && (
-                <div className="grid items-start gap-4 lg:grid-cols-[380px_1fr]">
-                  <AnalysisBuilder profile={profile} spec={spec} onChange={setSpec} onRun={runAnalysis} busy={busy === 'analyze'} />
-                  <div className="grid gap-4">
-                    {busy === 'analyze' && <Spinner label="Calculating…" />}
-                    {!result && busy !== 'analyze' && (
-                      <div className="rounded-xl border border-dashed border-line-strong p-10 text-center text-sm text-ink-2">
-                        Choose your measures and grouping, then select <strong>Run analysis</strong>. A starting point has been suggested
-                        from your columns.
+                <div className="grid items-start gap-5 lg:grid-cols-[340px_minmax(0,1fr)]">
+                  <AnalysisBuilder
+                    profile={profile}
+                    spec={spec}
+                    onChange={setSpec}
+                    onRun={() => runAnalysis()}
+                    onApplySuggestion={applySuggestion}
+                    busy={busy === 'analyze'}
+                  />
+                  <div ref={resultsRef} className="grid min-w-0 scroll-mt-4 gap-4 sm:scroll-mt-24">
+                    {busy === 'analyze' && (
+                      <div className="grid gap-4">
+                        <Spinner label="Calculating…" />
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <Skeleton className="h-36" />
+                          <Skeleton className="h-36" />
+                        </div>
+                        <Skeleton className="h-80" />
                       </div>
                     )}
-                    {result && (
+                    {!result && busy !== 'analyze' && (
+                      <div className="dot-grid grid place-items-center rounded-3xl border-2 border-dashed border-line-strong p-10 text-center">
+                        <IconChip icon={ChartColumn} tone="brand" size="lg" />
+                        <h2 className="mt-4 text-lg font-semibold tracking-tight text-ink">Your dashboard will appear here</h2>
+                        <p className="mt-1 max-w-sm text-sm text-ink-2">
+                          Pick a suggestion, or choose your measures and grouping, then select <strong>Run analysis</strong>.
+                        </p>
+                      </div>
+                    )}
+                    {result && busy !== 'analyze' && (
                       <>
-                        <Dashboard
-                          result={result}
-                          chartKind={chartKind}
-                          measureKey={measureKey}
-                          onChartKind={setChartKind}
-                          onMeasureKey={setMeasureKey}
-                        />
+                        <Dashboard result={result} chartKind={chartKind} measureKey={measureKey} onChartKind={setChartKind} onMeasureKey={setMeasureKey} />
                         <AiNarrative config={config} narrative={narrative} error={aiError} busy={busy === 'narrative'} onGenerate={generateNarrative} />
-                        <div className="flex justify-end">
-                          <Button variant="primary" onClick={() => setTab('report')}>
-                            Next: report & export
-                          </Button>
-                        </div>
+                        <NextButton onClick={() => goTo('report')}>Next: report & export</NextButton>
                       </>
                     )}
                   </div>
                 </div>
               )}
               {tab === 'report' && result && (
-                <div className="grid gap-4">
-                  <div className="grid gap-3 rounded-xl border border-line bg-surface p-4 print:hidden">
-                    <h2 className="text-base font-semibold text-ink">Downloads</h2>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button variant="primary" onClick={() => window.print()}>
+                <div className="animate-rise grid gap-5">
+                  <section className="rounded-2xl border border-line bg-surface p-5 shadow-card print:hidden" aria-labelledby="downloads-title">
+                    <h2 id="downloads-title" className="text-base font-semibold tracking-tight text-ink">
+                      Downloads
+                    </h2>
+                    <p className="mt-0.5 text-sm text-ink-muted">Everything below matches the numbers in your dashboard.</p>
+                    <div className="mt-4 grid gap-3 md:grid-cols-3">
+                      <Button variant="primary" size="lg" icon={Printer} onClick={() => window.print()}>
                         Print / save as PDF
                       </Button>
-                      <Button busy={busy === 'export-results'} onClick={exportResults}>
+                      <Button size="lg" icon={FileDown} busy={busy === 'export-results'} onClick={exportResults}>
                         Download results (CSV)
                       </Button>
-                      <Button busy={busy === 'export-clean'} onClick={exportCleaned}>
+                      <Button size="lg" icon={FileSpreadsheet} busy={busy === 'export-clean'} onClick={exportCleaned}>
                         Download cleaned data (CSV)
                       </Button>
-                      <label className="flex items-center gap-2 text-sm text-ink-2">
-                        <input
-                          type="checkbox"
-                          className="size-4 accent-[var(--accent)]"
-                          checked={exportDedupe}
-                          onChange={(e) => setExportDedupe(e.target.checked)}
-                        />
-                        Remove duplicate rows from cleaned data
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-ink-2">
-                        <input
-                          type="checkbox"
-                          className="size-4 accent-[var(--accent)]"
-                          checked={exportMerge}
-                          onChange={(e) => setExportMerge(e.target.checked)}
-                        />
-                        Merge case/spacing label variants
-                      </label>
                     </div>
-                    <p className="text-xs text-ink-muted">
-                      Cleaned data standardises numbers (e.g. ₹1,200 → 1200), dates (YYYY-MM-DD) and yes/no values. Missing values stay
-                      empty and invalid values are kept exactly as uploaded. Text that a spreadsheet could run as a formula is prefixed with
-                      an apostrophe.
+                    <div className="mt-4 grid gap-2 md:grid-cols-2">
+                      <Toggle checked={exportDedupe} onChange={setExportDedupe} label="Remove duplicate rows from cleaned data" />
+                      <Toggle checked={exportMerge} onChange={setExportMerge} label="Merge case/spacing label variants" />
+                    </div>
+                    <p className="mt-3 text-xs leading-relaxed text-ink-muted">
+                      Cleaned data standardises numbers (e.g. ₹1,200 → 1200), dates (YYYY-MM-DD) and yes/no values. Missing values stay empty and
+                      invalid values are kept exactly as uploaded. Text that a spreadsheet could run as a formula is prefixed with an apostrophe.
                     </p>
-                    {exportNotice && <Alert kind="success">{exportNotice}</Alert>}
-                  </div>
+                    {exportNotice && (
+                      <div className="mt-3">
+                        <Alert kind="success">{exportNotice}</Alert>
+                      </div>
+                    )}
+                  </section>
                   <ReportView profile={profile} result={result} narrative={narrative} chartKind={chartKind} measureKey={measureKey} preparedAt={analysedAt} />
                 </div>
               )}
             </div>
-          </>
+          </div>
         )}
       </main>
 
-      <footer className="mx-auto max-w-7xl px-4 pb-8 text-xs text-ink-muted print:hidden">
+      <footer className="mx-auto max-w-7xl px-4 pb-10 pt-4 text-center text-xs text-ink-muted print:hidden">
         TabulaVibe AI is a demonstration tool. Uploaded files are processed in memory and not stored. Sample data is synthetic.
       </footer>
     </div>

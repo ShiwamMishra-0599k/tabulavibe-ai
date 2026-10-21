@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.2.0 — 2026-10-21 (UI v2 "calm confidence")
+
+### Added
+- New design system (see `DESIGN.md`):
+  - Inter (self-hosted), indigo→violet brand gradient, lucide icons.
+  - Glass header, soft background glows, light/dark/system theme toggle (remembered per browser).
+- Landing page: hero, large drag-and-drop zone with limit chips, sample cards, 4-step "how it works" strip.
+- Full-width 4-step stepper with completion ticks and live hints.
+- **Data health** ring (share of cells that are present and valid) and per-column completeness bars.
+  Both are calculated by the backend (`valid_cell_pct`, `invalid_cell_count`, `valid_pct`).
+- **Suggested analyses:** up to three one-click specs built from the detected schema.
+- Redesigned KPI cards (icons, "values used / excluded" badges), segmented chart switcher with icons, gradient-wash trend chart, donut with server total in the centre.
+- Switch-style toggles (styled native checkboxes), skeleton loaders, empty states, entrance motion that respects reduced-motion.
+- Document-style printable report with a brand title band that prints as plain dark text.
+- `DESIGN.md` (design system) and `MEMORY.md` (project memory).
+- Tests:
+  - 4 new Vitest tests: suggestions, data health, theme, one-click run.
+  - A new Playwright journey covering dark theme, suggestions and theme persistence on desktop and mobile.
+
+### Fixed
+- Phone layout: the sticky header no longer covers content (sticky only from `sm`); the stepper fits the screen with no sideways scrolling.
+- KPI values no longer clip in narrow columns (auto-fit grid).
+
+
 ## 0.1.0 — 2026-10-21
 
 ### Added

@@ -6,6 +6,7 @@ const col = (name: string, inferred_type: ColumnProfile['inferred_type'], role: 
   role,
   missing_count: 0,
   missing_pct: 0,
+  valid_pct: 100,
   invalid_count: 0,
   invalid_examples: [],
   unique_count: 4,
@@ -32,6 +33,8 @@ export const profile: Profile = {
     duplicate_row_count: 1,
     missing_cell_count: 1,
     missing_cell_pct: 2.5,
+    invalid_cell_count: 0,
+    valid_cell_pct: 97.5,
     empty_rows_skipped: 0,
   },
   columns: [
@@ -40,6 +43,7 @@ export const profile: Profile = {
     col('revenue', 'number', 'measure', {
       missing_count: 1,
       missing_pct: 10,
+      valid_pct: 90,
       numeric_stats: { count: 9, sum: 355, mean: 39.44, median: 30, std: 22.1, min: 10, max: 70 },
     }),
     col('order_id', 'text', 'identifier', { unique_count: 10 }),

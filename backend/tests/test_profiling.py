@@ -44,8 +44,14 @@ def test_profile_counts_and_stats(sales_ds):
     assert profile["dataset"]["row_count"] == 10
     assert profile["dataset"]["column_count"] == 7
     assert profile["dataset"]["duplicate_row_count"] == 1
+    # 70 cells: 8 missing (units 1, revenue 1, notes 6) + 1 invalid date -> 61 valid = 87.1%
+    assert profile["dataset"]["missing_cell_count"] == 8
+    assert profile["dataset"]["invalid_cell_count"] == 1
+    assert profile["dataset"]["valid_cell_pct"] == 87.1
     units = next(c for c in profile["columns"] if c["name"] == "units")
     assert units["missing_pct"] == 10.0
+    assert units["valid_pct"] == 90.0
+    assert next(c for c in profile["columns"] if c["name"] == "date")["valid_pct"] == 90.0  # 1 invalid of 10
     stats = units["numeric_stats"]
     assert stats["count"] == 9 and stats["sum"] == 45 and stats["mean"] == 5
     assert stats["min"] == 1 and stats["max"] == 10 and stats["median"] == 5

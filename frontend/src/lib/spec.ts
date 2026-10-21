@@ -27,6 +27,60 @@ export function defaultSpec(profile: Profile): AnalysisSpec {
   }
 }
 
+export interface SuggestedAnalysis {
+  id: string
+  title: string
+  description: string
+  kind: 'trend' | 'compare' | 'count'
+  spec: AnalysisSpec
+}
+
+/** Up to three one-click analyses built from the server's schema suggestions (no calculation happens here). */
+export function suggestedAnalyses(profile: Profile): SuggestedAnalysis[] {
+  const { measures, dates, dimensions } = profile.suggestions
+  const base = { time_grain: 'month' as const, filters: [], remove_duplicates: false, merge_label_variants: false }
+  const out: SuggestedAnalysis[] = []
+  const [measure] = measures
+  const [date] = dates
+  const [dimension] = dimensions
+  if (measure && date) {
+    out.push({
+      id: 'trend',
+      kind: 'trend',
+      title: `${measure} by month`,
+      description: `Monthly total of ${measure}, as a trend line`,
+      spec: { ...base, measures: [{ column: measure, aggregation: 'sum' }], group_by: date },
+    })
+  }
+  if (measure && dimension) {
+    out.push({
+      id: 'compare',
+      kind: 'compare',
+      title: `${measure} by ${dimension}`,
+      description: `Compare total ${measure} across ${dimension}`,
+      spec: { ...base, measures: [{ column: measure, aggregation: 'sum' }], group_by: dimension },
+    })
+  }
+  if (dimension) {
+    out.push({
+      id: 'count',
+      kind: 'count',
+      title: `Rows per ${dimension}`,
+      description: `How many records fall in each ${dimension}`,
+      spec: { ...base, measures: [{ column: null, aggregation: 'count' }], group_by: dimension },
+    })
+  } else if (date) {
+    out.push({
+      id: 'count',
+      kind: 'count',
+      title: 'Rows per month',
+      description: `How many records there are each month (${date})`,
+      spec: { ...base, measures: [{ column: null, aggregation: 'count' }], group_by: date },
+    })
+  }
+  return out.slice(0, 3)
+}
+
 /** Client-side mirror of the server rules, so invalid combinations are caught before a request. */
 export function validateSpec(spec: AnalysisSpec, profile: Profile): string[] {
   const errors: string[] = []

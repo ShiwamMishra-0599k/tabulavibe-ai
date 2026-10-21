@@ -108,4 +108,37 @@ describe('App', () => {
     expect(screen.getByText("Select at least one value for the 'region' filter, or remove it.")).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Run analysis' })).toBeDisabled()
   })
+
+  it('runs a suggested analysis with one click', async () => {
+    const user = userEvent.setup()
+    const calls = mockServer()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Load sample: Retail sales (CSV)' }))
+    await user.click(await screen.findByRole('tab', { name: '3. Analyse' }))
+    await user.click(screen.getByRole('button', { name: /revenue by region/ }))
+    expect(await screen.findByText('16,45,592.43')).toBeInTheDocument()
+    const analyze = calls.find((c) => c.url.endsWith('/api/analyze'))!
+    expect(JSON.parse(analyze.body!.get('spec') as string)).toMatchObject({ group_by: 'region', measures: [{ column: 'revenue', aggregation: 'sum' }] })
+  })
+
+  it('shows the server-calculated data health on the quality step', async () => {
+    const user = userEvent.setup()
+    mockServer()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Load sample: Retail sales (CSV)' }))
+    await user.click(await screen.findByRole('tab', { name: '2. Data quality' }))
+    expect(screen.getByRole('img', { name: 'Data health: 97.5%' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'revenue valid values: 90%' })).toBeInTheDocument()
+  })
+
+  it('switches and remembers the colour theme', async () => {
+    const user = userEvent.setup()
+    mockServer()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Dark theme' }))
+    expect(document.documentElement.dataset.theme).toBe('dark')
+    expect(localStorage.getItem('tabulavibe-theme')).toBe('dark')
+    await user.click(screen.getByRole('button', { name: 'System theme' }))
+    expect(document.documentElement.hasAttribute('data-theme')).toBe(false)
+  })
 })

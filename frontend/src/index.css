@@ -1,25 +1,39 @@
 @import 'tailwindcss';
 
-/* Design tokens. Chart colours follow the validated reference palette (dataviz skill). */
+/*
+ * TabulaVibe design tokens: see DESIGN.md for the full system.
+ * Brand: indigo → violet gradient used sparingly. Chart series keep the validated dataviz palette.
+ * Themes: light by default, dark via OS preference or the in-app toggle (html[data-theme]).
+ */
 :root {
   color-scheme: light;
-  --page: #f6f6f3;
-  --surface: #fcfcfb;
-  --surface-2: #f0efec;
-  --ink: #0b0b0b;
-  --ink-2: #52514e;
-  --ink-muted: #6f6d68;
-  --line: #e1e0d9;
-  --line-strong: #c3c2b7;
-  --accent: #256abf;
+  --page: #f6f7fb;
+  --surface: #ffffff;
+  --surface-2: #f3f4f9;
+  --surface-3: #e9ebf4;
+  --glass: rgb(255 255 255 / 0.72);
+  --ink: #0f1222;
+  --ink-2: #474c63;
+  --ink-muted: #676c84;
+  --line: #e4e6ef;
+  --line-strong: #d0d4e1;
+  --accent: #4f46e5;
+  --accent-2: #7c3aed;
   --accent-ink: #ffffff;
-  --accent-soft: #e6effb;
-  --good: #006300;
-  --good-soft: #e5f3e5;
-  --warn: #8a5a00;
-  --warn-soft: #fdf3dc;
-  --bad: #b42828;
-  --bad-soft: #fbe9e9;
+  --accent-soft: #eef0ff;
+  --accent-text: #4338ca;
+  --good: #047857;
+  --good-soft: #e6f6ee;
+  --warn: #8a4b06;
+  --warn-soft: #fff4df;
+  --bad: #b42323;
+  --bad-soft: #fdecec;
+  --shadow-sm: 0 1px 2px rgb(15 18 34 / 0.06), 0 1px 1px rgb(15 18 34 / 0.04);
+  --shadow-md: 0 4px 16px -4px rgb(15 18 34 / 0.1), 0 2px 4px rgb(15 18 34 / 0.04);
+  --shadow-lg: 0 24px 48px -16px rgb(49 46 129 / 0.22);
+  --glow-1: rgb(99 102 241 / 0.16);
+  --glow-2: rgb(168 85 247 / 0.12);
+  --glow-3: rgb(14 165 233 / 0.1);
   --series-1: #2a78d6;
   --series-2: #eb6834;
   --series-3: #1baf7a;
@@ -33,23 +47,33 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
-    --page: #0d0d0d;
-    --surface: #1a1a19;
-    --surface-2: #242423;
-    --ink: #f0efec;
-    --ink-2: #c3c2b7;
-    --ink-muted: #9a988f;
-    --line: #2c2c2a;
-    --line-strong: #383835;
-    --accent: #3987e5;
-    --accent-ink: #0b0b0b;
-    --accent-soft: #1b2a3d;
-    --good: #0ca30c;
-    --good-soft: #142614;
-    --warn: #fab219;
-    --warn-soft: #2e2510;
-    --bad: #e66767;
-    --bad-soft: #351919;
+    --page: #0a0c16;
+    --surface: #121528;
+    --surface-2: #181c33;
+    --surface-3: #20253f;
+    --glass: rgb(18 21 40 / 0.72);
+    --ink: #eef0fb;
+    --ink-2: #b6bad3;
+    --ink-muted: #8d92b0;
+    --line: #252a47;
+    --line-strong: #353b60;
+    --accent: #818cf8;
+    --accent-2: #a78bfa;
+    --accent-ink: #0a0c16;
+    --accent-soft: #1d2046;
+    --accent-text: #a5b4fc;
+    --good: #34d399;
+    --good-soft: #0e2a21;
+    --warn: #fbbf24;
+    --warn-soft: #2c220c;
+    --bad: #f87171;
+    --bad-soft: #321517;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 6px 20px -6px rgb(0 0 0 / 0.55);
+    --shadow-lg: 0 24px 48px -16px rgb(0 0 0 / 0.6);
+    --glow-1: rgb(99 102 241 / 0.18);
+    --glow-2: rgb(168 85 247 / 0.12);
+    --glow-3: rgb(14 165 233 / 0.08);
     --series-1: #3987e5;
     --series-2: #d95926;
     --series-3: #199e70;
@@ -61,25 +85,71 @@
   }
 }
 
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --page: #0a0c16;
+  --surface: #121528;
+  --surface-2: #181c33;
+  --surface-3: #20253f;
+  --glass: rgb(18 21 40 / 0.72);
+  --ink: #eef0fb;
+  --ink-2: #b6bad3;
+  --ink-muted: #8d92b0;
+  --line: #252a47;
+  --line-strong: #353b60;
+  --accent: #818cf8;
+  --accent-2: #a78bfa;
+  --accent-ink: #0a0c16;
+  --accent-soft: #1d2046;
+  --accent-text: #a5b4fc;
+  --good: #34d399;
+  --good-soft: #0e2a21;
+  --warn: #fbbf24;
+  --warn-soft: #2c220c;
+  --bad: #f87171;
+  --bad-soft: #321517;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 6px 20px -6px rgb(0 0 0 / 0.55);
+  --shadow-lg: 0 24px 48px -16px rgb(0 0 0 / 0.6);
+  --glow-1: rgb(99 102 241 / 0.18);
+  --glow-2: rgb(168 85 247 / 0.12);
+  --glow-3: rgb(14 165 233 / 0.08);
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+}
+
 @theme inline {
   --color-page: var(--page);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-glass: var(--glass);
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
   --color-ink-muted: var(--ink-muted);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
   --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-text: var(--accent-text);
   --color-good: var(--good);
   --color-good-soft: var(--good-soft);
   --color-warn: var(--warn);
   --color-warn-soft: var(--warn-soft);
   --color-bad: var(--bad);
   --color-bad-soft: var(--bad-soft);
-  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --shadow-soft: var(--shadow-sm);
+  --shadow-card: var(--shadow-md);
+  --shadow-float: var(--shadow-lg);
+  --font-sans: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
 html,
@@ -91,11 +161,80 @@ body {
 body {
   margin: 0;
   font-family: var(--font-sans);
+  font-feature-settings: 'cv11', 'ss01';
   -webkit-font-smoothing: antialiased;
+  /* Soft brand glows behind the content. Decorative only. */
+  background-image:
+    radial-gradient(60rem 30rem at 10% -10%, var(--glow-1), transparent 60%),
+    radial-gradient(50rem 28rem at 95% 0%, var(--glow-2), transparent 60%),
+    radial-gradient(40rem 24rem at 50% 110%, var(--glow-3), transparent 60%);
+  background-attachment: fixed;
+}
+
+/* Keep scrolled-to content clear of the sticky header (sticky from the sm breakpoint). */
+@media (min-width: 40rem) {
+  html {
+    scroll-padding-top: 5.5rem;
+  }
 }
 
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* Registered as a Tailwind utility so variants like group-hover:brand-gradient work. */
+@utility brand-gradient {
+  background-image: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+}
+
+.brand-text {
+  background-image: linear-gradient(120deg, var(--accent) 0%, var(--accent-2) 60%, #0ea5e9 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Gradient hairline border for highlighted cards. */
+.gradient-border {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(135deg, var(--accent), var(--accent-2), #0ea5e9) border-box;
+}
+
+/* Native checkbox restyled as a switch: the knob is a radial gradient that slides on :checked. */
+.switch {
+  appearance: none;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  cursor: pointer;
+  background-color: var(--surface-3);
+  background-image: radial-gradient(circle at 0.625rem 50%, #ffffff 0.4rem, transparent 0.43rem);
+  background-repeat: no-repeat;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  transition:
+    background-color 0.15s,
+    background-position 0.15s;
+}
+.switch:checked {
+  background-color: var(--accent);
+  background-position: 1rem 0;
+  box-shadow: none;
+}
+
+/* Native checkbox with brand colour (filter values). */
+.check {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.dot-grid {
+  background-image: radial-gradient(var(--line-strong) 1px, transparent 1px);
+  background-size: 18px 18px;
 }
 
 :focus-visible {
@@ -103,13 +242,61 @@ body {
   outline-offset: 2px;
 }
 
+/* Motion: short, purposeful, and disabled for users who prefer reduced motion. */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -400px 0;
+  }
+  to {
+    background-position: 400px 0;
+  }
+}
+
+.animate-rise {
+  animation: rise-in 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 0%, var(--surface-3) 50%, var(--surface-2) 100%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 @media print {
-  :root {
+  :root,
+  :root[data-theme='dark'] {
     color-scheme: light;
     --page: #ffffff;
     --surface: #ffffff;
+    --surface-2: #f4f4f6;
     --ink: #000000;
     --ink-2: #333333;
+    --ink-muted: #555555;
+    --line: #dddddd;
+  }
+  body {
+    background-image: none;
   }
   @page {
     margin: 14mm;

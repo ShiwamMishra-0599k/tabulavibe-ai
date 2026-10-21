@@ -78,3 +78,22 @@ test('unsupported and invalid files show a clear error', async ({ page }) => {
   await page.locator('#file-input').setInputFiles({ name: 'header-only.csv', mimeType: 'text/csv', buffer: Buffer.from('a,b,c\n') })
   await expect(page.getByRole('alert')).toContainText('no data rows')
 })
+
+test('dark theme and one-click suggestion work end to end', async ({ page }, testInfo) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Dark theme' }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  await page.screenshot({ path: testInfo.outputPath('dark-01-home.png'), fullPage: true })
+  await page.getByRole('button', { name: 'Load sample: Retail sales (CSV)' }).click()
+  await page.getByRole('tab', { name: '2. Data quality' }).click()
+  await expect(page.getByRole('img', { name: /Data health: \d+(\.\d)?%/ })).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('dark-02-quality.png'), fullPage: true })
+  await page.getByRole('tab', { name: '3. Analyse' }).click()
+  // The first suggested measure in this sample is 'units'.
+  await page.getByRole('button', { name: /units by month/ }).click()
+  await expect(page.getByRole('img', { name: /line chart of sum of units over time/i })).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('dark-03-dashboard.png'), fullPage: true })
+  // The theme choice survives a reload.
+  await page.reload()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+})

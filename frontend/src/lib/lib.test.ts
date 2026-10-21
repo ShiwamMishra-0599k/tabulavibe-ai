@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { profile } from '../test/fixtures'
 import { api, ApiError } from './api'
 import { formatCompact, formatNumber, formatPercent } from './format'
-import { defaultSpec, validateSpec } from './spec'
+import { defaultSpec, suggestedAnalyses, validateSpec } from './spec'
 
 describe('format', () => {
   it('uses Indian digit grouping and handles missing values', () => {
@@ -52,6 +52,14 @@ describe('spec', () => {
       "Select at least one value for the 'region' filter, or remove it.",
       "Choose a start or end date for the 'date' filter, or remove it.",
     ])
+  })
+
+  it('suggests up to three one-click analyses from the schema', () => {
+    const suggestions = suggestedAnalyses(profile)
+    expect(suggestions.map((s) => s.title)).toEqual(['revenue by month', 'revenue by region', 'Rows per region'])
+    expect(suggestions[0].spec).toMatchObject({ measures: [{ column: 'revenue', aggregation: 'sum' }], group_by: 'date', time_grain: 'month' })
+    expect(suggestions[2].spec.measures).toEqual([{ column: null, aggregation: 'count' }])
+    for (const s of suggestions) expect(validateSpec(s.spec, profile)).toEqual([])
   })
 
   it('accepts a valid spec', () => {

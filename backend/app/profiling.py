@@ -265,6 +265,7 @@ def column_profile(ds: Dataset, name: str) -> dict[str, Any]:
         "role": info.role,
         "missing_count": info.missing_count,
         "missing_pct": round(info.missing_count / n * 100, 2) if n else 0.0,
+        "valid_pct": round((n - info.missing_count - info.invalid_count) / n * 100, 1) if n else 0.0,
         "invalid_count": info.invalid_count,
         "invalid_examples": info.invalid_examples,
         "unique_count": info.unique_count,
@@ -317,6 +318,9 @@ def build_profile(ds: Dataset, filename: str | None, preview_rows: int = 50) -> 
     duplicates = duplicate_row_count(ds)
     total_cells = ds.row_count * len(columns)
     missing_cells = sum(c["missing_count"] for c in columns)
+    invalid_cells = sum(c["invalid_count"] for c in columns)
+    # Data health = share of cells that are present and valid for their column type.
+    valid_cells = total_cells - missing_cells - invalid_cells
     issues: list[dict[str, str]] = []
     if duplicates:
         issues.append(
@@ -359,6 +363,8 @@ def build_profile(ds: Dataset, filename: str | None, preview_rows: int = 50) -> 
             "duplicate_row_count": duplicates,
             "missing_cell_count": missing_cells,
             "missing_cell_pct": round(missing_cells / total_cells * 100, 2) if total_cells else 0.0,
+            "invalid_cell_count": invalid_cells,
+            "valid_cell_pct": round(valid_cells / total_cells * 100, 1) if total_cells else 0.0,
             "empty_rows_skipped": ds.source.empty_rows_dropped,
         },
         "columns": columns,
