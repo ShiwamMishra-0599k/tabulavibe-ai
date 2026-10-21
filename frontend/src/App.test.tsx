@@ -23,6 +23,17 @@ function mockServer(overrides: Record<string, () => Response> = {}) {
 }
 
 describe('App', () => {
+  it('opens a sign-in dialog with Google and GitHub options', async () => {
+    const user = userEvent.setup()
+    mockServer()
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: 'Sign in' }))
+    expect(screen.getByRole('dialog', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue with GitHub' })).toBeInTheDocument()
+  })
+
   it('walks through sample → preview → quality → analysis → report', async () => {
     const user = userEvent.setup()
     mockServer()

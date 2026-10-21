@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Stethoscope,
   Sun,
+  LogIn,
   type LucideIcon,
 } from 'lucide-react'
 import { AiNarrative } from './components/AiNarrative'
@@ -21,6 +22,7 @@ import { Dashboard } from './components/Dashboard'
 import { DataPreview } from './components/DataPreview'
 import { QualityReport } from './components/QualityReport'
 import { ReportView } from './components/ReportView'
+import { SignInDialog } from './components/SignInDialog'
 import { Alert, Button, IconChip, Skeleton, Spinner, Toggle } from './components/ui'
 import { Hero, UploadPanel } from './components/UploadPanel'
 import { api, ApiError, saveBlob } from './lib/api'
@@ -87,6 +89,7 @@ export default function App() {
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [analysedAt, setAnalysedAt] = useState(() => new Date())
   const [narrative, setNarrative] = useState<Narrative | null>(null)
+  const [signInOpen, setSignInOpen] = useState(false)
   const [tab, setTab] = useState<Tab>('preview')
   const [chartKind, setChartKind] = useState<ChartKind>('bar')
   const [measureKey, setMeasureKey] = useState('')
@@ -275,10 +278,14 @@ export default function App() {
                 </Button>
               </>
             )}
+            <Button size="sm" variant="secondary" icon={LogIn} onClick={() => setSignInOpen(true)}>
+              Sign in
+            </Button>
             <ThemeToggle />
           </div>
         </div>
       </header>
+      <SignInDialog open={signInOpen} onClose={() => setSignInOpen(false)} />
 
       <main className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:py-8">
         {serverError && (
