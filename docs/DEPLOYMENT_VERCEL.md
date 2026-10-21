@@ -1,5 +1,13 @@
 # Deploying to Vercel (from GitHub)
 
+**Live:** <https://tabulavibe-ai.vercel.app> · Vercel project `shiwam/tabulavibe-ai` (Hobby) · Git: `ShiwamMishra-0599k/tabulavibe-ai`, production branch `main`.
+
+Check any deployment with the full browser suite (desktop + Pixel 7, no local servers):
+
+```powershell
+cd frontend; $env:E2E_BASE_URL = 'https://tabulavibe-ai.vercel.app'; npx playwright test; Remove-Item Env:E2E_BASE_URL
+```
+
 One Vercel project serves everything on one domain, using [Vercel Services](https://vercel.com/docs/services)
 (configured in [`vercel.json`](../vercel.json)):
 
@@ -82,7 +90,11 @@ Add the production URL in four places (replace `<project>`):
 
 ## Verified locally
 
-`vercel dev -L` (Vercel CLI 65.0.0, no login) ran both services from this `vercel.json`. Through the Vercel
+First production deployment (2026-10-21, commit `6866091`, build 40 s, Python function about 52 MB):
+all API checks, the 3.5 MB limit (413), hidden docs, security headers (`X-Frame-Options: DENY`,
+`nosniff`, `Referrer-Policy`, HSTS from Vercel, immutable `/assets` caching) and all 8 Playwright journeys passed.
+
+Before that, `vercel dev -L` (Vercel CLI 65.0.0, no login) ran both services from this `vercel.json`. Through the Vercel
 router: `/` served the frontend, and `/api/health`, `/api/samples/retail-sales`, `/api/profile`,
 `/api/analyze`, `/api/export/cleaned` and `/api/github` worked. `/api/docs` returned 404 and the upload limit
 was 3.5 MB (the `VERCEL=1` defaults). The security headers in `vercel.json` are not applied by the local dev

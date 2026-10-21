@@ -6,6 +6,8 @@ an interactive KPI dashboard, downloadable CSV exports and a print-ready managem
 services are required. Optional **Supabase** accounts (sign up with Google/Gmail or GitHub) let users save
 reports and reopen them later.
 
+**🌐 Live demo: <https://tabulavibe-ai.vercel.app>** (hosted on Vercel; sample data is synthetic)
+
 > ⚠️ TabulaVibe AI is a demonstration tool. Files are processed in memory and never stored (saved reports
 > keep only aggregated results), but do not upload confidential or regulated data.
 

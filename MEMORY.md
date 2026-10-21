@@ -17,7 +17,7 @@ look and feel, see `DESIGN.md`.
 | Repository | https://github.com/ShiwamMishra-0599k/tabulavibe-ai (public) |
 | Local path | `C:\Users\swath\projects\tabulavibe-ai` |
 | Budget rule | ₹0 software and infrastructure cost wherever possible; never claim "free forever" |
-| Status | Local app complete and tested; AWS deployment prepared, **not deployed** (no AWS CLI, SAM or credentials) |
+| Status | **Live on Vercel: https://tabulavibe-ai.vercel.app** (project `shiwam/tabulavibe-ai`, Hobby). AWS prepared but not used |
 | Version | 0.3.0 (Supabase accounts + saved reports, 2026-10-21) |
 
 ## 2. Non-negotiable product rules
@@ -72,6 +72,7 @@ look and feel, see `DESIGN.md`.
 | 2026-10-21 | `docs/TECHNICAL_REFERENCE.md` (+ PDF) reverse-engineered from the code; 10 findings (F1–F10) |
 | 2026-10-21 | UI v2 redesign; `DESIGN.md` and `MEMORY.md` added |
 | 2026-10-21 | Shashank pushed the floating navbar (`4faf22d`) and sign-in dialog (`c390ec6`) to `main` |
+| 2026-10-21 | **Deployed to Vercel**: https://tabulavibe-ai.vercel.app (all live checks + 8 E2E passed) |
 | 2026-10-21 | v0.3.0: Supabase accounts (Google/GitHub), profiles, saved reports; 136 pytest, 26 Vitest; GitHub star badge |
 
 ## 5. Conventions
@@ -101,6 +102,7 @@ look and feel, see `DESIGN.md`.
 - **lucide-react v1** renamed icons (`ChartColumn`, `TriangleAlert`, `LoaderCircle`). Check names against the package before using them.
 - **OAuth redirect reloads the page:** the in-memory file is lost on sign-in. The sign-in page warns when a file is open.
 - **Shell heredocs:** long multi-line Python heredocs in Bash sometimes fail to parse here. Write the script to the scratchpad and run it.
+- **Vercel CLI edits files:** `vercel link` appended `.vercel` and `.env*` to `.gitignore` (the latter would hide `.env.example`) and wrote a token to `.env.local`. Revert the `.gitignore` edit; `.env.local` is already ignored by `.env.*`.
 - **Print:** browsers drop background colours, so white-on-gradient headers need `print:` overrides.
 
 ## 7. Open items
@@ -109,7 +111,7 @@ look and feel, see `DESIGN.md`.
 |---|---|---|
 | Fix F10 (500 responses without CORS headers) | **High before AWS** | See TECHNICAL_REFERENCE §14 |
 | Create Supabase project + enable Google/GitHub providers | **Waiting on Shiwam** | Follow `docs/SUPABASE_SETUP.md`; then live-test sign-in and saving |
-| Import the repo in Vercel and verify the live URL + security headers | **Waiting on Shiwam** | `docs/DEPLOYMENT_VERCEL.md` |
+| Confirm auto-deploy on push (Vercel GitHub App) | Check | First deploy was triggered via the Vercel API from GitHub `main`; see DEPLOYMENT_VERCEL.md |
 | Deploy to AWS | Optional (Vercel chosen) | Install AWS CLI + SAM, non-root credentials, check Free/Paid plan, follow `docs/DEPLOYMENT.md` |
 | Live-test Gemini | Optional | Needs a key from an AI Studio project **without billing** |
 | Fix F1–F9 | Low–medium | Filter options vs. label merging (F2) is the most user-visible |
