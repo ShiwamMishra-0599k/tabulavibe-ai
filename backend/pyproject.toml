@@ -1,0 +1,23 @@
+[project]
+name = "tabulavibe-backend"
+version = "0.1.0"
+description = "TabulaVibe AI API: CSV/XLSX profiling, KPI analysis and exports"
+requires-python = ">=3.13"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient`"]
+
+[tool.ruff]
+line-length = 140
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM"]
+# B008: FastAPI declares File()/Form()/Depends() in defaults. E501: long strings are left to the formatter.
+ignore = ["S101", "B008", "E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S"]
+"scripts/*" = ["S311"]

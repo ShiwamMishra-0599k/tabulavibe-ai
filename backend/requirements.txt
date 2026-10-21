@@ -1,0 +1,11 @@
+# Runtime dependencies (also packaged into the AWS Lambda function).
+fastapi==0.156.3
+starlette==1.9.0
+pydantic==2.14.1
+pydantic-settings==2.16.1
+pandas==3.0.6
+numpy==2.5.4
+openpyxl==3.1.5
+python-multipart==0.0.32
+httpx==0.28.1
+mangum==0.22.0

@@ -1,0 +1,4 @@
+-r requirements.txt
+uvicorn==0.54.0
+pytest==9.1.1
+ruff==0.17.1
