@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { api, setAccessTokenProvider } from './lib/api'
-import type { AuthState } from './lib/auth'
+import { ProviderDisabledError, type AuthState } from './lib/auth'
 import { config, jsonResponse, profile, result } from './test/fixtures'
 
 // Supabase Auth is replaced by a controllable fake; the backend is mocked through fetch.
@@ -12,7 +12,8 @@ const authMock = vi.hoisted(() => ({
   signIn: vi.fn(async () => {}),
   signOut: vi.fn(async () => {}),
 }))
-vi.mock('./lib/auth', () => ({
+vi.mock('./lib/auth', async (importOriginal) => ({
+  ProviderDisabledError: (await importOriginal<typeof import('./lib/auth')>()).ProviderDisabledError,
   useAuth: () => ({ state: authMock.state, signIn: authMock.signIn, signOut: authMock.signOut, token: async () => 'user-token' }),
 }))
 
@@ -130,6 +131,17 @@ describe('Accounts and saved reports', () => {
     const signUp = screen.getByRole('region', { name: 'Create your TabulaVibe account' })
     await user.click(within(signUp).getByRole('button', { name: 'Sign in' }))
     expect(screen.getByRole('dialog', { name: 'Sign in' })).toBeInTheDocument()
+  })
+
+  it('explains when a provider is not switched on yet instead of sending the visitor to an error page', async () => {
+    const user = userEvent.setup()
+    mockServer()
+    authMock.signIn.mockRejectedValueOnce(new ProviderDisabledError('google'))
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Sign in' }))
+    await user.click(screen.getByRole('button', { name: 'Continue with Google' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent("Google sign-in isn't switched on yet. Try the other option, or come back soon.")
+    expect(screen.getByRole('button', { name: 'Continue with GitHub' })).toBeEnabled()
   })
 
   it('asks a signed-out user to sign in before saving', async () => {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { TriangleAlert, X } from 'lucide-react'
-import type { OAuthProvider } from '../lib/auth'
+import { ProviderDisabledError, type OAuthProvider } from '../lib/auth'
 
 type Provider = 'Google' | 'GitHub'
 
@@ -68,8 +68,8 @@ export function SignInDialog({ open, onClose, onSignIn, onCreateAccount, hasOpen
     if (!onSignIn) return
     try {
       await onSignIn(PROVIDER_IDS[provider]) // the browser now leaves for the provider's consent page
-    } catch {
-      setError(`${provider} sign-in could not start. Check your connection and try again.`)
+    } catch (e) {
+      setError(e instanceof ProviderDisabledError ? e.message : `${provider} sign-in could not start. Check your connection and try again.`)
       setSelectedProvider(null)
     }
   }

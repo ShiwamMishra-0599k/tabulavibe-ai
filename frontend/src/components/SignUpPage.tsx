@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ArrowLeft, ChartNoAxesColumn, FolderOpen, Lock, ShieldCheck, UserRoundPlus } from 'lucide-react'
-import type { OAuthProvider } from '../lib/auth'
+import { ProviderDisabledError, type OAuthProvider } from '../lib/auth'
 import { GitHubMark, GoogleMark } from './SignInDialog'
 import { Alert, IconChip } from './ui'
 
@@ -33,8 +33,8 @@ export function SignUpPage({ onSignUp, onSignInInstead, onBack, hasOpenWork }: P
     setError(null)
     try {
       await onSignUp(provider) // the browser now leaves for the provider's consent page
-    } catch {
-      setError('Sign-up could not start. Check your connection and try again.')
+    } catch (e) {
+      setError(e instanceof ProviderDisabledError ? e.message : 'Sign-up could not start. Check your connection and try again.')
       setPending(null)
     }
   }

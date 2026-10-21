@@ -35,6 +35,7 @@ look and feel, see `DESIGN.md`.
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-10-21 | Supabase project **`xftrxawqcoygrzohaase`** connected (URL + publishable key in Vercel Production/Preview and `backend/.env`); sign-in required stays **off** until Google/GitHub work | Avoid locking visitors out; buttons check provider status first |
 | 2026-10-21 | **Uploads require sign-in** (`TABULAVIBE_REQUIRE_SIGN_IN`), enforced server-side via Supabase `/auth/v1/user` (60 s cache by token hash) | Shiwam's request. Server-side so it can't be bypassed; `/auth/v1/user` needs no extra JWT library and rejects signed-out sessions; fails closed if Supabase is missing |
 | 2026-10-21 | OAuth credentials are created **by Shiwam** in GitHub/Google/Supabase | Client secrets must never pass through Claude, code, Vercel or chat; GitHub OAuth apps can't be created by API anyway |
 | 2026-10-21 | Host on **Vercel** (Services: one project, one domain) instead of AWS for now | Shiwam asked for Vercel via GitHub; same origin removes CORS; Hobby is free but non-commercial only |

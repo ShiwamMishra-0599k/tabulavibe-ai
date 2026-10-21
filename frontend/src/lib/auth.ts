@@ -11,6 +11,30 @@ import type { AppConfig } from './types'
  */
 export type OAuthProvider = 'google' | 'github'
 
+const PROVIDER_NAMES: Record<OAuthProvider, string> = { google: 'Google', github: 'GitHub' }
+
+/** The provider is not switched on in Supabase yet (Authentication → Sign In / Providers). */
+export class ProviderDisabledError extends Error {
+  readonly provider: OAuthProvider
+
+  constructor(provider: OAuthProvider) {
+    super(`${PROVIDER_NAMES[provider]} sign-in isn't switched on yet. Try the other option, or come back soon.`)
+    this.provider = provider
+  }
+}
+
+/** Asks Supabase which providers are enabled, so a visitor never lands on a raw "provider is not enabled" page. */
+async function providerEnabled(url: string, anonKey: string, provider: OAuthProvider): Promise<boolean> {
+  try {
+    const response = await fetch(`${url}/auth/v1/settings`, { headers: { apikey: anonKey } })
+    if (!response.ok) return true // can't tell: let Supabase decide
+    const settings = (await response.json()) as { external?: Record<string, boolean> }
+    return settings.external?.[provider] !== false
+  } catch {
+    return true
+  }
+}
+
 export type AuthState =
   | { status: 'disabled' }
   | { status: 'loading' }
@@ -94,6 +118,7 @@ export function useAuth(config: AppConfig | null) {
   }
 
   async function signIn(provider: OAuthProvider): Promise<void> {
+    if (url && anonKey && !(await providerEnabled(url, anonKey, provider))) throw new ProviderDisabledError(provider)
     const { error } = await (await client()).auth.signInWithOAuth({ provider, options: { redirectTo: `${window.location.origin}/` } })
     if (error) throw error
   }

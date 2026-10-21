@@ -8,6 +8,7 @@
   v0.3.0 wires this dialog to Supabase Auth; without Supabase it keeps the original "available after OAuth is configured" preview.
 
 ### Added
+- Sign-in buttons check which providers are switched on in Supabase (`/auth/v1/settings`) and explain "Google sign-in isn't switched on yet" instead of sending visitors to Supabase's raw error page.
 - **Sign-in-only uploads** (`TABULAVIBE_REQUIRE_SIGN_IN=true`): every upload/analysis/export/AI endpoint needs a valid Supabase session, checked by the backend with Supabase Auth (`/auth/v1/user`, verified tokens cached 60 s by hash). Signed-out visitors see "Sign in to upload your data" and locked samples; signing out closes the open file. Refuses to start if enabled without Supabase. AI rate limit is per user when signed in.
 - Optional **Supabase** integration (off until `TABULAVIBE_SUPABASE_URL` and `TABULAVIBE_SUPABASE_ANON_KEY` are set).
 - **Sign in** (Shashank's dialog, now live) and a full **Sign up page**, both with Google (Gmail) and GitHub (Supabase Auth, PKCE). A `profiles` row is created by a database trigger on first sign-in.

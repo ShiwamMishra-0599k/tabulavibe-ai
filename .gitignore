@@ -39,3 +39,6 @@ Thumbs.db
 .vercel/
 backend/build/
 *.egg-info/
+
+# Supabase CLI cache
+supabase/.temp/
