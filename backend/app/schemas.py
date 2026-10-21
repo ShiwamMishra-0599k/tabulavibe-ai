@@ -50,9 +50,12 @@ class AnalysisSpec(BaseModel):
     time_grain: TimeGrain = "month"
     filters: list[Filter] = Field(default_factory=list, max_length=10)
     remove_duplicates: bool = False
+    # Treat category labels that differ only by letter case or spacing as one value.
+    merge_label_variants: bool = False
 
 
 class CleanOptions(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     remove_duplicates: bool = False
+    merge_label_variants: bool = False

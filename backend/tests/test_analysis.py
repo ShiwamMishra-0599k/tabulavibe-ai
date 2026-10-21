@@ -198,3 +198,15 @@ def test_group_truncation(settings):
     assert len(result["rows"]) == 10
     assert result["grouping"]["truncated"] is True
     assert result["rows"][0]["group"] == "n29"
+
+
+def test_merge_label_variants_is_opt_in(settings):
+    from app.ingest import load_table
+    from app.profiling import build_dataset
+
+    ds = build_dataset(load_table("x.csv", b"region,v\nNorth,1\nNorth,2\nnorth,4\n NORTH ,8\nSouth,16\n", settings))
+    base = run_analysis(ds, spec(measures=[{"column": "v", "aggregation": "sum"}], group_by="region"))
+    assert {r["group"] for r in base["rows"]} == {"North", "north", "NORTH", "South"}
+    merged = run_analysis(ds, spec(measures=[{"column": "v", "aggregation": "sum"}], group_by="region", merge_label_variants=True))
+    assert [(r["group"], r["values"]["sum__v"]) for r in merged["rows"]] == [("North", 15), ("South", 16)][::-1]
+    assert any("2 'region' value(s)" in n for n in merged["notes"])

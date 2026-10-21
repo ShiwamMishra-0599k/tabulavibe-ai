@@ -367,3 +367,26 @@ def build_profile(ds: Dataset, filename: str | None, preview_rows: int = 50) -> 
         "preview": {"columns": list(ds.raw.columns), "rows": preview.values.tolist(), "total_rows": ds.row_count},
         "suggestions": suggestions(ds),
     }
+
+
+def merge_label_variants(ds: Dataset) -> tuple[pd.DataFrame, dict[str, int]]:
+    """Return a copy of the typed frame where category labels that differ only by letter case or
+    spacing are replaced by their most frequent spelling. Only applied when the user opts in."""
+    typed = ds.typed.copy()
+    changed: dict[str, int] = {}
+    for name, info in ds.columns.items():
+        if info.inferred_type != "category":
+            continue
+        col = typed[name]
+        present = col.dropna().astype(str)
+        if present.empty:
+            continue
+        keys = present.str.lower().str.replace(r"\s+", " ", regex=True)
+        counts = pd.DataFrame({"key": keys, "value": present}).groupby(["key", "value"]).size().reset_index(name="n")
+        canonical = counts.sort_values(["n", "value"], ascending=[False, True]).drop_duplicates("key").set_index("key")["value"]
+        merged = keys.map(canonical)
+        diff = int((merged != present).sum())
+        if diff:
+            typed.loc[merged.index, name] = merged
+            changed[name] = diff
+    return typed, changed

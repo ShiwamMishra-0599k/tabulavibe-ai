@@ -8,9 +8,10 @@ from typing import Any
 
 import pandas as pd
 
-from .profiling import MISSING_TOKENS, Dataset
+from .profiling import MISSING_TOKENS, Dataset, merge_label_variants
 
 # OWASP CSV injection guidance: cells starting with these characters may be run as formulas.
+UTF8_BOM = chr(0xFEFF)
 _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r", "\n")
 
 
@@ -39,13 +40,17 @@ def _to_csv(header: list[str], rows: list[list[str]]) -> str:
     writer.writerow([safe_cell(h) for h in header])
     writer.writerows(rows)
     # UTF-8 BOM so Excel opens non-ASCII text (e.g. ₹) correctly.
-    return "﻿" + buffer.getvalue()
+    return UTF8_BOM + buffer.getvalue()
 
 
-def cleaned_rows(ds: Dataset, remove_duplicates: bool) -> tuple[list[str], list[list[str]], dict[str, int]]:
+def cleaned_rows(ds: Dataset, remove_duplicates: bool, merge_variants: bool = False) -> tuple[list[str], list[list[str]], dict[str, int]]:
     """Standardise parseable values; keep unparseable values exactly as uploaded; leave missing values empty."""
     raw = ds.raw
     typed = ds.typed
+    labels_merged = 0
+    if merge_variants:
+        typed, changed = merge_label_variants(ds)
+        labels_merged = sum(changed.values())
     keep = ~raw.duplicated(keep="first") if remove_duplicates else pd.Series(True, index=raw.index)
     raw = raw[keep]
     typed = typed[keep]
@@ -78,12 +83,12 @@ def cleaned_rows(ds: Dataset, remove_duplicates: bool) -> tuple[list[str], list[
                 final.append(safe_cell(original))
         columns.append(final)
     rows = [list(row) for row in zip(*columns, strict=True)] if columns else []
-    summary = {"rows_exported": len(rows), "duplicates_removed": int((~keep).sum())}
+    summary = {"rows_exported": len(rows), "duplicates_removed": int((~keep).sum()), "labels_merged": labels_merged}
     return list(raw.columns), rows, summary
 
 
-def cleaned_csv(ds: Dataset, remove_duplicates: bool) -> tuple[str, dict[str, int]]:
-    header, rows, summary = cleaned_rows(ds, remove_duplicates)
+def cleaned_csv(ds: Dataset, remove_duplicates: bool, merge_variants: bool = False) -> tuple[str, dict[str, int]]:
+    header, rows, summary = cleaned_rows(ds, remove_duplicates, merge_variants)
     return _to_csv(header, rows), summary
 
 

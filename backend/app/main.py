@@ -60,7 +60,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_origins=settings.origins,
         allow_methods=["GET", "POST"],
         allow_headers=["Content-Type"],
-        expose_headers=["Content-Disposition", "X-Rows-Exported", "X-Duplicates-Removed"],
+        expose_headers=["Content-Disposition", "X-Rows-Exported", "X-Duplicates-Removed", "X-Labels-Merged"],
         max_age=600,
     )
 
@@ -165,7 +165,7 @@ def _register_routes(app: FastAPI) -> None:
     def export_cleaned(settings: SettingsDep, file: UploadFile = File(...), options: str = Form("{}", max_length=2_000)):
         parsed = _parse_json_field(CleanOptions, options, "options")
         ds = _load(file, settings)
-        text, summary = cleaned_csv(ds, parsed.remove_duplicates)
+        text, summary = cleaned_csv(ds, parsed.remove_duplicates, parsed.merge_label_variants)
         return Response(
             content=text.encode("utf-8"),
             media_type="text/csv; charset=utf-8",
@@ -173,6 +173,7 @@ def _register_routes(app: FastAPI) -> None:
                 "Content-Disposition": 'attachment; filename="tabulavibe_cleaned_data.csv"',
                 "X-Rows-Exported": str(summary["rows_exported"]),
                 "X-Duplicates-Removed": str(summary["duplicates_removed"]),
+                "X-Labels-Merged": str(summary["labels_merged"]),
             },
         )
 

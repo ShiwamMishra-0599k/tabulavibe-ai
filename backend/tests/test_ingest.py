@@ -20,7 +20,7 @@ def test_csv_parsing_reads_header_and_rows(settings, sales_bytes):
 
 
 def test_csv_semicolon_and_bom_and_whitespace(settings):
-    content = "﻿name ; amount\n alpha ; 1\nbeta;2\n".encode()
+    content = b"\xef\xbb\xbf" + b"name ; amount\n alpha ; 1\nbeta;2\n"  # UTF-8 byte-order mark
     table = load_table("x.csv", content, settings)
     assert list(table.frame.columns) == ["name", "amount"]
     assert table.frame["name"].tolist() == ["alpha", "beta"]

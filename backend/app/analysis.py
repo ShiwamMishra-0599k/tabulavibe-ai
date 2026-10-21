@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from .errors import DataError
-from .profiling import Dataset, _num
+from .profiling import Dataset, _num, merge_label_variants
 from .schemas import AnalysisSpec, Filter, Measure
 
 AGG_LABELS = {"sum": "Sum", "mean": "Average", "count": "Count", "min": "Minimum", "max": "Maximum"}
@@ -180,6 +180,14 @@ def run_analysis(ds: Dataset, spec: AnalysisSpec, max_groups: int = 100) -> dict
     _validate(ds, spec)
     frame = ds.typed
     notes: list[str] = []
+    if spec.merge_label_variants:
+        frame, changed = merge_label_variants(ds)
+        for column, count in changed.items():
+            notes.append(
+                f"{count} '{column}' value(s) that differed only by letter case or spacing were merged into the most common spelling."
+            )
+        if not changed:
+            notes.append("No labels differing only by letter case or spacing were found.")
     if spec.remove_duplicates:
         keep = ~ds.raw.duplicated(keep="first")
         removed = int((~keep).sum())

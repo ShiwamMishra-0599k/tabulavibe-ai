@@ -17,7 +17,7 @@ def upload(data: bytes, name: str = "sales.csv"):
 
 
 def read_csv(text: str) -> list[list[str]]:
-    assert text.startswith("﻿")
+    assert text.startswith(chr(0xFEFF))
     return list(csv.reader(io.StringIO(text[1:])))
 
 
@@ -180,3 +180,12 @@ def test_wildcard_origin_is_ignored():
 def test_docs_hidden_in_production():
     client = TestClient(create_app(Settings(app_env="production", _env_file=None)))
     assert client.get("/api/docs").status_code == 404
+
+
+def test_cleaned_export_can_merge_label_variants(client):
+    data = b"region,v\nNorth,1\nNorth,2\nnorth,3\n"
+    res = client.post("/api/export/cleaned", files=upload(data), data={"options": json.dumps({"merge_label_variants": True})})
+    assert res.headers["x-labels-merged"] == "1"
+    assert [r[0] for r in read_csv(res.text)] == ["region", "North", "North", "North"]
+    plain = client.post("/api/export/cleaned", files=upload(data))
+    assert [r[0] for r in read_csv(plain.text)] == ["region", "North", "North", "north"]
