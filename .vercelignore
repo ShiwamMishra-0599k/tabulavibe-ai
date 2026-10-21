@@ -1,0 +1,16 @@
+# Never upload these with `vercel deploy` (Git deployments only see committed files anyway).
+**/.venv
+**/node_modules
+frontend/dist
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+frontend/test-results
+frontend/playwright-report
+frontend/blob-report
+.env*
+!.env.example
+.aws-sam
+infra/build
+backend/build
+*.egg-info
