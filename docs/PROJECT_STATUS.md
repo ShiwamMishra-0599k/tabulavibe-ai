@@ -6,7 +6,7 @@ _Last updated: 2026-10-21_
 |---|---|---|
 | M1 Local dashboard MVP | **Done** | Full journey verified in real Chrome on desktop and mobile viewports (Playwright). Hand-computed fixtures and an independent `csv` cross-check pass |
 | M2 Optional AI commentary | **Done** (not live-tested) | Provider abstraction plus Gemini REST provider. Missing key, failures, quota, timeouts, malformed responses and rate limiting are tested. No real API key was available, so no live Gemini call was made |
-| M3 GitHub / AWS deployment | **Prepared, not deployed** | SAM template passes cfn-lint. The arm64 package was built and invoked in the official Lambda image. Deploy script and checklist written. Blockers listed below |
+| M3 GitHub / AWS deployment | **GitHub: done. AWS: prepared, not deployed** | Public repo <https://github.com/ShiwamMishra-0599k/tabulavibe-ai> (pushed and verified 2026-10-21). SAM template passes cfn-lint; the arm64 package was built and invoked in the official Lambda image; deploy script and checklist written. AWS blocker below |
 | M4 Quality and handover | **Done** | See the check results below |
 
 ## Check results (2026-10-21)
@@ -28,7 +28,6 @@ _Last updated: 2026-10-21_
 ## Blockers for deployment
 
 1. **AWS:** the AWS CLI and SAM CLI are not installed and there are no AWS credentials. The account plan, free-tier eligibility and credits are therefore unknown, so the ₹0 budget cannot be evaluated for a real account. Follow [DEPLOYMENT.md](DEPLOYMENT.md).
-2. **GitHub:** publishing needs the owner's decision on the account and on public versus private visibility. This is an outward-facing action.
 
 ## Known limitations
 

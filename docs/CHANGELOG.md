@@ -24,3 +24,4 @@
   - The template passes cfn-lint.
   - The arm64 package was verified in the official Lambda image and Runtime Interface Emulator.
 - Documentation: spec, architecture, deployment and cost analysis, status, research notes.
+- Published to GitHub: https://github.com/ShiwamMishra-0599k/tabulavibe-ai (public).
