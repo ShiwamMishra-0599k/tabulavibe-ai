@@ -1,0 +1,183 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  TabulaVibe AI - minimal serverless deployment. Private S3 bucket + CloudFront (OAC) for the
+  static frontend; one Lambda function with a Function URL for the FastAPI backend. No database,
+  no API Gateway, no NAT, no load balancer. Uploaded files are processed in memory and never stored.
+
+Parameters:
+  AlertEmail:
+    Type: String
+    Default: ''
+    Description: Email address for the monthly cost budget alert (leave empty to skip creating the budget).
+  MonthlyBudgetUsd:
+    Type: Number
+    Default: 1
+    MinValue: 1
+    Description: Budget alert threshold in USD. Alerts fire at 50% actual, 100% actual and 100% forecast.
+  AiProvider:
+    Type: String
+    Default: none
+    AllowedValues: [none, gemini]
+    Description: Optional AI commentary provider. Keep "none" unless you have a free-tier key.
+  GeminiApiKey:
+    Type: String
+    Default: ''
+    NoEcho: true
+    Description: Only used when AiProvider=gemini. Stored as a Lambda environment variable.
+  GeminiModel:
+    Type: String
+    Default: gemini-3.5-flash-lite
+  LogRetentionDays:
+    Type: Number
+    Default: 7
+    AllowedValues: [1, 3, 5, 7, 14, 30]
+
+Conditions:
+  HasAlertEmail: !Not [!Equals [!Ref AlertEmail, '']]
+
+Globals:
+  Function:
+    Runtime: python3.14
+    Architectures: [arm64]
+    MemorySize: 1024
+    Timeout: 20
+
+Resources:
+  # ------------------------------------------------------------------ backend
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: TabulaVibe AI FastAPI backend (stateless)
+      CodeUri: build/api/
+      Handler: app.lambda_handler.handler
+      LoggingConfig:
+        LogGroup: !Ref ApiLogGroup
+      Environment:
+        Variables:
+          TABULAVIBE_APP_ENV: production
+          TABULAVIBE_ALLOWED_ORIGINS: !Sub https://${FrontendDistribution.DomainName}
+          TABULAVIBE_AI_PROVIDER: !Ref AiProvider
+          TABULAVIBE_GEMINI_API_KEY: !Ref GeminiApiKey
+          TABULAVIBE_GEMINI_MODEL: !Ref GeminiModel
+      FunctionUrlConfig:
+        # Public HTTPS endpoint. CORS is enforced by the application (explicit origin list),
+        # so Function URL CORS is intentionally not configured to avoid duplicate headers.
+        AuthType: NONE
+      # No extra IAM permissions: the function only needs to write its own logs (added by SAM).
+
+  ApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-api
+      RetentionInDays: !Ref LogRetentionDays
+
+  # ----------------------------------------------------------------- frontend
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowCloudFrontReadOnly
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub ${FrontendBucket.Arn}/*
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${FrontendDistribution}
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt FrontendBucket.Arn
+              - !Sub ${FrontendBucket.Arn}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  FrontendOac:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub ${AWS::StackName}-oac
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  FrontendDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: TabulaVibe AI frontend
+        Enabled: true
+        HttpVersion: http2and3
+        PriceClass: PriceClass_200
+        DefaultRootObject: index.html
+        Origins:
+          - Id: s3-frontend
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt FrontendOac.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+        DefaultCacheBehavior:
+          TargetOriginId: s3-frontend
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD]
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # Managed-CachingOptimized
+          ResponseHeadersPolicyId: 67f7725c-6f97-4210-82d7-5512b31e9d03 # Managed-SecurityHeadersPolicy
+
+  # ------------------------------------------------------------- cost guard
+  CostBudget:
+    Type: AWS::Budgets::Budget
+    Condition: HasAlertEmail
+    Properties:
+      Budget:
+        BudgetName: !Sub ${AWS::StackName}-monthly-cost
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: !Ref MonthlyBudgetUsd
+          Unit: USD
+      NotificationsWithSubscribers:
+        - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 50, ThresholdType: PERCENTAGE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+        - Notification: { NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 100, ThresholdType: PERCENTAGE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+        - Notification: { NotificationType: FORECASTED, ComparisonOperator: GREATER_THAN, Threshold: 100, ThresholdType: PERCENTAGE }
+          Subscribers: [{ SubscriptionType: EMAIL, Address: !Ref AlertEmail }]
+
+Outputs:
+  FrontendUrl:
+    Description: Public URL of the web app
+    Value: !Sub https://${FrontendDistribution.DomainName}
+  ApiUrl:
+    Description: Lambda Function URL for the API (used as VITE_API_BASE_URL at frontend build time)
+    Value: !GetAtt ApiFunctionUrl.FunctionUrl
+  FrontendBucketName:
+    Value: !Ref FrontendBucket
+  DistributionId:
+    Value: !Ref FrontendDistribution
