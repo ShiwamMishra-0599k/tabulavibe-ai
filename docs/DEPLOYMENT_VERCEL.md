@@ -20,7 +20,8 @@ Because the browser and the API share one origin, no CORS configuration is neede
 deploys to production once the **Vercel GitHub App** is installed on the repository
 (<https://github.com/apps/vercel> → Configure → Only select repositories → `tabulavibe-ai`); every other branch
 or pull request gets its own preview URL. On 2026-10-21 the project was linked with `vercel link`, which did not
-reliably deliver push events, so deployments were started from GitHub `main` through the Vercel API.
+reliably deliver push events, so deployments were started from GitHub `main` through the Vercel API until
+the Vercel GitHub App was installed on the repository (2026-10-21).
 
 > Checked against vercel.com/docs on 2026-10-21. **Services is in beta**: if Vercel changes the format,
 > see the fallback at the end.
