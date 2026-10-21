@@ -17,7 +17,7 @@ One Vercel project serves everything on one domain, using [Vercel Services](http
 | everything else | `web` (`frontend/`) | The Vite build (`npm run build` → `dist/`) from Vercel's CDN |
 
 Because the browser and the API share one origin, no CORS configuration is needed. Every push to `main`
-deploys to production; every other branch or pull request gets its own preview URL.
+deploys to production (confirmed 2026-10-21); every other branch or pull request gets its own preview URL.
 
 > Checked against vercel.com/docs on 2026-10-21. **Services is in beta**: if Vercel changes the format,
 > see the fallback at the end.
