@@ -195,8 +195,8 @@ export function AgentView({ config, context, onContext, events, running, report,
           </div>
         )}
       </Card>
-      <nav aria-label="Analyst report pages" className="print:hidden">
-        <div role="tablist" className="flex flex-wrap gap-1 rounded-2xl bg-surface-2 p-1 ring-1 ring-inset ring-line">
+      <nav aria-label="Analyst report pages" className="overflow-x-auto print:hidden">
+        <div role="tablist" className="flex w-max min-w-full gap-1 rounded-2xl bg-surface-2 p-1 ring-1 ring-inset ring-line">
           {PAGES.map((p) => (
             <button
               key={p.id}
@@ -204,7 +204,7 @@ export function AgentView({ config, context, onContext, events, running, report,
               role="tab"
               aria-selected={page === p.id}
               onClick={() => setPage(p.id)}
-              className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${page === p.id ? 'bg-surface text-ink shadow-soft ring-1 ring-line' : 'text-ink-muted hover:text-ink'}`}
+              className={`shrink-0 rounded-xl px-3 py-2 text-sm font-semibold transition ${page === p.id ? 'bg-surface text-ink shadow-soft ring-1 ring-line' : 'text-ink-muted hover:text-ink'}`}
             >
               {p.label}
             </button>

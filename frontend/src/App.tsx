@@ -59,7 +59,7 @@ const THEMES: { value: ThemeChoice; label: string; icon: LucideIcon }[] = [
 function ThemeToggle() {
   const [theme, setTheme] = useTheme()
   return (
-    <div role="group" aria-label="Colour theme" className="flex rounded-xl bg-surface-2 p-1 ring-1 ring-inset ring-line">
+    <div role="group" aria-label="Colour theme" className="flex rounded-xl bg-surface-2 p-1 ring-1 ring-inset ring-line max-sm:rounded-lg max-sm:p-0.5">
       {THEMES.map(({ value, label, icon: Icon }) => (
         <button
           key={value}
@@ -68,7 +68,7 @@ function ThemeToggle() {
           aria-pressed={theme === value}
           title={label}
           onClick={() => setTheme(value)}
-          className={`grid size-8 place-items-center rounded-lg transition ${theme === value ? 'bg-surface text-accent shadow-soft ring-1 ring-line' : 'text-ink-muted hover:text-ink'}`}
+          className={`grid size-8 place-items-center rounded-lg transition max-sm:size-7 ${theme === value ? 'bg-surface text-accent shadow-soft ring-1 ring-line' : 'text-ink-muted hover:text-ink'}`}
         >
           <Icon aria-hidden className="size-4" />
         </button>
@@ -424,20 +424,20 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-3 z-30 mx-auto w-[calc(100%-2rem)] max-w-7xl print:hidden">
-        <div className="flex min-h-16 flex-wrap items-center justify-between gap-3 rounded-[2rem] border border-line bg-glass px-4 py-2 shadow-float backdrop-blur-xl sm:px-5">
-          <div className="flex items-center gap-3">
-            <span aria-hidden className="grid size-9 place-items-center rounded-xl brand-gradient text-white shadow-[0_8px_20px_-8px_rgb(79_70_229/0.8)]">
+      <header className="sticky top-3 z-30 mx-auto w-[calc(100%-2rem)] max-w-7xl min-w-0 print:hidden">
+        <div className="flex min-h-16 flex-wrap items-center justify-between gap-3 rounded-[2rem] border border-line bg-glass px-4 py-2 shadow-float backdrop-blur-xl max-sm:min-h-0 max-sm:gap-2 max-sm:rounded-2xl max-sm:px-3 sm:px-5">
+          <div className="flex min-w-0 items-center gap-3 max-sm:gap-2">
+            <span aria-hidden className="grid size-9 place-items-center rounded-xl brand-gradient text-white shadow-[0_8px_20px_-8px_rgb(79_70_229/0.8)] max-sm:size-8 max-sm:rounded-lg">
               <ChartNoAxesColumn className="size-5" />
             </span>
-            <div>
-              <p className="text-base font-bold leading-tight tracking-tight text-ink">
+            <div className="min-w-0">
+              <p className="truncate text-base font-bold leading-tight tracking-tight text-ink max-sm:text-sm">
                 TabulaVibe <span className="brand-text">AI</span>
               </p>
               <p className="hidden text-xs text-ink-muted sm:block">Spreadsheets to dashboards and reports</p>
             </div>
           </div>
-          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <div className="flex max-w-full flex-wrap items-center justify-end gap-2 max-sm:gap-1.5 sm:gap-3">
             {profile && (
               <>
                 <div className="hidden min-w-0 items-center gap-2 rounded-xl border border-line bg-surface px-3 py-1.5 md:flex" title={profile.dataset.file_name}>
@@ -446,14 +446,14 @@ export default function App() {
                   <span className="text-xs text-ink-muted">· {formatCount(profile.dataset.row_count)} rows</span>
                 </div>
                 <Button size="sm" icon={RotateCcw} onClick={reset}>
-                  New file
+                  <span className="max-[430px]:sr-only">New file</span>
                 </Button>
               </>
             )}
             {!signedIn && (
               <>
                 <Button size="sm" variant="secondary" icon={LogIn} onClick={() => setSignInOpen(true)}>
-                  Sign in
+                  <span className="max-[430px]:sr-only">Sign in</span>
                 </Button>
                 {storageOn && (
                   <Button size="sm" variant="primary" className="hidden sm:inline-flex" onClick={openSignUp}>
@@ -463,7 +463,9 @@ export default function App() {
               </>
             )}
             <AccountMenu auth={auth} account={account} onReports={openReports} onSignOut={signOut} />
-            <GitHubStars />
+            <div className="hidden sm:block">
+              <GitHubStars />
+            </div>
             <ThemeToggle />
           </div>
         </div>
@@ -526,8 +528,8 @@ export default function App() {
 
         {view === 'workspace' && profile && spec && (
           <div className="grid gap-6">
-            <nav aria-label="Workflow steps" className="print:hidden">
-              <div role="tablist" className="grid grid-cols-5 gap-1.5 sm:gap-3">
+            <nav aria-label="Workflow steps" className="overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden print:hidden">
+              <div role="tablist" className="flex min-w-max gap-2 sm:grid sm:min-w-0 sm:grid-cols-5 sm:gap-3">
                 {steps.map((step, i) => {
                   const active = tab === step.id
                   const done = isDone(step.id)
@@ -541,7 +543,7 @@ export default function App() {
                       aria-controls={`panel-${step.id}`}
                       disabled={step.disabled}
                       onClick={() => goTo(step.id)}
-                      className={`relative flex min-w-0 flex-col items-center gap-1.5 rounded-2xl border p-2 text-center transition disabled:cursor-not-allowed disabled:opacity-45 md:flex-row md:gap-3 md:p-3 md:text-left ${
+                      className={`relative flex w-32 shrink-0 items-center gap-2 rounded-xl border p-2 text-left transition disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto sm:min-w-0 sm:flex-col sm:gap-1.5 sm:rounded-2xl sm:text-center md:flex-row md:gap-3 md:p-3 md:text-left ${
                         active ? 'border-transparent bg-surface shadow-card ring-2 ring-accent/60' : 'border-line bg-surface/60 hover:border-line-strong hover:bg-surface'
                       }`}
                     >

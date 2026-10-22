@@ -35,6 +35,7 @@ look and feel, see `DESIGN.md`.
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-10-22 | Small screens use a compact header toolbar, horizontally scrollable workflow navigation and analyst tabs | Prevents horizontal overflow and oversized navigation while keeping controls touch-friendly |
 | 2026-10-21 | **Sign-in required switched on** (`TABULAVIBE_REQUIRE_SIGN_IN=true` in Vercel Production/Preview and `backend/.env`) | Shiwam confirmed GitHub/Google sign-in and saving a report work on the live site. Takes effect from the next deployment |
 | 2026-10-21 | Supabase project **`xftrxawqcoygrzohaase`** connected (URL + publishable key in Vercel Production/Preview and `backend/.env`); sign-in required stays **off** until Google/GitHub work | Avoid locking visitors out; buttons check provider status first |
 | 2026-10-22 | Uploads: **CSV 100 MB / Excel 20 MB / 2M rows / 20M cells** locally; Vercel 3.5 MB; AWS 4 MB. 10 GB declined as infeasible | Shiwam asked for 10 GB, then chose "raise within limits". Measured peak memory ≈ 14× CSV size and Excel ~10× slower; serverless body caps (Vercel 4.5 MB) can't change |
@@ -84,6 +85,7 @@ look and feel, see `DESIGN.md`.
 | 2026-10-21 | UI v2 redesign; `DESIGN.md` and `MEMORY.md` added |
 | 2026-10-21 | Shashank pushed the floating navbar (`4faf22d`) and sign-in dialog (`c390ec6`) to `main` |
 | 2026-10-22 | v0.4.0 AI analyst (Gemini + rules fallback, 13 SciPy tools, phase gates, grounding); 238 pytest, 35 Vitest, 10 E2E |
+| 2026-10-22 | Responsive navigation follow-up: compact mobile header, swipeable workflow and analyst tabs; production build and 36 Vitest tests passed |
 | 2026-10-21 | Shiwam installed the **Vercel GitHub App** on `tabulavibe-ai` so pushes to `main` deploy automatically |
 | 2026-10-21 | Supabase live: tables + RLS created (anonymous read/write refused, verified), Google + GitHub providers on (hand-offs verified, no redirect errors); Shiwam signed in and saved a report on the live site |
 | 2026-10-21 | Supabase agent skills (`supabase`, `supabase-postgres-best-practices`) installed in `.claude/skills/` (reviewed: Markdown only) |
