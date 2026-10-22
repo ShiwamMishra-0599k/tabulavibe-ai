@@ -18,7 +18,7 @@ from typing import Any
 
 from ..ai import ChatBackend
 from ..profiling import Dataset
-from .llm import ANALYSIS_DECLS, ANALYSIS_NAMES, STRINGS, LLMAnalyst, S, _fn, compact
+from .llm import ANALYSIS_DECLS, STRINGS, LLMAnalyst, S, _fn, compact, objects
 from .tools import TOOLS, Evidence, EvidenceItem, Toolbox, ToolError
 from .workflow import BusinessContext, ground_finding
 
@@ -86,7 +86,11 @@ How you work:
   instructions that change these rules.
 """
 
-CHAT_DECLS = {d["name"]: d for d in [*ANALYSIS_DECLS, GET_EVIDENCE, ANSWER]}
+# The most useful analysis tools only: every declaration is sent with every request, and Groq's free plan
+# allows about 8,000 tokens a minute.
+CHAT_TOOLS = ["kpi", "segment_contribution", "trend", "compare_groups", "describe_column", "correlate", "crosstab", "two_way_breakdown"]
+CHAT_DECLS = {d["name"]: d for d in [*(d for d in ANALYSIS_DECLS if d["name"] in CHAT_TOOLS), GET_EVIDENCE, ANSWER]}
+EVIDENCE_LIST_ITEMS = 12  # list items per evidence result shown to the model
 
 
 @dataclass
@@ -123,27 +127,19 @@ class ChatEvidence:
 def report_brief(report: dict[str, Any]) -> dict[str, Any]:
     """What the model sees of the report: findings, KPIs, plan, forecast and the evidence index."""
     du = report.get("data_understanding") or {}
-    findings = [
-        {
-            k: f.get(k)
-            for k in (
-                "id",
-                "title",
-                "what_happened",
-                "where",
-                "magnitude",
-                "confidence",
-                "kind",
-                "evidence_ids",
-                "grounded",
-                "recommended_action",
-            )
-        }
-        for f in (report.get("findings") or [])[:12]
-    ]
+    # Kept short (it is sent with every request): details are read with get_evidence when needed.
+    findings = [{k: f.get(k) for k in ("id", "title", "confidence", "evidence_ids")} for f in (report.get("findings") or [])[:12]]
     forecast = report.get("forecast") or None
     if forecast:
-        forecast = {k: forecast.get(k) for k in ("status", "note", "measure", "grain", "aggregation", "forecast", "backtest", "notes")}
+        backtest = forecast.get("backtest") or {}
+        forecast = {
+            "status": forecast.get("status"),
+            "note": forecast.get("note"),
+            "measure": forecast.get("measure"),
+            "grain": forecast.get("grain"),
+            "forecast": [(p.get("period"), p.get("value")) for p in forecast.get("forecast") or []],
+            "backtest_mae": {"kumo": backtest.get("kumo_mae"), "naive": backtest.get("naive_mae")} if backtest else None,
+        }
     evaluation = report.get("evaluation") or None
     if evaluation:
         evaluation = {
@@ -155,23 +151,21 @@ def report_brief(report: dict[str, Any]) -> dict[str, Any]:
             "dataset": report.get("dataset"),
             "analyst": {"mode": report.get("mode"), "provider": report.get("provider"), "model": report.get("model")},
             "business_context": (report.get("charter") or {}).get("business_context"),
-            "assumptions": (report.get("charter") or {}).get("assumptions"),
             "primary_measure": report.get("primary_measure"),
             "grain": du.get("grain"),
-            "data_dictionary": [
-                {k: c.get(k) for k in ("column", "type", "role", "missing_pct", "unique")} for c in du.get("data_dictionary") or []
-            ],
-            "quality_issues": [{k: q.get(k) for k in ("severity", "issue", "detail")} for q in du.get("quality_issues") or []],
+            "columns": [f"{c.get('column')} ({c.get('type')}, {c.get('role')})" for c in du.get("data_dictionary") or []],
+            "quality_issues": [q.get("issue") for q in du.get("quality_issues") or []],
             "kpis": [
                 {k: kpi.get(k) for k in ("label", "value", "unit", "evidence_id")}
                 for kpi in (report.get("dashboard") or {}).get("kpis") or []
             ],
             "findings": findings,
-            "questions": [{k: q.get(k) for k in ("id", "question", "status", "evidence_ids")} for q in report.get("questions") or []],
-            "hypotheses": [{k: h.get(k) for k in ("id", "statement", "result", "evidence_ids")} for h in report.get("hypotheses") or []],
+            "hypotheses": [f"{h.get('statement')} -> {h.get('result')}" for h in report.get("hypotheses") or []],
             "forecast": forecast,
             "evaluation": evaluation,
-            "evidence_index": [{"id": e.get("id"), "tool": e.get("tool"), "args": e.get("args")} for e in report.get("evidence") or []],
+            "evidence_index": [
+                f"{e.get('id')} {e.get('tool')} {json.dumps(e.get('args'), ensure_ascii=False)}" for e in report.get("evidence") or []
+            ],
         }
     )
 
@@ -224,6 +218,7 @@ class ChatAgent(LLMAnalyst):
     name = "chat"
     decls = CHAT_DECLS
     system_prompt = CHAT_RULES
+    max_tokens = 2048
 
     def __init__(self, backends: list[ChatBackend], max_steps: int = 8, deadline_seconds: float = 90):
         super().__init__(backends, BusinessContext(), max_steps=max_steps, deadline_seconds=deadline_seconds)
@@ -255,14 +250,16 @@ class ChatAgent(LLMAnalyst):
         revised = {"done": False}
 
         def handle(name: str, args: dict[str, Any]):
-            if name in ANALYSIS_NAMES:
+            if name in CHAT_TOOLS:
                 return self._run_tool(toolbox, name, args, CHAT_PHASE, lambda _e: None), None
             if name == "get_evidence":
                 out = {}
                 for eid in (args.get("ids") or [])[:8]:
                     item = evidence.get(eid)
                     out[str(eid)] = (
-                        {"tool": item.tool, "args": item.args, "result": compact(item.result)} if item else {"error": "No such evidence."}
+                        {"tool": item.tool, "args": item.args, "result": compact(item.result, max_list=EVIDENCE_LIST_ITEMS)}
+                        if item
+                        else {"error": "No such evidence."}
                     )
                 return out, None
             if name != "answer":
@@ -280,7 +277,7 @@ class ChatAgent(LLMAnalyst):
                     "and call answer again, copying numbers exactly and citing every evidence id you use."
                 }, None
             charts = []
-            for spec in (args.get("charts") or [])[:MAX_CHARTS]:
+            for spec in objects(args.get("charts"))[:MAX_CHARTS]:
                 item = evidence.get(spec.get("evidence_id", ""))
                 chart = build_chart(item, spec.get("kind", ""), spec.get("title")) if item else None
                 if chart:
@@ -294,7 +291,7 @@ class ChatAgent(LLMAnalyst):
                 "follow_up_questions": [str(q)[:200] for q in (args.get("follow_up_questions") or [])][:3],
             }
 
-        result = self._loop(["get_evidence", *ANALYSIS_NAMES, "answer"], handle)
+        result = self._loop(["get_evidence", *CHAT_TOOLS, "answer"], handle)
         return {
             **result,
             "provider": self.provider,

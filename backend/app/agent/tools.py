@@ -9,11 +9,13 @@ values of free-text and identifier columns are never returned, only counts.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
 import pandas as pd
+from pydantic import ValidationError
 
 from ..analysis import run_analysis
 from ..errors import AppError
@@ -25,6 +27,8 @@ from .stats import num
 MAX_GROUPS = 10
 MAX_CROSSTAB_CATEGORIES = 8
 MAX_MATRIX_COLUMNS = 12
+logger = logging.getLogger("tabulavibe")
+
 GRAINS = ("day", "week", "month", "quarter", "year")
 PERIOD_FREQ = {"day": "D", "week": "W-SUN", "month": "M", "quarter": "Q", "year": "Y"}
 
@@ -82,6 +86,12 @@ class Toolbox:
             return {"error": f"Invalid arguments for '{name}': {exc}"}
         except (ToolError, AppError) as exc:
             return {"error": getattr(exc, "message", str(exc))}
+        except ValidationError as exc:  # e.g. kpi arguments the metric engine's spec rejects
+            details = "; ".join(f"{'.'.join(str(p) for p in e['loc'])}: {e['msg']}" for e in exc.errors()[:5])
+            return {"error": f"Invalid arguments for '{name}': {details}"}
+        except Exception as exc:  # noqa: BLE001 - a model's odd arguments must not end the whole analysis
+            logger.warning("Tool %s failed: %s", name, type(exc).__name__)  # type only, never data
+            return {"error": f"'{name}' could not run with these arguments. Check the column names and argument types."}
         item = self.evidence.add(name, args, result, phase)
         return {"evidence_id": item.id, "result": result}
 

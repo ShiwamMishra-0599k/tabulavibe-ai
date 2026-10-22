@@ -388,7 +388,7 @@ def get_agent_factory(settings: SettingsDep):
 
     def make(context: BusinessContext):
         rules = RulesAnalyst(context)
-        backends = chat_backends(settings, timeout=max(settings.ai_timeout_seconds, 30))
+        backends = chat_backends(settings, timeout=settings.agent_request_timeout_seconds)
         if backends:
             ai = LLMAnalyst(backends, context, max_steps=settings.agent_max_steps, deadline_seconds=settings.agent_deadline_seconds)
             return ai, rules
@@ -401,7 +401,7 @@ def get_chat_factory(settings: SettingsDep):
     """FastAPI dependency: makes an "Ask AI" agent (Groq, then NVIDIA), or None when AI is off. Overridden in tests."""
 
     def make() -> ChatAgent | None:
-        backends = chat_backends(settings, timeout=max(settings.ai_timeout_seconds, 30))
+        backends = chat_backends(settings, timeout=settings.agent_request_timeout_seconds)
         return ChatAgent(backends) if backends else None
 
     return make

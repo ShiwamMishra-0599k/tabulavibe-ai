@@ -170,8 +170,10 @@ def test_charts_are_built_by_python_and_fit_their_data():
 
 def test_report_brief_lists_evidence_without_results(report):
     brief = report_brief(report)
-    assert brief["evidence_index"] and all(set(e) == {"id", "tool", "args"} for e in brief["evidence_index"])
-    assert brief["findings"] and brief["data_dictionary"]
+    assert brief["evidence_index"] and all(e.split(" ")[0].startswith("E") and "result" not in e for e in brief["evidence_index"])
+    assert brief["findings"] and brief["columns"]
+    # Small enough for Groq's free plan (about 8,000 tokens a minute) together with the rules and tools.
+    assert len(json.dumps(brief)) < 9_000
 
 
 # ---------------------------------------------------------------- API

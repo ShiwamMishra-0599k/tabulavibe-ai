@@ -135,12 +135,15 @@ def pct(share: float | None) -> str:
 
 _DATE_LIKE = re.compile(r"\b\d{4}-(?:Q[1-4]|\d{2}(?:-\d{2})?)\b")
 _THRESHOLD = re.compile(r"[<>≤≥]=?\s*\d*\.?\d+")  # "p < 0.0001" is a threshold, not a reported value
+# "95% confidence interval", "95% CI": a fixed confidence level, not a measured value
+_CONFIDENCE_LEVEL = re.compile(r"\b(?:80|90|95|99)(?:\.0)?\s*%?\s*(?=confidence\b|CI\b|C\.I\.)", re.IGNORECASE)
 _NUMBER = re.compile(r"(?<![A-Za-z0-9_.])-?\d[\d,]*(?:\.\d+)?")
 
 
 def _numbers_in(text: str) -> list[tuple[str, float]]:
     found = []
-    for match in _NUMBER.finditer(_THRESHOLD.sub(" ", _DATE_LIKE.sub(" ", text or ""))):
+    cleaned = _CONFIDENCE_LEVEL.sub(" ", _THRESHOLD.sub(" ", _DATE_LIKE.sub(" ", text or "")))
+    for match in _NUMBER.finditer(cleaned):
         raw = match.group(0)
         try:
             found.append((raw, float(raw.replace(",", ""))))

@@ -17,14 +17,16 @@ conversation continues on the next one, so no work is lost.
 from __future__ import annotations
 
 import json
+import logging
 import time
 from pathlib import Path
 from typing import Any
 
-from ..ai import AIError, ChatBackend
+from ..ai import AIError, AIQuotaError, ChatBackend, estimate_tokens
 from .tools import TOOLS, Toolbox
 from .workflow import BusinessContext, EmitFn, adjusted_p, ground_finding, spec_from_evidence
 
+logger = logging.getLogger("tabulavibe")
 WORKFLOW = (Path(__file__).parent / "workflow_prompt.md").read_text(encoding="utf-8")
 MAX_LIST = 25
 
@@ -254,6 +256,93 @@ ANALYSIS_NAMES = [d["name"] for d in ANALYSIS_DECLS]
 DECLS = {d["name"]: d for d in [*ANALYSIS_DECLS, REGISTER_PLAN, FINISH_INVESTIGATION, SUBMIT_FINDINGS]}
 
 
+def _json_or(value: Any) -> Any:
+    """Decode JSON text; anything else is returned unchanged."""
+    if isinstance(value, str) and value.strip()[:1] in ("[", "{"):
+        try:
+            return json.loads(value)
+        except ValueError:
+            return value
+    return value
+
+
+def objects(value: Any) -> list[dict[str, Any]]:
+    """A list of objects from what an open model sent: a list, one object, or JSON text of either.
+    Items that are not objects are dropped (the caller reports them)."""
+    value = _json_or(value)
+    if isinstance(value, dict):
+        return [value]
+    if not isinstance(value, list):
+        return []
+    out = []
+    for item in value:
+        item = _json_or(item)
+        if isinstance(item, dict):
+            out.append(item)
+        elif isinstance(item, list):
+            out.extend(i for i in item if isinstance(i, dict))
+    return out
+
+
+def strings(value: Any) -> list[str]:
+    """A list of strings from a list, one string, or JSON text."""
+    value = _json_or(value)
+    if isinstance(value, str):
+        return [value] if value.strip() else []
+    if isinstance(value, list):
+        return [str(v) for v in value if isinstance(v, str | int | float) and str(v).strip()]
+    return []
+
+
+def coerce_args(args: dict[str, Any], decl: dict[str, Any] | None) -> dict[str, Any]:
+    """Open models sometimes send a list or object argument as JSON text: decode it per the schema."""
+    props = ((decl or {}).get("parameters") or {}).get("properties") or {}
+    out = dict(args)
+    for key, schema in props.items():
+        if key not in out:
+            continue
+        kind = schema.get("type")
+        if kind == "array":
+            if (schema.get("items") or {}).get("type") == "object":
+                # Decode JSON text but keep invalid items, so the stage's validation can report them.
+                decoded = _json_or(out[key])
+                decoded = [decoded] if isinstance(decoded, dict) else decoded
+                out[key] = [_json_or(item) for item in decoded] if isinstance(decoded, list) else decoded
+            elif (schema.get("items") or {}).get("type") == "string":
+                out[key] = strings(out[key])
+            else:
+                decoded = _json_or(out[key])
+                out[key] = decoded if isinstance(decoded, list) else out[key]
+        elif kind == "object":
+            decoded = _json_or(out[key])
+            out[key] = decoded if isinstance(decoded, dict) else out[key]
+    return out
+
+
+def evidence_numbers_hint(items: list[Any], limit: int = 12) -> str:
+    """A few numbers from the cited evidence, to help the model copy instead of calculate."""
+    seen: list[str] = []
+
+    def walk(node: Any) -> None:
+        if len(seen) >= limit:
+            return
+        if isinstance(node, dict):
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node[:20]:
+                walk(v)
+        elif isinstance(node, int | float) and not isinstance(node, bool):
+            text = f"{node:g}" if abs(node) < 1e6 else f"{node:.2f}"
+            if text not in seen:
+                seen.append(text)
+
+    for item in items:
+        if item is not None:
+            walk(item.result)
+    return ", ".join(seen)
+
+
 def _text_call(content: str, allowed: list[str]) -> dict[str, Any] | None:
     """Some open models occasionally write a tool call as JSON text instead of a tool_calls entry."""
     text = content.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
@@ -271,19 +360,21 @@ def _text_call(content: str, allowed: list[str]) -> dict[str, Any] | None:
     return {"name": data["name"], "args": args}
 
 
-def compact(value: Any, depth: int = 0) -> Any:
+def compact(value: Any, depth: int = 0, max_list: int = MAX_LIST) -> Any:
     """Shrink a tool result for the model: drop histograms, cap long lists."""
     if isinstance(value, dict):
-        return {k: compact(v, depth + 1) for k, v in value.items() if k != "histogram"}
+        return {k: compact(v, depth + 1, max_list) for k, v in value.items() if k != "histogram"}
     if isinstance(value, list):
-        head = [compact(v, depth + 1) for v in value[:MAX_LIST]]
-        return head + ([f"... {len(value) - MAX_LIST} more"] if len(value) > MAX_LIST else [])
+        head = [compact(v, depth + 1, max_list) for v in value[:max_list]]
+        return head + ([f"... {len(value) - max_list} more"] if len(value) > max_list else [])
     return value
 
 
 class LLMAnalyst:
     name = "ai"
     decls: dict[str, dict[str, Any]] = DECLS  # functions this conversation may offer
+    max_tokens = 4096  # per reply
+    max_wait_seconds = 20.0  # longest wait for a provider's per-minute limit before switching
     system_prompt = WORKFLOW + "\n\n" + OPERATING_RULES
 
     def __init__(
@@ -306,6 +397,7 @@ class LLMAnalyst:
         self._emit: EmitFn | None = None
         self._phase = 0
         self.switches: list[str] = []  # why each earlier provider handed over, for the report
+        self._waits = 0
 
     @property
     def backend(self) -> ChatBackend:
@@ -328,8 +420,27 @@ class LLMAnalyst:
         """Send to the current provider; on failure, continue the same conversation on the next one."""
         while True:
             try:
+                limit = self.backend.max_request_tokens
+                if limit and estimate_tokens(body) > limit:
+                    # Known in advance (e.g. Groq's free plan): skip without a request or a wait.
+                    raise AIQuotaError("ai_request_too_large", f"the request is larger than {self.backend.label}'s per-minute limit")
                 return self.backend.chat(body)
             except AIError as exc:
+                wait = getattr(exc, "retry_after", None)
+                left = self._deadline - time.monotonic()
+                if wait is not None and wait <= self.max_wait_seconds and self._waits < 4 and left > wait + 30:
+                    # A per-minute limit refills in seconds: waiting is faster than a slower provider.
+                    self._waits += 1
+                    if self._emit:
+                        self._emit(
+                            {
+                                "type": "log",
+                                "phase": self._phase,
+                                "message": f"{self.backend.label}'s per-minute limit is full; waiting {wait:.0f} s.",
+                            }
+                        )
+                    time.sleep(wait + 0.5)
+                    continue
                 if self._current + 1 >= len(self._backends):
                     raise
                 failed = self.backend
@@ -346,16 +457,16 @@ class LLMAnalyst:
 
     def _request(self, allowed: list[str]) -> list[dict[str, Any]]:
         if self._steps >= self._max_steps:
-            raise AIError("ai_step_limit", "The AI analyst used its step budget before finishing.")
+            raise AIError("ai_step_limit", "it used its step budget before finishing")
         if time.monotonic() > self._deadline:
-            raise AIError("ai_timeout", "The AI analyst ran out of time.")
+            raise AIError("ai_timeout", "it ran out of time")
         self._steps += 1
         body = {
             "messages": self._messages,
             "tools": [{"type": "function", "function": self.decls[name]} for name in allowed],
             "tool_choice": "auto",
             "temperature": 0.2,
-            "max_tokens": 4096,
+            "max_tokens": self.max_tokens,
             "stream": False,
         }
         message = self._chat(body)
@@ -370,6 +481,8 @@ class LLMAnalyst:
                 args = json.loads(arguments) if isinstance(arguments, str) else arguments
             except ValueError:
                 args = None
+            if isinstance(args, dict):
+                args = coerce_args(args, self.decls.get(fn.get("name", "")))
             calls.append({"id": raw.get("id") or f"call_{self._steps}_{i}", "name": fn.get("name", ""), "args": args})
         if not calls and content:
             found = _text_call(content, allowed)
@@ -407,7 +520,16 @@ class LLMAnalyst:
                 if not isinstance(call.get("args"), dict):
                     results.append((call, {"error": "The function arguments were not a valid JSON object. Call the function again."}))
                     continue
-                payload, done = handle(call.get("name", ""), call["args"])
+                try:
+                    payload, done = handle(call.get("name", ""), call["args"])
+                except AIError:
+                    raise
+                except Exception as exc:  # noqa: BLE001 - odd arguments must not end the whole analysis
+                    logger.warning("Handling %s failed: %s", call.get("name"), type(exc).__name__)  # type only, never data
+                    payload, done = (
+                        {"error": "This call could not be processed. Check the argument names and types, then call again."},
+                        None,
+                    )
                 results.append((call, payload))
                 if done is not None:
                     final = done
@@ -467,7 +589,14 @@ class LLMAnalyst:
 
     def _validate_plan(self, args: dict[str, Any], measures: set[str]) -> tuple[list[str], dict[str, Any]]:
         problems = []
-        questions = args.get("questions") or []
+        raw_questions = args.get("questions")
+        questions = [q for q in objects(raw_questions) if q.get("id") and q.get("question")]
+        if isinstance(raw_questions, list) and len(questions) < len(raw_questions):
+            problems.append("every question must be an object with id, question, variables and priority")
+        for q in questions:
+            q["variables"] = strings(q.get("variables"))
+            q["metrics"] = strings(q.get("metrics"))
+        hypotheses = [h for h in objects(args.get("hypotheses")) if h.get("id") and h.get("question_id") and h.get("statement")]
         if not questions:
             problems.append("at least one question is required")
         if len(questions) > 10:
@@ -478,7 +607,7 @@ class LLMAnalyst:
             if unknown:
                 problems.append(f"{q.get('id')}: unknown columns {unknown}")
             ids.add(q.get("id"))
-        for h in args.get("hypotheses") or []:
+        for h in hypotheses:
             if h.get("question_id") not in ids:
                 problems.append(f"hypothesis {h.get('id')} refers to unknown question {h.get('question_id')}")
         primary = args.get("primary_measure") or None
@@ -526,7 +655,7 @@ class LLMAnalyst:
                     "result": "inconclusive",
                     "evidence_ids": [],
                 }
-                for h in args.get("hypotheses") or []
+                for h in hypotheses
             ],
         }
         return problems, plan
@@ -585,25 +714,48 @@ class LLMAnalyst:
             + json.dumps(compact(validation), ensure_ascii=False, default=str)
             + "\n\nNow call submit_findings."
         )
-        revised = {"done": False}
+        revisions = {"used": 0}
+        last: dict[str, Any] = {}
 
         def handle(name: str, args: dict[str, Any]):
             if name != "submit_findings":
                 return {"error": "Only submit_findings is available in phase 5."}, None
             findings, problems = self._build_findings(toolbox, args, validation)
-            if problems and not revised["done"]:
-                revised["done"] = True
-                return {"error": "Some findings failed validation. Fix them and call submit_findings again: " + "; ".join(problems)}, None
+            if findings:
+                last.update(findings=findings, args=args)
+            # Up to two corrections, the second only while there is time left for it.
+            allowed = 1 if self._deadline - time.monotonic() < 60 else 2
+            if problems and revisions["used"] < allowed:
+                revisions["used"] += 1
+                return {
+                    "error": "Some findings failed validation. Fix them and call submit_findings again: "
+                    + "; ".join(problems)
+                    + ". Copy every number exactly from the evidence you cite. Do not calculate percentages, totals or "
+                    "differences yourself: cite the evidence that contains the number, or remove it."
+                }, None
             self._apply_hypotheses(toolbox, plan, args, validation)
             plan.setdefault("outstanding_questions", args.get("outstanding_questions") or [])
             return {"status": "accepted"}, findings
 
-        return self._loop(["submit_findings"], handle)
+        try:
+            return self._loop(["submit_findings"], handle)
+        except AIError as exc:
+            if exc.code not in ("ai_timeout", "ai_step_limit") or not last:
+                raise
+            # Out of time while correcting: keep the AI's last submission. Findings whose numbers do not
+            # match their evidence stay flagged "unverified" and out of the overview (phase 5 rule).
+            emit({"type": "log", "phase": 5, "message": "Time is up: using the AI's last findings; any unverified figures are flagged."})
+            self._apply_hypotheses(toolbox, plan, last["args"], validation)
+            plan.setdefault("outstanding_questions", last["args"].get("outstanding_questions") or [])
+            return last["findings"]
 
     def _build_findings(self, toolbox: Toolbox, args: dict[str, Any], validation: dict[str, Any]) -> tuple[list[dict[str, Any]], list[str]]:
         findings, problems = [], []
-        for i, raw in enumerate((args.get("findings") or [])[:12], 1):
-            ids = [e for e in raw.get("evidence_ids") or [] if toolbox.evidence.get(e)]
+        raws = objects(args.get("findings"))
+        if isinstance(args.get("findings"), list) and len(raws) < len(args["findings"]):
+            problems.append("every finding must be an object with title, what_happened, evidence_ids, confidence and kind")
+        for i, raw in enumerate(raws[:12], 1):
+            ids = [e for e in strings(raw.get("evidence_ids")) if toolbox.evidence.get(e)]
             first = toolbox.evidence.get(ids[0]) if ids else None
             f = {
                 "id": f"F{i}",
@@ -624,7 +776,11 @@ class LLMAnalyst:
             }
             check = ground_finding(dict(f), toolbox.evidence, validation)
             if not check["grounded"]:
-                problems.append(f"'{f['title'][:60]}': numbers not found in the cited evidence {check['unverified_numbers']}")
+                available = evidence_numbers_hint([toolbox.evidence.get(e) for e in ids])
+                problems.append(
+                    f"'{f['title'][:60]}': {check['unverified_numbers']} are not in its cited evidence {ids or '(none)'}"
+                    + (f"; numbers there include {available}" if available else "")
+                )
             findings.append(f)
         if not findings:
             problems.append("submit at least one finding (a data-quality or 'no reliable difference' finding is acceptable)")
@@ -632,7 +788,7 @@ class LLMAnalyst:
 
     def _apply_hypotheses(self, toolbox: Toolbox, plan: dict[str, Any], args: dict[str, Any], validation: dict[str, Any]) -> None:
         by_id = {h["id"]: h for h in plan["hypotheses"]}
-        for res in args.get("hypothesis_results") or []:
+        for res in objects(args.get("hypothesis_results")):
             h = by_id.get(res.get("hypothesis_id"))
             if h is None:
                 continue

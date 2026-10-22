@@ -208,10 +208,12 @@ class AIError(AppError): 502 · AIDisabledError: 503 · AIQuotaError: 429   # in
 | `max_groups` | 100 | Grouped rows returned |
 | `ai_provider` | `none` | `none` or an order of `groq`, `nvidia` (e.g. `groq,nvidia`); a retired `gemini` value starts with AI off |
 | `groq_api_key`, `nvidia_api_key` | `None` | `SecretStr`: never printed in reprs or logs |
-| `groq_model` | `llama-3.3-70b-versatile` | Any Groq chat model with tool calling |
-| `nvidia_model` | `meta/llama-3.3-70b-instruct` | Any NVIDIA API catalog chat model with tool calling |
+| `groq_model` | `openai/gpt-oss-120b` | Any Groq chat model with tool calling |
+| `nvidia_model` | `nvidia/nemotron-3.5-lightning-30b-a3b` | Any NVIDIA API catalog chat model with tool calling |
 | `forecast_provider` | `none` | `kumo`: NVIDIA Kumo Relational forecasting (needs `nvidia_api_key`) |
 | `chat_questions_per_minute` | `8` | Ask AI questions per user (or IP) |
+| `groq_tokens_per_minute` | `8000` | Requests estimated above it skip Groq (free-plan limit) |
+| `agent_request_timeout_seconds` | `90` | Seconds per AI reply in the analyst and Ask AI |
 | `ai_timeout_seconds` | 20 (≤ 60) | httpx timeout |
 | `ai_requests_per_minute` | 5 | Per-client burst limit |
 

@@ -272,7 +272,7 @@ export function aiAnalystLabel(agent: AppConfig['agent']): string {
   return agent?.provider ? (PROVIDER_LABEL[agent.provider] ?? agent.provider) : 'AI'
 }
 
-/** "Groq · llama-3.3-70b-versatile" (the publisher prefix of the model id is dropped). */
+/** "Groq · gpt-oss-120b" (the publisher prefix of the model id is dropped). */
 export function providerModel(provider: string | null | undefined, model: string | null | undefined): string {
   const name = (model ?? '').split('/').pop()
   const label = provider ? (PROVIDER_LABEL[provider] ?? provider) : 'AI'

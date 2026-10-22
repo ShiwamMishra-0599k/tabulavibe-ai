@@ -103,7 +103,7 @@ describe('api', () => {
 describe('aiAnalystLabel', () => {
   it('names the provider order and the model without its publisher prefix', () => {
     expect(aiAnalystLabel({ mode: 'ai', model: 'm', chain: [{ provider: 'groq', label: 'Groq', model: 'g' }, { provider: 'nvidia', label: 'NVIDIA', model: 'n' }] })).toBe('Groq → NVIDIA')
-    expect(providerModel('nvidia', 'meta/llama-3.3-70b-instruct')).toBe('NVIDIA · llama-3.3-70b-instruct')
+    expect(providerModel('nvidia', 'openai/gpt-oss-20b')).toBe('NVIDIA · gpt-oss-20b')
     expect(aiAnalystLabel(undefined)).toBe('AI')
   })
 })

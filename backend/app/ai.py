@@ -6,6 +6,7 @@ to a provider: never raw rows, file names or anything else from the upload.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import threading
 import time
@@ -50,6 +51,7 @@ class AIDisabledError(AIError):
 
 class AIQuotaError(AIError):
     status_code = 429
+    retry_after: float | None = None  # seconds, when the provider says
 
 
 class NarrativeProvider(Protocol):
@@ -76,6 +78,8 @@ class ChatBackend:
     api_key: str = field(repr=False)
     timeout: float = 30
     transport: httpx.BaseTransport | None = field(default=None, repr=False, compare=False)
+    # Largest request (estimated tokens) this provider accepts; 0 means no known limit.
+    max_request_tokens: int = 0
 
     @property
     def label(self) -> str:
@@ -97,7 +101,10 @@ class ChatBackend:
             raise AIError("ai_unavailable", f"{label} could not be reached") from exc
 
         if response.status_code == 429:
-            raise AIQuotaError("ai_quota_exceeded", f"the {label} rate limit was reached")
+            error = AIQuotaError("ai_quota_exceeded", f"the {label} rate limit was reached")
+            with contextlib.suppress(ValueError):  # Groq says how long until its per-minute budget refills
+                error.retry_after = float(response.headers.get("retry-after", ""))
+            raise error
         if response.status_code == 413:  # Groq: the request is larger than the plan's tokens-per-minute limit
             raise AIQuotaError("ai_request_too_large", f"the request is larger than {label}'s free-plan limit")
         if response.status_code in (401, 403):
@@ -114,6 +121,11 @@ class ChatBackend:
         return {**message, "_finish_reason": choice.get("finish_reason")}
 
 
+def estimate_tokens(body: dict[str, Any]) -> int:
+    """Rough request size: about 4 characters per token, plus the reply budget."""
+    return len(json.dumps(body, ensure_ascii=False, default=str)) // 4 + int(body.get("max_tokens") or 0) // 4
+
+
 def chat_backends(settings: Settings, timeout: float | None = None) -> list[ChatBackend]:
     """The configured providers, in order, skipping any without a key."""
     keys = {"groq": settings.groq_api_key, "nvidia": settings.nvidia_api_key}
@@ -122,7 +134,8 @@ def chat_backends(settings: Settings, timeout: float | None = None) -> list[Chat
     for name in settings.ai_chain:
         key = keys[name].get_secret_value().strip() if keys[name] else ""
         if key:
-            backends.append(ChatBackend(name, models[name], key, timeout or settings.ai_timeout_seconds))
+            limit = settings.groq_tokens_per_minute if name == "groq" else 0
+            backends.append(ChatBackend(name, models[name], key, timeout or settings.ai_timeout_seconds, max_request_tokens=limit))
     return backends
 
 

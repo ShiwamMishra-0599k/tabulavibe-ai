@@ -45,15 +45,15 @@ def test_no_provider_without_key():
     assert get_provider(Settings(ai_provider="nvidia", nvidia_api_key="", _env_file=None)) is None
     assert get_provider(Settings(ai_provider="nvidia", nvidia_api_key="   ", _env_file=None)) is None
     provider = get_provider(Settings(ai_provider="nvidia", nvidia_api_key="k", _env_file=None))
-    assert isinstance(provider, ChainProvider) and provider.model == "meta/llama-3.3-70b-instruct"
+    assert isinstance(provider, ChainProvider) and provider.model == "nvidia/nemotron-3.5-lightning-30b-a3b"
 
 
 def test_provider_order_and_keys():
     both = Settings(ai_provider=" Groq , nvidia ", groq_api_key="gsk-test-secret", nvidia_api_key="nvapi-test-secret", _env_file=None)
     assert both.ai_provider == "groq,nvidia"
     assert [(b.name, b.model) for b in chat_backends(both)] == [
-        ("groq", "llama-3.3-70b-versatile"),
-        ("nvidia", "meta/llama-3.3-70b-instruct"),
+        ("groq", "openai/gpt-oss-120b"),
+        ("nvidia", "nvidia/nemotron-3.5-lightning-30b-a3b"),
     ]
     only_nvidia_key = Settings(ai_provider="groq,nvidia", nvidia_api_key="n", _env_file=None)
     assert [b.name for b in chat_backends(only_nvidia_key)] == ["nvidia"]  # Groq has no key, so it is skipped
@@ -71,10 +71,10 @@ def test_retired_gemini_setting_starts_with_ai_off():
 def test_config_reports_ai_enabled_without_leaking_key():
     settings = Settings(ai_provider="groq,nvidia", groq_api_key="gsk-secret-1", nvidia_api_key="nvapi-secret-2", _env_file=None)
     res = TestClient(create_app(settings)).get("/api/config")
-    assert res.json()["ai"] == {"enabled": True, "provider": "groq", "model": "llama-3.3-70b-versatile"}
+    assert res.json()["ai"] == {"enabled": True, "provider": "groq", "model": "openai/gpt-oss-120b"}
     assert res.json()["agent"]["chain"] == [
-        {"provider": "groq", "label": "Groq", "model": "llama-3.3-70b-versatile"},
-        {"provider": "nvidia", "label": "NVIDIA", "model": "meta/llama-3.3-70b-instruct"},
+        {"provider": "groq", "label": "Groq", "model": "openai/gpt-oss-120b"},
+        {"provider": "nvidia", "label": "NVIDIA", "model": "nvidia/nemotron-3.5-lightning-30b-a3b"},
     ]
     assert "secret" not in res.text
     assert "secret-key-123" not in res.text

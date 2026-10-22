@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-10-22 (v0.7.0: Ask AI chat about the analysed data)_
+_Last updated: 2026-10-23 (v0.7.1: AI analyst and Ask AI tested live on the free plans)_
 
 | Milestone | Status | Evidence |
 |---|---|---|
@@ -18,7 +18,7 @@ _Last updated: 2026-10-22 (v0.7.0: Ask AI chat about the analysed data)_
 
 | Check | Result |
 |---|---|
-| Backend `pytest` | 296 passed |
+| Backend `pytest` | 307 passed |
 | Backend `ruff check` / `ruff format --check` | clean |
 | Frontend `tsc -b` | clean |
 | Frontend `oxlint` | 0 warnings, 0 errors |

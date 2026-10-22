@@ -43,9 +43,12 @@ class Settings(BaseSettings):
     # without a key are skipped. Models must support tool calling (the AI analyst relies on it).
     ai_provider: str = "none"
     groq_api_key: SecretStr | None = None
-    groq_model: str = "llama-3.3-70b-versatile"
+    groq_model: str = "openai/gpt-oss-120b"
+    # Groq's per-minute token budget (8,000 on the free plan). Requests estimated above it skip Groq at once.
+    groq_tokens_per_minute: int = Field(8_000, ge=0)
     nvidia_api_key: SecretStr | None = None
-    nvidia_model: str = "meta/llama-3.3-70b-instruct"
+    # Answers the analyst's large requests in about 30 s on the free endpoint (tested 2026-10-22).
+    nvidia_model: str = "nvidia/nemotron-3.5-lightning-30b-a3b"
     # Predictive forecasting of the AI analyst's primary measure with NVIDIA Kumo Relational (hosted on
     # build.nvidia.com, uses the NVIDIA key). Only period totals are sent, never raw rows.
     forecast_provider: Literal["none", "kumo"] = "none"
@@ -57,6 +60,8 @@ class Settings(BaseSettings):
     agent_max_steps: int = Field(24, ge=4, le=60)
     agent_deadline_seconds: float = Field(200, gt=10, le=280)
     agent_runs_per_minute: int = Field(4, ge=1)
+    # Seconds to wait for one AI provider reply in the analyst and Ask AI (free endpoints can be slow).
+    agent_request_timeout_seconds: float = Field(90, gt=0, le=240)
     # "Ask AI" questions about an analysed file, per user (or IP) per minute.
     chat_questions_per_minute: int = Field(8, ge=1)
 

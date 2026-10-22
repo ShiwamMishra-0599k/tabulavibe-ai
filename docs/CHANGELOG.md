@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.7.1 — 2026-10-23 (AI analyst and Ask AI work on the free plans)
+
+Found by testing with real Groq and NVIDIA keys.
+
+### Fixed
+- **Retired models:** Groq and NVIDIA removed the Llama 3.3 70B models (NVIDIA end of life 2026-08-26; requests returned 404 and 410). Defaults are now Groq `openai/gpt-oss-120b` and NVIDIA `nvidia/nemotron-3.5-lightning-30b-a3b`, chosen by a live tool-calling test (NVIDIA `openai/gpt-oss-20b` timed out on analyst-sized requests; several other catalog models are not available to free accounts).
+- **Groq's free plan (8,000 tokens a minute) can never take an analyst request (about 7,600 tokens before results):** requests estimated above `TABULAVIBE_GROQ_TOKENS_PER_MINUTE` now go straight to NVIDIA instead of being refused first. When Groq answers "retry in N seconds" (up to 20 s), the app waits instead of switching.
+- **Ask AI fits Groq's free plan:** the request shrank from about 5,300 to 2,900 tokens (compact report summary, the 8 most useful analysis tools, evidence lists capped at 12 items, 2,048-token replies). Live: answers in 5–16 s with checked numbers and charts.
+- **Crashes on open-model arguments:** nested arguments sent as JSON text (findings, questions, hypotheses, evidence ids) are decoded; items that are still not objects are reported back to the model; tool arguments the metric engine rejects (`kpi`) and any other per-call failure become messages the model can correct, never a crashed run.
+- **Out of time while correcting findings:** the AI's last submission is kept (unmatched figures flagged "unverified" and kept out of the overview) instead of discarding the AI's work.
+- Up to two corrections of findings when time allows, with the numbers available in the cited evidence listed and an explicit "do not calculate percentages, totals or differences" rule; "95% confidence interval" is no longer flagged as an unmatched number.
+- NVIDIA replies get 90 s (`TABULAVIBE_AGENT_REQUEST_TIMEOUT_SECONDS`), up from 30 s.
+- Tests: 11 new (skip by size, retry-after wait and switch, JSON-text arguments, malformed findings, engine-rejected arguments, odd arguments, last findings on timeout, confidence levels and correction feedback).
+
+### Measured live (2026-10-23, free plans)
+- AI analyst completes all phases on NVIDIA Nemotron in 2.5–4 minutes. On both samples the rules-based analysis scored higher (100 vs 69.6 and 75.6) because some AI findings contained figures not found in their evidence, so it built the dashboard, as designed.
+- Kumo Relational forecasts ran on both samples.
+
 ## 0.7.0 — 2026-10-22 (Ask AI: chat about your data)
 
 ### Added

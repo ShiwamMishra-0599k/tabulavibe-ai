@@ -62,10 +62,19 @@ Statistics are in `backend/app/agent/stats.py`, tested against hand-computed val
 `TABULAVIBE_AI_PROVIDER=groq,nvidia` sets the order. Both speak OpenAI-compatible chat completions with tool
 calling (`https://api.groq.com/openai/v1/chat/completions`, `https://integrate.api.nvidia.com/v1/chat/completions`;
 fixed in code). Keys: `TABULAVIBE_GROQ_API_KEY`, `TABULAVIBE_NVIDIA_API_KEY`; models: `TABULAVIBE_GROQ_MODEL`
-(default `llama-3.3-70b-versatile`), `TABULAVIBE_NVIDIA_MODEL` (default `meta/llama-3.3-70b-instruct`).
+(default `openai/gpt-oss-120b`), `TABULAVIBE_NVIDIA_MODEL` (default `nvidia/nemotron-3.5-lightning-30b-a3b`).
 
 If Groq fails at any step (rate limit, request larger than the plan allows, error), **the same conversation
-continues on NVIDIA**: nothing is repeated, and the report lists the switch. Groq's free plan allows fewer
+continues on NVIDIA**: nothing is repeated, and the report lists the switch. Requests estimated above
+`TABULAVIBE_GROQ_TOKENS_PER_MINUTE` (8,000 on the free plan) skip Groq without a request; when Groq answers
+"retry in N seconds" (up to 20 s) the app waits instead. Each reply may take up to
+`TABULAVIBE_AGENT_REQUEST_TIMEOUT_SECONDS` (90 s).
+
+Measured on the free plans (2026-10-23): an analyst request is about 7,600 tokens, so the analyst runs on NVIDIA
+(`nvidia/nemotron-3.5-lightning-30b-a3b`, about 30 s per reply); Ask AI requests are about 2,900 tokens and run on
+Groq in seconds. Open models sometimes send nested arguments as JSON text or call a tool with arguments the
+engine rejects: arguments are decoded, and any per-call failure is returned to the model to correct. If time runs
+out while the model corrects its findings, its last submission is kept with unmatched figures flagged. Groq's free plan allows fewer
 tokens a minute than one analyst request (the workflow text alone is about 9,000 tokens), so on that plan runs
 normally switch at the first request. Only if every provider fails does the rules-based analyst take over.
 

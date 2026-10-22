@@ -37,7 +37,7 @@ Parameters:
     Description: Used when AiProvider includes nvidia, and by ForecastProvider=kumo. Stored as a Lambda environment variable.
   NvidiaModel:
     Type: String
-    Default: meta/llama-3.3-70b-instruct
+    Default: nvidia/nemotron-3.5-lightning-30b-a3b
   SupabaseUrl:
     Type: String
     Default: ''

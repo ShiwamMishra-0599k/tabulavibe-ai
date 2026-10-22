@@ -136,14 +136,14 @@ describe('AI analyst', () => {
     const criteria = (detail: string, score: number) => ({
       mode: score === 100 ? 'ai' : 'rules',
       provider: score === 100 ? 'nvidia' : null,
-      model: score === 100 ? 'meta/llama-3.3-70b-instruct' : null,
+      model: score === 100 ? 'openai/gpt-oss-20b' : null,
       score,
       criteria: [{ key: 'grounded', label: 'Findings whose numbers match their evidence', weight: 30, value: 1, detail }],
     })
     Object.assign(final, {
       mode: 'ai',
       provider: 'nvidia',
-      model: 'meta/llama-3.3-70b-instruct',
+      model: 'openai/gpt-oss-20b',
       ai_note: null,
       provider_switches: ["Groq stopped (the request is larger than Groq's free-plan limit); NVIDIA continued"],
       evaluation: { winner: 'ai', rule: 'The analysis with the higher score builds the dashboard; a tie goes to the AI analyst.', candidates: [criteria('2 of 2', 100), criteria('1 of 2', 85)] },
@@ -162,7 +162,7 @@ describe('AI analyst', () => {
     await screen.findByRole('heading', { name: 'Analysis of sales.csv' })
 
     expect(screen.getByText(/Groq stopped/)).toBeInTheDocument()
-    expect(screen.getByText(/AI analyst \(NVIDIA · llama-3.3-70b-instruct\)/)).toBeInTheDocument()
+    expect(screen.getByText(/AI analyst \(NVIDIA · gpt-oss-20b\)/)).toBeInTheDocument()
     const forecast = screen.getByRole('table', { name: 'Forecast values' })
     expect(within(forecast).getByText('2025-11')).toBeInTheDocument()
     expect(within(forecast).getByText('110')).toBeInTheDocument()
@@ -199,7 +199,7 @@ describe('AI analyst', () => {
       unverified_numbers: [],
       follow_up_questions: ['How did South change over time?'],
       provider: 'nvidia',
-      model: 'meta/llama-3.3-70b-instruct',
+      model: 'openai/gpt-oss-20b',
       provider_switches: ["Groq stopped (the request is larger than Groq's free-plan limit); NVIDIA continued"],
       new_evidence: [{ id: 'C1', tool: 'segment_contribution', args: { measure: 'revenue', dimension: 'region' } }],
     }
@@ -218,7 +218,7 @@ describe('AI analyst', () => {
     expect(within(answer).getByText('Revenue by region')).toBeInTheDocument()
     expect(within(answer).getByRole('img', { name: /Bar chart/i })).toBeInTheDocument()
     expect(within(answer).getByText('Numbers checked')).toBeInTheDocument()
-    expect(within(answer).getByText(/NVIDIA · llama-3.3-70b-instruct/)).toBeInTheDocument()
+    expect(within(answer).getByText(/NVIDIA · gpt-oss-20b/)).toBeInTheDocument()
 
     const sent = JSON.parse(calls.find((c) => c.url === '/api/agent/chat')!.body!.get('payload') as string)
     expect(sent.question).toBe('What are the three most important things in this data?')

@@ -390,7 +390,7 @@ def test_the_rules_baseline_wins_when_it_scores_higher(sales_ds):
         return reply(call("submit_findings", {"findings": [finding]}, "s1"))
 
     ctx = BusinessContext()
-    fake = ScriptedChat([*steps[:3], submit_ungrounded_twice, submit_ungrounded_twice])
+    fake = ScriptedChat([*steps[:3], submit_ungrounded_twice, submit_ungrounded_twice, submit_ungrounded_twice])  # two corrections allowed
     report = list(run_best(sales_ds, "sales.csv", ctx, analyst(fake, ctx), fallback=RulesAnalyst(ctx)))[-1]["report"]
     ai, rules = report["evaluation"]["candidates"]
     assert ai["score"] < rules["score"]
@@ -403,3 +403,170 @@ def test_a_rules_only_run_is_evaluated_alone(sales_ds):
     report = list(run_best(sales_ds, "sales.csv", ctx, RulesAnalyst(ctx)))[-1]["report"]
     assert [c["mode"] for c in report["evaluation"]["candidates"]] == ["rules"]
     assert report["evaluation"]["candidates"][0] == evaluate_report(report)
+
+
+def test_a_full_per_minute_limit_is_waited_out_instead_of_switching(sales_ds, monkeypatch):
+    slept = []
+    monkeypatch.setattr("app.agent.llm.time.sleep", slept.append)
+    steps = happy_steps()
+    groq = ScriptedChat([steps[0], lambda b: httpx.Response(429, json={}, headers={"retry-after": "7"}), *steps[1:]], provider="groq")
+    nvidia = ScriptedChat([])
+    events, report = run_ai(sales_ds, [groq, nvidia])
+    assert (report["provider"], report["provider_switches"]) == ("groq", [])
+    assert slept == [7.5] and nvidia.bodies == []
+    assert any(e["type"] == "log" and "per-minute limit is full; waiting 7 s" in e["message"] for e in events)
+
+
+def test_a_long_wait_switches_provider_instead(sales_ds, monkeypatch):
+    monkeypatch.setattr("app.agent.llm.time.sleep", lambda s: pytest.fail("should not wait"))
+    steps = happy_steps()
+    groq = ScriptedChat([steps[0], lambda b: httpx.Response(429, json={}, headers={"retry-after": "45"})], provider="groq")
+    _, report = run_ai(sales_ds, [groq, ScriptedChat(steps[1:])])
+    assert report["provider"] == "nvidia"
+
+
+def test_a_request_too_large_for_groq_skips_it_without_calling(sales_ds):
+    groq = ScriptedChat([], provider="groq")
+    nvidia = ScriptedChat(happy_steps())
+    small_groq = ChatBackend("groq", "groq-test", "groq-key", 5, httpx.MockTransport(groq.handler), max_request_tokens=1_000)
+    ctx = BusinessContext()
+    analyst_ = LLMAnalyst([small_groq, nvidia.backend()], ctx)
+    report = list(run_workflow(sales_ds, "sales.csv", ctx, analyst_, fallback=RulesAnalyst(ctx)))[-1]["report"]
+    assert groq.bodies == []  # never sent: the workflow prompt alone is far above 1,000 tokens
+    assert report["provider"] == "nvidia" and "larger than Groq's per-minute limit" in report["provider_switches"][0]
+
+
+# ---------------------------------------------------------------- arguments sent as JSON text (seen live from NVIDIA Nemotron)
+
+
+def test_findings_sent_as_json_text_are_decoded(sales_ds):
+    steps = happy_steps()
+    original = steps[4]
+
+    def as_text(body):
+        args = json.loads(original(body).json()["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"])
+        args["findings"] = json.dumps(args["findings"])  # the whole list as one JSON string
+        args["findings"] = args["findings"]
+        args["hypothesis_results"] = json.dumps(args["hypothesis_results"])
+        return reply(call("submit_findings", args, "s2"))
+
+    steps[4] = as_text
+    _, report = run_ai(sales_ds, ScriptedChat(steps))
+    assert report["mode"] == "ai" and [f["title"] for f in report["findings"]] == [
+        "Revenue fell 78.57% in 2025-04",
+        "South holds 53.52% of revenue",
+    ]
+    assert report["hypotheses"][0]["result"] == "supported"
+
+
+def test_a_plan_sent_as_json_text_is_decoded(sales_ds):
+    steps = happy_steps()
+    plan = {
+        **PLAN,
+        "questions": json.dumps(PLAN["questions"]),
+        "hypotheses": json.dumps(PLAN["hypotheses"]),
+        "assumptions": "One assumption.",
+    }
+    steps[0] = lambda b: reply(call("register_plan", plan, "p1"))
+    _, report = run_ai(sales_ds, ScriptedChat(steps))
+    assert report["mode"] == "ai" and [q["id"] for q in report["questions"]] == ["Q1", "Q2"]
+
+
+def evidence_by_tool(body):
+    """Evidence ids returned so far in the conversation, by tool name."""
+    names = {c["id"]: c["function"]["name"] for m in body["messages"] for c in (m.get("tool_calls") or [])}
+    out = {}
+    for m in body["messages"]:
+        if m["role"] == "tool":
+            data = json.loads(m["content"])
+            if "evidence_id" in data:
+                out[names[m["tool_call_id"]]] = data["evidence_id"]
+    return out
+
+
+def test_malformed_findings_are_sent_back_instead_of_crashing(sales_ds):
+    steps = happy_steps()
+
+    def broken(body):
+        return reply(call("submit_findings", {"findings": ["Revenue fell", 42]}, "s1"))
+
+    def fixed_with_single_ids(body):
+        assert "every finding must be an object" in last_results(body)["submit_findings"]["error"]
+        ids = evidence_by_tool(body)
+        finding = {
+            "title": "South holds 53.52% of revenue",
+            "what_happened": "South has 190 of 355.",
+            "evidence_ids": ids["segment_contribution"],  # one string instead of a list
+            "confidence": "high",
+            "kind": "observed_fact",
+            "recommended_action": "Monitor South.",
+        }
+        return reply(call("submit_findings", {"findings": [finding]}, "s2"))
+
+    _, report = run_ai(sales_ds, ScriptedChat([*steps[:3], broken, fixed_with_single_ids]))
+    assert report["mode"] == "ai" and report["findings"][0]["evidence_ids"] and report["findings"][0]["grounded"]
+
+
+def test_confidence_levels_are_not_data_and_feedback_lists_available_numbers(sales_ds):
+    from app.agent.workflow import _numbers_in
+
+    text = "Difference 45.66 (95% confidence interval 12.1 to 79.2), 99% CI, 90 % confidence"
+    assert [raw for raw, _ in _numbers_in(text)] == ["45.66", "12.1", "79.2"]
+
+    steps = happy_steps()
+    submitted = {}
+
+    def with_wrong_total(body):
+        args = json.loads(steps[4](body).json()["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"])
+        submitted["args"] = args
+        wrong = json.loads(json.dumps(args))
+        wrong["findings"][1]["what_happened"] = "South has 191 of 355."
+        return reply(call("submit_findings", wrong, "s1"))
+
+    def check_feedback_then_fix(body):
+        error = last_results(body)["submit_findings"]["error"]
+        assert "['191'] are not in its cited evidence" in error
+        assert "numbers there include" in error and "190" in error  # the right value is offered
+        assert "Do not calculate percentages" in error
+        return reply(call("submit_findings", submitted["args"], "s2"))
+
+    _, report = run_ai(sales_ds, ScriptedChat([*steps[:4], with_wrong_total, check_feedback_then_fix]))
+    assert report["mode"] == "ai" and all(f["grounded"] for f in report["findings"])
+
+
+def test_tool_arguments_the_engine_rejects_are_sent_back_not_crashing(sales_ds):
+    from app.agent.tools import Toolbox
+
+    res = Toolbox(sales_ds).call("kpi", {"measures": [{"column": "revenue", "aggregation": "median"}]}, 4)
+    assert "Invalid arguments for 'kpi'" in res["error"] and "aggregation" in res["error"]
+    res = Toolbox(sales_ds).call("kpi", {"measures": "revenue"}, 4)
+    assert "Invalid arguments for 'kpi'" in res["error"]
+
+
+def test_any_tool_failure_on_odd_arguments_is_reported_to_the_model(sales_ds):
+    from app.agent.tools import Toolbox
+
+    res = Toolbox(sales_ds).call("describe_column", {"column": ["revenue", "units"]}, 4)
+    assert "error" in res and "evidence_id" not in res
+
+
+def test_an_unexpected_error_in_one_call_is_reported_to_the_model(sales_ds):
+    steps = happy_steps()
+    odd = {**PLAN, "primary_measure": ["revenue"]}  # a list where a column name belongs
+
+    def check_then_plan(body):
+        assert "could not be processed" in last_results(body)["register_plan"]["error"]
+        return reply(call("register_plan", PLAN, "p1"))
+
+    _, report = run_ai(sales_ds, ScriptedChat([lambda b: reply(call("register_plan", odd, "p0")), check_then_plan, *steps[1:]]))
+    assert report["mode"] == "ai"
+
+
+def test_out_of_time_while_correcting_keeps_the_ais_last_findings_flagged(sales_ds):
+    steps = happy_steps()[:4]  # plan, investigate, finish, then findings with one invented number
+    events, report = run_ai(sales_ds, ScriptedChat(steps), max_steps=4)  # no step left for the correction
+    assert report["mode"] == "ai" and report["ai_note"] is None
+    assert [f["grounded"] for f in report["findings"]] == [True, False]
+    assert report["findings"][1]["unverified_numbers"] == ["999.9"]
+    assert report["dashboard"]["unverified_findings"] == ["F2"]  # kept out of the overview
+    assert any(e["type"] == "log" and "using the AI's last findings" in e["message"] for e in events)
