@@ -44,7 +44,7 @@ backend/
     profiling.py      inference, Dataset, profile, label-variant merging
     analysis.py       authoritative calculations
     export.py         CSV exports, formula-injection protection
-    ai.py             provider abstraction, Gemini REST provider, rate limiter, payload builder
+    ai.py             provider abstraction, NVIDIA chat-completions client, rate limiter, payload builder
     schemas.py        request models (AnalysisSpec, CleanOptions)
     samples.py        sample registry;  samples/  synthetic CSV + XLSX
     lambda_handler.py Mangum entry point
@@ -140,5 +140,5 @@ risks in [DEPLOYMENT.md](DEPLOYMENT.md).
 | arm64 | About 20% cheaper per GB-second than x86 once the free tier is exceeded |
 | Recharts | Requested stack; enough for line/bar/donut with custom tooltips |
 | Tailwind v4 + CSS tokens | Small CSS; light/dark themes from one token set |
-| Gemini over REST (httpx) | No SDK dependency; easy to mock; key stays server-side |
+| NVIDIA API catalog over REST (httpx) | No SDK dependency; easy to mock; key stays server-side; fixed URL so the key only goes to NVIDIA |
 | Vitest + Testing Library, Playwright (system Chrome) | Fast unit tests; real-browser E2E without downloading browsers |

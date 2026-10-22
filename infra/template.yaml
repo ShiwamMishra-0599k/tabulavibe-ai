@@ -18,16 +18,26 @@ Parameters:
   AiProvider:
     Type: String
     Default: none
-    AllowedValues: [none, gemini]
-    Description: Optional AI commentary provider. Keep "none" unless you have a free-tier key.
-  GeminiApiKey:
+    AllowedValues: [none, groq, nvidia, 'groq,nvidia']
+    Description: Optional AI providers, tried in order. Keep "none" unless you have a key.
+  GroqApiKey:
     Type: String
     Default: ''
     NoEcho: true
-    Description: Only used when AiProvider=gemini. Stored as a Lambda environment variable.
-  GeminiModel:
+    Description: Only used when AiProvider includes groq. Stored as a Lambda environment variable.
+  ForecastProvider:
     Type: String
-    Default: gemini-3.5-flash-lite
+    Default: none
+    AllowedValues: [none, kumo]
+    Description: NVIDIA Kumo Relational forecasting (needs NvidiaApiKey).
+  NvidiaApiKey:
+    Type: String
+    Default: ''
+    NoEcho: true
+    Description: Used when AiProvider includes nvidia, and by ForecastProvider=kumo. Stored as a Lambda environment variable.
+  NvidiaModel:
+    Type: String
+    Default: meta/llama-3.3-70b-instruct
   SupabaseUrl:
     Type: String
     Default: ''
@@ -69,8 +79,10 @@ Resources:
           TABULAVIBE_MAX_XLSX_MB: '4'
           TABULAVIBE_ALLOWED_ORIGINS: !Sub https://${FrontendDistribution.DomainName}
           TABULAVIBE_AI_PROVIDER: !Ref AiProvider
-          TABULAVIBE_GEMINI_API_KEY: !Ref GeminiApiKey
-          TABULAVIBE_GEMINI_MODEL: !Ref GeminiModel
+          TABULAVIBE_GROQ_API_KEY: !Ref GroqApiKey
+          TABULAVIBE_NVIDIA_API_KEY: !Ref NvidiaApiKey
+          TABULAVIBE_FORECAST_PROVIDER: !Ref ForecastProvider
+          TABULAVIBE_NVIDIA_MODEL: !Ref NvidiaModel
           TABULAVIBE_SUPABASE_URL: !Ref SupabaseUrl
           TABULAVIBE_SUPABASE_ANON_KEY: !Ref SupabaseAnonKey
       FunctionUrlConfig:

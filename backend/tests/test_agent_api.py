@@ -5,13 +5,13 @@ import json
 import httpx
 from fastapi.testclient import TestClient
 
-from app.agent.gemini import GeminiAnalyst
+from app.agent.llm import LLMAnalyst
 from app.agent.workflow import RulesAnalyst
 from app.auth import get_token_verifier
 from app.config import Settings
 from app.main import create_app, get_agent_factory
 
-from .test_agent_gemini import ScriptedGemini, happy_steps
+from .test_agent_llm import ScriptedChat, happy_steps
 from .test_auth import ANON_KEY, FakeAuth, TokenVerifier
 
 
@@ -47,15 +47,13 @@ def test_invalid_context_is_rejected(client, sales_bytes):
 
 
 def test_config_reports_the_agent_mode(client):
-    assert client.get("/api/config").json()["agent"] == {"mode": "rules", "model": None}
+    assert client.get("/api/config").json()["agent"] == {"mode": "rules", "provider": None, "model": None, "chain": [], "forecast": None}
 
 
 def test_ai_mode_through_the_api(sales_bytes):
     app = create_app(Settings(app_env="test", _env_file=None))
-    fake = ScriptedGemini(happy_steps())
-    app.dependency_overrides[get_agent_factory] = lambda: (
-        lambda ctx: (GeminiAnalyst("test-key", "gemini-test", ctx, transport=httpx.MockTransport(fake.handler)), RulesAnalyst(ctx))
-    )
+    fake = ScriptedChat(happy_steps())
+    app.dependency_overrides[get_agent_factory] = lambda: lambda ctx: (LLMAnalyst([fake.backend()], ctx), RulesAnalyst(ctx))
     report = events_of(run(TestClient(app), sales_bytes))[-1]["report"]
     assert report["mode"] == "ai" and all(f["grounded"] for f in report["findings"])
 

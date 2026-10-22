@@ -1,7 +1,7 @@
 # 📊 TabulaVibe AI: Spreadsheet-to-Dashboard Analytics with Optional Generative AI
 
 An end-to-end business analytics web app built with **FastAPI**, **pandas**, **React + TypeScript** and
-optional **Google Gemini** commentary. It turns ordinary CSV and Excel files into a data-quality report,
+optional AI from **Groq** and the **NVIDIA API catalog**, with **NVIDIA Kumo Relational** forecasts. It turns ordinary CSV and Excel files into a data-quality report,
 an interactive KPI dashboard, downloadable CSV exports and a print-ready management report. No paid
 services are required. Optional **Supabase** accounts (sign up with Google/Gmail or GitHub) let users save
 reports and reopen them later.
@@ -27,11 +27,11 @@ reports and reopen them later.
 - 📤 Exports: results CSV, cleaned-data CSV (safe from spreadsheet formula injection), printable report (save as PDF)
 - 🧭 **Choose your analyst** after uploading: the **AI Analyst** runs the full workflow; the **Manual Analyst** walks you through Preview → Data quality → Analyse → Report & export
 - 📑 **Final report as PDF or PowerPoint**: A4 PDF with vector charts, or a 16:9 deck with native, editable PowerPoint charts, for both analysts and for saved reports
-- 🤖 **AI analyst**: runs a 9-phase analytics workflow (business understanding → data understanding → problem discovery → preparation → EDA → validation → dashboard → checks → handover) with enforced phase gates. Gemini plans and explains; Python (pandas, SciPy) computes every number, and every figure in a finding is checked against the calculation it cites. Works without AI via a rules-based analyst ([docs/AGENT_WORKFLOW.md](docs/AGENT_WORKFLOW.md))
+- 🤖 **AI analyst**: runs a 9-phase analytics workflow (business understanding → data understanding → problem discovery → preparation → EDA → validation → dashboard → checks → handover) with enforced phase gates. An LLM (Groq, switching to NVIDIA mid-run when Groq cannot finish) plans and explains; Python (pandas, SciPy) computes every number; the AI run is scored against a rules-based baseline and the better one builds the dashboard; NVIDIA Kumo Relational forecasts the primary measure, with a backtest, and every figure in a finding is checked against the calculation it cites. Works without AI via a rules-based analyst ([docs/AGENT_WORKFLOW.md](docs/AGENT_WORKFLOW.md))
 - 👤 Accounts: sign up / sign in with **Google (Gmail) or GitHub** via Supabase Auth; a profile is created on first sign-in
 - 🔐 Optional **sign-in-only uploads** (`TABULAVIBE_REQUIRE_SIGN_IN=true`), enforced by the backend on every upload and analysis request
 - 💾 **My reports:** save a report (figures, chart data, quality notes, AI commentary) to Supabase Postgres, reopen, print or delete it. Row Level Security keeps every user's reports private
-- ✍️ Optional AI commentary: Gemini summarises the already-calculated results and never sees raw rows
+- ✍️ Optional AI commentary: Groq (or NVIDIA as a fallback) summarises the already-calculated results and never sees raw rows
 - 📡 REST API built with FastAPI, ready for AWS Lambda (Function URL) + S3 / CloudFront
 
 ## 🧰 Tech Stack
@@ -43,7 +43,8 @@ reports and reopen them later.
 | Backend | FastAPI 0.156, Uvicorn, Pydantic 2 / pydantic-settings |
 | Data processing | pandas 3.0, NumPy, SciPy 1.18 (statistics), openpyxl (Excel), python-multipart |
 | Reports | ReportLab 5 (PDF, embedded DejaVu Sans), python-pptx 1.0 (PowerPoint with native charts) |
-| Optional LLM | Google Gemini over REST (`httpx`, no SDK) |
+| Optional LLM | Groq, then the NVIDIA API catalog (OpenAI-compatible chat completions with tool calling) over REST (`httpx`, no SDK) |
+| Optional forecasting | NVIDIA Kumo Relational (hosted predictions API, regression per forecast horizon) |
 | Optional accounts & database | Supabase: Auth (Google + GitHub OAuth, PKCE) and Postgres with Row Level Security; backend talks to its REST API with `httpx`; `@supabase/supabase-js` (lazy-loaded) in the browser |
 | Hosting | **Vercel** (Services: Vite frontend + FastAPI Python function, one domain) |
 | Cloud (alternative) | AWS SAM: Lambda (python3.14, arm64) + Function URL, S3 + CloudFront, AWS Budgets |
@@ -74,7 +75,7 @@ reports and reopen them later.
 ↓ [ Profiling ] ├─ Type inference ├─ Missing / invalid / duplicates └─ Statistics
 ↓ [ Analysis Engine (pandas) ] ├─ KPIs ├─ Grouping + time periods ├─ Filters └─ Chart advice
 ↓ [ Exports ] ├─ Results CSV ├─ Cleaned CSV └─ Printable report (browser)
-↓ [ Optional Gemini Narrative: aggregates only ] ↓ [ JSON / CSV responses ]
+↓ [ Optional AI Narrative (Groq → NVIDIA): aggregates only ] ↓ [ JSON / CSV responses ]
 
 Uploads are **never stored**; the browser re-sends the file with each request. Only when a signed-in user
 chooses **Save report** does the backend recalculate the results and write them (aggregates only) to Supabase,
@@ -201,13 +202,15 @@ Calculations are checked against hand-computed fixtures and an independent `csv`
 Off by default. To enable it, add to `backend/.env`:
 
 ```
-TABULAVIBE_AI_PROVIDER=gemini
-TABULAVIBE_GEMINI_API_KEY=<key from a Google AI Studio project without billing>
-TABULAVIBE_GEMINI_MODEL=gemini-3.5-flash-lite
+TABULAVIBE_AI_PROVIDER=groq,nvidia
+TABULAVIBE_GROQ_API_KEY=<key from console.groq.com>
+TABULAVIBE_NVIDIA_API_KEY=<nvapi- key from build.nvidia.com>
+TABULAVIBE_FORECAST_PROVIDER=kumo
 ```
 
-Before enabling it, note:
-- On Gemini's free tier, prompts may be used to improve Google's products. That is why only aggregated figures are sent, and the UI shows the exact payload.
+The same keys power the AI Analyst. Before enabling them, note:
+- Groq is tried first. Its free plan allows only a few thousand tokens a minute, which is smaller than one AI Analyst request, so analyst runs usually continue on NVIDIA (about 40 requests a minute; one run makes roughly 10–20). The short commentary fits Groq's free plan.
+- Only aggregated figures are sent (never raw rows), and the UI shows the exact payload. Kumo Relational receives period totals of one measure. NVIDIA's trial terms allow it to record inputs, so do not use it for confidential data.
 - If the provider fails or hits its quota, the rest of the app keeps working.
 
 ## 👤 Optional Accounts & Saved Reports (Supabase)
@@ -233,7 +236,7 @@ rows, and every query runs as the signed-in user.
 - pandas (authoritative calculations)
 - openpyxl (read-only, no formula evaluation)
 - Recharts
-- Google Gemini via REST (optional)
+- Groq and the NVIDIA API catalog via REST (optional), NVIDIA Kumo Relational (optional forecasting)
 - Supabase Auth + Postgres with Row Level Security (optional)
 - Mangum (FastAPI → AWS Lambda)
 - Playwright with the system Chrome (no browser download)
@@ -244,8 +247,9 @@ rows, and every query runs as the signed-in user.
 - **Supabase service-role key on the server:** unnecessary and dangerous; user tokens + RLS are enough.
 - **API Gateway:** a Lambda Function URL costs nothing extra.
 - **AWS Lambda Web Adapter:** adds a second process and slower cold starts compared with Mangum.
-- **Gemini Python SDK:** plain REST is easier to mock and adds no dependency.
-- **Gemini 2.5 models:** Google now limits them to existing users, so the default is `gemini-3.5-flash-lite`.
+- **OpenAI / NVIDIA SDKs:** plain REST is easier to mock and adds no dependency.
+- **Google Gemini:** replaced by the NVIDIA API catalog in 0.6.0 (owner's choice).
+- **NVIDIA Kumo Relational as the analyst:** it is a prediction model, not a chat model, so it forecasts but cannot plan, call tools or write findings.
 - **AI-calculated numbers:** the LLM never produces figures; it only describes pandas results.
 
 ## 🛡️ Ethics & Safeguards
@@ -308,7 +312,7 @@ Infrastructure as code is ready in `infra/` (SAM template, `deploy.ps1`).
 - 🔐 CloudFront + WAF rate limiting for the public API
 - 📊 Period-over-period comparisons (this month vs last month) on KPI cards
 - ⚡ Code-split the chart library to shrink the first page load
-- 🧪 Live-test the Gemini integration with a free-tier key
+- 🧪 Live-test the Groq, NVIDIA and Kumo integrations with real keys
 
 ## 📚 Documentation
 
@@ -327,7 +331,7 @@ Infrastructure as code is ready in `infra/` (SAM template, `deploy.ps1`).
 ## 📌 License
 
 This project is for educational and demo purposes. All sample data is synthetic. For commercial use,
-review the terms of third-party services (e.g. Google Gemini API, AWS).
+review the terms of third-party services (e.g. Groq, NVIDIA API catalog, AWS).
 
 ## 🤝 Contributions
 

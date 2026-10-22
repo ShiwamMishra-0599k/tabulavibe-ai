@@ -1,6 +1,6 @@
 [project]
 name = "tabulavibe-backend"
-version = "0.5.0"
+version = "0.6.0"
 description = "TabulaVibe AI API: CSV/XLSX profiling, KPI analysis and exports"
 requires-python = ">=3.13"
 # Runtime dependencies. Keep identical to requirements.txt (tests/test_packaging.py checks this).

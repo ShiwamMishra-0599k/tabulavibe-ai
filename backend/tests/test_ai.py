@@ -4,7 +4,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app.ai import AIError, AIQuotaError, GeminiProvider, RateLimiter, build_payload, get_provider
+from app.ai import CHAT_URLS, AIError, AIQuotaError, ChainProvider, ChatBackend, RateLimiter, build_payload, chat_backends, get_provider
 from app.analysis import run_analysis
 from app.config import Settings
 from app.main import create_app, get_narrative_provider
@@ -41,15 +41,42 @@ def post(client, sales_bytes):
 
 def test_no_provider_without_key():
     assert get_provider(Settings(ai_provider="none", _env_file=None)) is None
-    assert get_provider(Settings(ai_provider="gemini", gemini_api_key=None, _env_file=None)) is None
-    assert get_provider(Settings(ai_provider="gemini", gemini_api_key="", _env_file=None)) is None
-    assert isinstance(get_provider(Settings(ai_provider="gemini", gemini_api_key="k", _env_file=None)), GeminiProvider)
+    assert get_provider(Settings(ai_provider="nvidia", nvidia_api_key=None, _env_file=None)) is None
+    assert get_provider(Settings(ai_provider="nvidia", nvidia_api_key="", _env_file=None)) is None
+    assert get_provider(Settings(ai_provider="nvidia", nvidia_api_key="   ", _env_file=None)) is None
+    provider = get_provider(Settings(ai_provider="nvidia", nvidia_api_key="k", _env_file=None))
+    assert isinstance(provider, ChainProvider) and provider.model == "meta/llama-3.3-70b-instruct"
+
+
+def test_provider_order_and_keys():
+    both = Settings(ai_provider=" Groq , nvidia ", groq_api_key="gsk-test-secret", nvidia_api_key="nvapi-test-secret", _env_file=None)
+    assert both.ai_provider == "groq,nvidia"
+    assert [(b.name, b.model) for b in chat_backends(both)] == [
+        ("groq", "llama-3.3-70b-versatile"),
+        ("nvidia", "meta/llama-3.3-70b-instruct"),
+    ]
+    only_nvidia_key = Settings(ai_provider="groq,nvidia", nvidia_api_key="n", _env_file=None)
+    assert [b.name for b in chat_backends(only_nvidia_key)] == ["nvidia"]  # Groq has no key, so it is skipped
+    assert "secret" not in repr(chat_backends(both))  # keys never appear in a repr
+    for bad in ("openai", "groq,groq"):
+        with pytest.raises(ValueError):
+            Settings(ai_provider=bad, _env_file=None)
+
+
+def test_retired_gemini_setting_starts_with_ai_off():
+    settings = Settings(ai_provider="gemini", _env_file=None)
+    assert settings.ai_provider == "none" and get_provider(settings) is None
 
 
 def test_config_reports_ai_enabled_without_leaking_key():
-    client = TestClient(create_app(Settings(ai_provider="gemini", gemini_api_key="secret-key-123", _env_file=None)))
-    res = client.get("/api/config")
-    assert res.json()["ai"]["enabled"] is True
+    settings = Settings(ai_provider="groq,nvidia", groq_api_key="gsk-secret-1", nvidia_api_key="nvapi-secret-2", _env_file=None)
+    res = TestClient(create_app(settings)).get("/api/config")
+    assert res.json()["ai"] == {"enabled": True, "provider": "groq", "model": "llama-3.3-70b-versatile"}
+    assert res.json()["agent"]["chain"] == [
+        {"provider": "groq", "label": "Groq", "model": "llama-3.3-70b-versatile"},
+        {"provider": "nvidia", "label": "NVIDIA", "model": "meta/llama-3.3-70b-instruct"},
+    ]
+    assert "secret" not in res.text
     assert "secret-key-123" not in res.text
 
 
@@ -116,50 +143,89 @@ def test_payload_is_limited(sales_ds):
     assert set(payload) == {"rows_analyzed", "kpis", "filters", "duplicates_removed", "data_quality", "grouped_by", "groups"}
 
 
-# ---------------------------------------------------------------- Gemini HTTP layer
+# ---------------------------------------------------------------- chat providers (Groq, NVIDIA) HTTP layer
 
 
-def gemini(handler) -> GeminiProvider:
-    return GeminiProvider("test-key", "gemini-test", timeout=5, transport=httpx.MockTransport(handler))
+def backend(handler, name="nvidia") -> ChatBackend:
+    return ChatBackend(name, f"{name}-test", "test-key", 5, httpx.MockTransport(handler))
 
 
-def test_gemini_success_and_request_shape():
+def nvidia(handler) -> ChainProvider:
+    return ChainProvider([backend(handler)])
+
+
+def chat(message: dict) -> httpx.Response:
+    return httpx.Response(200, json={"choices": [{"index": 0, "message": message, "finish_reason": "stop"}]})
+
+
+@pytest.mark.parametrize("name", ["groq", "nvidia"])
+def test_chat_success_and_request_shape(name):
     seen = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen["url"] = str(request.url)
-        seen["key"] = request.headers.get("x-goog-api-key")
+        seen["auth"] = request.headers.get("authorization")
         seen["body"] = json.loads(request.content)
-        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": "Hello "}, {"text": "world"}]}}]})
+        return chat({"role": "assistant", "content": "Hello world"})
 
-    assert gemini(handler).generate("sys", "prompt") == "Hello world"
-    assert seen["url"].endswith("/v1beta/models/gemini-test:generateContent")
-    assert "key=" not in seen["url"]  # key travels in a header, not the URL
-    assert seen["key"] == "test-key"
-    assert seen["body"]["systemInstruction"]["parts"][0]["text"] == "sys"
+    provider = ChainProvider([backend(handler, name)])
+    assert provider.generate("sys", "prompt") == "Hello world"
+    assert (provider.name, provider.model) == (name, f"{name}-test")
+    assert seen["url"] == CHAT_URLS[name]
+    assert "test-key" not in seen["url"]  # the key travels in a header, not the URL
+    assert seen["auth"] == "Bearer test-key"
+    assert seen["body"]["model"] == f"{name}-test"
+    assert seen["body"]["messages"] == [{"role": "system", "content": "sys"}, {"role": "user", "content": "prompt"}]
 
 
 @pytest.mark.parametrize(
     ("response", "code"),
     [
-        (httpx.Response(429, json={"error": {"status": "RESOURCE_EXHAUSTED"}}), "ai_quota_exceeded"),
+        (httpx.Response(429, json={"status": 429, "title": "Too Many Requests"}), "ai_quota_exceeded"),
+        (httpx.Response(413, json={"error": {"message": "Request too large"}}), "ai_request_too_large"),
+        (httpx.Response(401, json={}), "ai_auth_failed"),
         (httpx.Response(403, json={}), "ai_auth_failed"),
+        (httpx.Response(404, json={"detail": "model not found"}), "ai_provider_error"),
         (httpx.Response(500, text="oops"), "ai_provider_error"),
         (httpx.Response(200, text="not json"), "ai_malformed_response"),
-        (httpx.Response(200, json={"candidates": []}), "ai_malformed_response"),
-        (httpx.Response(200, json={"promptFeedback": {"blockReason": "SAFETY"}}), "ai_malformed_response"),
+        (httpx.Response(200, json={"choices": []}), "ai_malformed_response"),
+        (httpx.Response(200, json={"choices": [{"message": None}]}), "ai_malformed_response"),
+        (chat({"role": "assistant", "content": ["not", "text"]}), "ai_malformed_response"),
     ],
 )
-def test_gemini_error_mapping(response, code):
+def test_nvidia_error_mapping(response, code):
     with pytest.raises(AIError) as err:
-        gemini(lambda _req: response).generate("s", "p")
+        nvidia(lambda _req: response).generate("s", "p")
     assert err.value.code == code
 
 
-def test_gemini_timeout():
+def test_nvidia_empty_reply_is_reported_by_the_narrative(sales_bytes):
+    provider = nvidia(lambda _req: chat({"role": "assistant", "content": None}))
+    res = post(client_with(provider), sales_bytes)
+    assert res.status_code == 502 and res.json()["error"]["code"] == "ai_malformed_response"
+
+
+def test_nvidia_timeout():
     def handler(request):
         raise httpx.ReadTimeout("slow", request=request)
 
     with pytest.raises(AIError) as err:
-        gemini(handler).generate("s", "p")
+        nvidia(handler).generate("s", "p")
     assert err.value.code == "ai_timeout"
+
+
+def test_commentary_falls_back_from_groq_to_nvidia():
+    groq = backend(lambda _req: httpx.Response(413, json={}), "groq")
+    nvidia_ok = backend(lambda _req: chat({"role": "assistant", "content": "From NVIDIA."}))
+    provider = ChainProvider([groq, nvidia_ok])
+    assert provider.generate("s", "p") == "From NVIDIA."
+    assert (provider.name, provider.model) == ("nvidia", "nvidia-test")
+
+
+def test_commentary_reports_the_last_error_when_every_provider_fails():
+    provider = ChainProvider(
+        [backend(lambda _req: httpx.Response(413, json={}), "groq"), backend(lambda _req: httpx.Response(401, json={}))]
+    )
+    with pytest.raises(AIError) as err:
+        provider.generate("s", "p")
+    assert err.value.code == "ai_auth_failed"

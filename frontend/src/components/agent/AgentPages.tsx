@@ -8,15 +8,17 @@ import {
   Gauge,
   Lightbulb,
   ListChecks,
+  Scale,
   ScanSearch,
   Sigma,
   Target,
+  TrendingUp,
   TriangleAlert,
 } from 'lucide-react'
 import { BarComparison, TrendChart } from '../Charts'
 import { Alert, Badge, Button, Card, Meter, Stat, selectClass, labelClass } from '../ui'
 import { formatCount, formatNumber, TYPE_LABELS } from '../../lib/format'
-import { formatP, KIND_LABEL, rowsOf, type AgentReport, type Evidence, type Finding } from '../../lib/agent'
+import { formatP, KIND_LABEL, PROVIDER_LABEL, rowsOf, type AgentReport, type Evidence, type Finding, type Forecast } from '../../lib/agent'
 import type { AnalysisSpec } from '../../lib/types'
 import { BoxPlot, CorrelationHeatmap, Histogram, VarianceBars } from './AgentCharts'
 
@@ -70,6 +72,59 @@ function trendOf(report: AgentReport, ev: Map<string, Evidence>): Evidence<R> | 
 
 // ===================================================================== Page 1: Executive overview
 
+function ForecastCard({ forecast: fc }: { forecast: Forecast }) {
+  if (fc.status !== 'ok' || !fc.forecast?.length) {
+    return (
+      <Card title="Forecast" subtitle="NVIDIA Kumo Relational" icon={TrendingUp}>
+        <p className="text-sm text-ink-muted">{fc.note}</p>
+      </Card>
+    )
+  }
+  const history = (fc.history ?? []).slice(-12).map((p) => ({ group: p.period, rows: 0, value: p.value }))
+  const ahead = fc.forecast.map((p) => ({ group: `${p.period} (forecast)`, rows: 0, value: p.value }))
+  const bt = fc.backtest
+  return (
+    <Card title={`Forecast: ${fc.measure} by ${fc.grain}`} subtitle={`NVIDIA Kumo Relational · from '${fc.date_column}' · sent: ${fc.shared}`} icon={TrendingUp}>
+      <TrendChart rows={rowsOf([...history, ...ahead])} measureKey="v" measureLabel={`${fc.measure} (history and forecast)`} height={240} />
+      <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-2">
+        <table className="w-full text-sm" aria-label="Forecast values">
+          <thead>
+            <tr className="border-b border-line text-left text-xs text-ink-muted">
+              <th className="py-1.5 font-medium">Period</th>
+              <th className="py-1.5 text-right font-medium">Forecast</th>
+            </tr>
+          </thead>
+          <tbody>
+            {fc.forecast.map((p) => (
+              <tr key={p.period} className="border-b border-line/60">
+                <td className="py-1.5 text-ink-2">{p.period}</td>
+                <td className="tabular py-1.5 text-right font-semibold text-ink">{formatNumber(p.value)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {bt && (
+          <div className="text-sm">
+            <p className="font-semibold text-ink">Backtest (accuracy on the last {bt.periods.length} known periods)</p>
+            <p className="mt-1 text-ink-2">
+              Average error: <span className="tabular font-semibold text-ink">{formatNumber(bt.kumo_mae)}</span> for Kumo vs{' '}
+              <span className="tabular font-semibold text-ink">{formatNumber(bt.naive_mae)}</span> for "same as last period".
+            </p>
+            <div className="mt-2">
+              <Badge tone={bt.kumo_better ? 'good' : 'warn'}>{bt.kumo_better ? 'Kumo was more accurate' : 'The simple baseline was more accurate'}</Badge>
+            </div>
+          </div>
+        )}
+      </div>
+      <ul className="mt-3 grid gap-1 text-xs text-ink-muted">
+        {(fc.notes ?? []).map((n) => (
+          <li key={n}>{n}</li>
+        ))}
+      </ul>
+    </Card>
+  )
+}
+
 export function OverviewPage({ report, ev, onExplore }: PageProps) {
   const trend = trendOf(report, ev)
   const segment = report.dashboard.charts.find((c) => c.type === 'bar')
@@ -104,6 +159,7 @@ export function OverviewPage({ report, ev, onExplore }: PageProps) {
           </Card>
         )}
       </div>
+      {report.forecast && <ForecastCard forecast={report.forecast} />}
       <Card title="Key findings" subtitle="Validated findings only; every figure was computed in Python and cites its evidence." icon={Lightbulb}>
         {key.length === 0 && <p className="text-sm text-ink-muted">No finding met the evidence threshold.</p>}
         <ol className="grid gap-3">
@@ -633,10 +689,58 @@ export function InsightsPage({ report, onExplore }: PageProps) {
 
 // ===================================================================== Plan & method (phases 0-3)
 
+function EvaluationCard({ report }: { report: AgentReport }) {
+  const ev = report.evaluation
+  if (!ev) return null
+  const name = (c: (typeof ev.candidates)[number]) => (c.mode === 'ai' ? `AI (${PROVIDER_LABEL[c.provider ?? ''] ?? 'AI'})` : 'Rules-based')
+  return (
+    <Card title="Which analysis built this dashboard" subtitle={ev.rule} icon={Scale}>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[18rem] text-sm" aria-label="Analysis evaluation">
+          <thead>
+            <tr className="border-b border-line text-left text-xs text-ink-muted">
+              <th className="py-2 pr-3 font-medium">Criterion (weight)</th>
+              {ev.candidates.map((c) => (
+                <th key={c.mode} className="py-2 pr-3 font-medium">
+                  {name(c)}
+                  {c.mode === ev.winner && ' ✓'}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {ev.candidates[0].criteria.map((crit, i) => (
+              <tr key={crit.key} className="border-b border-line/60">
+                <td className="py-2 pr-3 text-ink-2">
+                  {crit.label} ({crit.weight})
+                </td>
+                {ev.candidates.map((c) => (
+                  <td key={c.mode} className="tabular py-2 pr-3 text-ink">
+                    {c.criteria[i].detail}
+                  </td>
+                ))}
+              </tr>
+            ))}
+            <tr>
+              <td className="py-2 pr-3 font-semibold text-ink">Score (0–100)</td>
+              {ev.candidates.map((c) => (
+                <td key={c.mode} className="tabular py-2 pr-3 font-semibold text-ink">
+                  {formatNumber(c.score)}
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}
+
 export function PlanPage({ report }: PageProps) {
   const c = report.charter
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
+      <EvaluationCard report={report} />
       <Card title="Project charter (phase 0)" subtitle={c.provided_by_user ? 'Based on the business context you provided.' : 'No business context was provided: see the assumptions.'} icon={Target}>
         <KeyValues items={[['Business context', c.business_context], ['Audience', c.stakeholders]]} />
         <div className="mt-4 grid gap-4 text-sm sm:grid-cols-2">

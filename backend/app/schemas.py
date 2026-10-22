@@ -72,6 +72,22 @@ class ReportExportRequest(BaseModel):
     # manual: {dataset, issues, result, narrative?, chart_kind?, measure_key?}; agent: the AI analyst report
     data: dict[str, Any]
 
+    @model_validator(mode="after")
+    def _clean_text(self) -> "ReportExportRequest":
+        # JSON may carry lone surrogates ("\udc81"), which cannot be written to a file; replace them.
+        self.data = _clean(self.data)
+        return self
+
+
+def _clean(value: Any) -> Any:
+    if isinstance(value, str):
+        return value.encode("utf-8", "replace").decode("utf-8")
+    if isinstance(value, dict):
+        return {_clean(k): _clean(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_clean(v) for v in value]
+    return value
+
 
 class SavedNarrative(BaseModel):
     """AI commentary the user chose to keep with a saved report (as returned by /api/narrative)."""

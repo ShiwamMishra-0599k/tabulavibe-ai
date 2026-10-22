@@ -172,7 +172,7 @@ describe('App', () => {
   it('keeps the dashboard usable when AI commentary fails', async () => {
     const user = userEvent.setup()
     mockServer({
-      '/api/config': () => jsonResponse({ ...config, ai: { enabled: true, provider: 'gemini', model: 'test' } }),
+      '/api/config': () => jsonResponse({ ...config, ai: { enabled: true, provider: 'nvidia', model: 'test' } }),
       '/api/narrative': () => jsonResponse({ error: { code: 'ai_quota_exceeded', message: 'The free usage limit has been reached.' } }, 429),
     })
     render(<App />)

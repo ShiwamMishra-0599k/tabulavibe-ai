@@ -1,4 +1,5 @@
 import { ArrowRight, Check, SlidersHorizontal, Sparkles, type LucideIcon } from 'lucide-react'
+import { aiAnalystLabel } from '../lib/agent'
 import { formatCount } from '../lib/format'
 import type { AppConfig, Profile } from '../lib/types'
 import { Badge } from './ui'
@@ -77,7 +78,7 @@ export function ModeChoice({ profile, config, onChoose }: { profile: Profile; co
               </span>
               {o.mode === 'ai' && (
                 <Badge tone="accent" icon={Sparkles}>
-                  {ai ? `Gemini · ${config?.agent?.model}` : 'Rules-based (AI not configured)'}
+                  {ai ? aiAnalystLabel(config?.agent) : 'Rules-based (AI not configured)'}
                 </Badge>
               )}
             </span>

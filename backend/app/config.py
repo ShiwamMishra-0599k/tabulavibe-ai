@@ -6,8 +6,10 @@ import os
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+AI_PROVIDERS = ("groq", "nvidia")
 
 
 class Settings(BaseSettings):
@@ -35,14 +37,22 @@ class Settings(BaseSettings):
     # Files above this size are processed one at a time, so two large uploads cannot exhaust memory together.
     large_file_mb: float = Field(25.0, gt=0)
 
-    # Optional AI narrative. Disabled unless explicitly configured.
-    ai_provider: Literal["none", "gemini"] = "none"
-    gemini_api_key: SecretStr | None = None
-    gemini_model: str = "gemini-3.5-flash-lite"
+    # Optional AI (commentary and the AI analyst). Disabled unless explicitly configured.
+    # ai_provider is "none" or a comma-separated order of OpenAI-compatible chat providers to try, e.g.
+    # "groq,nvidia": Groq first, NVIDIA (build.nvidia.com, nvapi- key) when Groq cannot finish. Providers
+    # without a key are skipped. Models must support tool calling (the AI analyst relies on it).
+    ai_provider: str = "none"
+    groq_api_key: SecretStr | None = None
+    groq_model: str = "llama-3.3-70b-versatile"
+    nvidia_api_key: SecretStr | None = None
+    nvidia_model: str = "meta/llama-3.3-70b-instruct"
+    # Predictive forecasting of the AI analyst's primary measure with NVIDIA Kumo Relational (hosted on
+    # build.nvidia.com, uses the NVIDIA key). Only period totals are sent, never raw rows.
+    forecast_provider: Literal["none", "kumo"] = "none"
     ai_timeout_seconds: float = Field(20.0, gt=0, le=60)
     ai_requests_per_minute: int = Field(5, ge=1)
 
-    # Analytics agent (phases 0-8). Uses Gemini when the AI provider is configured, otherwise the
+    # Analytics agent (phases 0-8). Uses the AI providers above when configured, otherwise the
     # rules-based analyst. Limits keep one run inside the serverless time limit and the free AI quota.
     agent_max_steps: int = Field(24, ge=4, le=60)
     agent_deadline_seconds: float = Field(200, gt=10, le=280)
@@ -60,6 +70,25 @@ class Settings(BaseSettings):
 
     # Public GitHub repository ("owner/name") whose star count the navigation bar shows. Empty hides it.
     github_repo: str = "ShiwamMishra-0599k/tabulavibe-ai"
+
+    @field_validator("ai_provider")
+    @classmethod
+    def _check_ai_provider(cls, value: str) -> str:
+        names = [n.strip().lower() for n in value.split(",") if n.strip()]
+        # Gemini was replaced in 0.6.0. An old deployment that still says "gemini" starts with AI off
+        # (rules-based analyst) instead of failing to start.
+        names = [n for n in names if n != "gemini"]
+        if not names or names == ["none"]:
+            return "none"
+        unknown = [n for n in names if n not in AI_PROVIDERS]
+        if unknown or len(set(names)) != len(names):
+            raise ValueError(f"TABULAVIBE_AI_PROVIDER must be 'none' or a comma-separated list of {', '.join(AI_PROVIDERS)}")
+        return ",".join(names)
+
+    @property
+    def ai_chain(self) -> list[str]:
+        """Providers to try, in order (keys are checked by app.ai.chat_backends)."""
+        return [] if self.ai_provider == "none" else self.ai_provider.split(",")
 
     @model_validator(mode="after")
     def _check_supabase(self) -> "Settings":

@@ -307,6 +307,33 @@ def agent_doc(report: dict[str, Any]) -> Doc:
             )
         )
 
+    fc = report.get("forecast") or {}
+    if fc.get("status") == "ok" and fc.get("forecast"):
+        hist = (fc.get("history") or [])[-12:]
+        points = hist + fc["forecast"]
+        bt = fc.get("backtest")
+        chart = Chart(
+            "line",
+            f"{fc.get('measure')} by {fc.get('grain')}: history and forecast",
+            [_clip(p.get("period"), 20) for p in points],
+            [_num(p.get("value")) for p in points],
+            str(fc.get("measure")),
+            f"The last {len(fc['forecast'])} point(s) are the forecast by NVIDIA Kumo Relational.",
+        )
+        blocks: list[Block] = [
+            TableBlock(
+                ["Period", "Forecast"], [[_clip(p.get("period"), 30), fmt(_num(p.get("value")))] for p in fc["forecast"]], numeric={1}
+            ),
+        ]
+        notes = [f"Sent to NVIDIA: {fc.get('shared')}."]
+        if bt:
+            notes.append(
+                f"Backtest on the last {len(bt['periods'])} period(s): mean absolute error {fmt(_num(bt.get('kumo_mae')))} (Kumo) vs {fmt(_num(bt.get('naive_mae')))} (previous period's value)."
+            )
+        blocks.append(Bullets(notes + [_clip(x, 300) for x in fc.get("notes") or []]))
+        sections.append(Section("Forecast (NVIDIA Kumo Relational)", [chart]))  # the chart fills its slide
+        sections.append(Section("Forecast details and accuracy", blocks))
+
     for f in findings[:10]:
         badges = [
             f"{f.get('confidence', 'low')} confidence",
@@ -409,6 +436,31 @@ def agent_doc(report: dict[str, Any]) -> Doc:
             [Bullets([_clip(x, 300) for x in (report.get("limitations") or []) + (report.get("outstanding_questions") or [])][:10])],
         )
     )
+    ev = report.get("evaluation") or {}
+    if ev.get("candidates"):
+        cands = ev["candidates"]
+        names = ["AI analyst" if c.get("mode") == "ai" else "Rules-based" for c in cands]
+        rows = [
+            [_clip(crit.get("label"), 80), *[str(c["criteria"][i].get("detail")) for c in cands]]
+            for i, crit in enumerate(cands[0].get("criteria") or [])
+        ]
+        rows.append(["Score (0-100)", *[fmt(_num(c.get("score")), 1) for c in cands]])
+        sections.append(
+            Section(
+                "Which analysis built this dashboard",
+                [
+                    TableBlock(
+                        [
+                            "Criterion",
+                            *[n + (" (used)" if c.get("mode") == ev.get("winner") else "") for n, c in zip(names, cands, strict=True)],
+                        ],
+                        rows,
+                        numeric=set(range(1, len(cands) + 1)),
+                        note=_clip(ev.get("rule"), 200),
+                    )
+                ],
+            )
+        )
     sections.append(Section("Workflow phases and gates", [TableBlock(["Phase", "Name", "Status"], phases, widths=[0.12, 0.58, 0.30])]))
     mode = f"AI analyst ({report.get('model')})" if report.get("mode") == "ai" else "Rules-based analyst"
     return Doc(

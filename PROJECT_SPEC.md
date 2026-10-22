@@ -66,7 +66,7 @@ name). The product is called **TabulaVibe AI**.
 - Spreadsheet formula injection prevented (`= + - @ \t \r \n` prefixes are neutralised with `'`).
 
 ### F. Optional AI narrative
-- Disabled by default; provider abstraction (`none`, `gemini`); key only on the backend.
+- Disabled by default; provider abstraction (`none`, `nvidia`); key only on the backend.
 - Sends only aggregated results (KPIs, ≤30 group rows, column/group labels), never raw rows or file names.
 - Output is labelled AI-generated with a disclaimer; failures (missing key, quota, timeout, malformed
   response) never affect the dashboard. The exact payload sent is shown to the user.

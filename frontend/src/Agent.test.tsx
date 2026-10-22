@@ -127,6 +127,52 @@ describe('AI analyst', () => {
     expect(bodies[0].data.findings.length).toBeGreaterThan(0)
   })
 
+  it('shows the provider switch, the evaluation scorecard and the Kumo forecast', async () => {
+    const user = userEvent.setup()
+    const events = structuredClone(agentEvents) as { type: string; report?: Record<string, unknown> }[]
+    const final = events.at(-1)!.report!
+    const criteria = (detail: string, score: number) => ({
+      mode: score === 100 ? 'ai' : 'rules',
+      provider: score === 100 ? 'nvidia' : null,
+      model: score === 100 ? 'meta/llama-3.3-70b-instruct' : null,
+      score,
+      criteria: [{ key: 'grounded', label: 'Findings whose numbers match their evidence', weight: 30, value: 1, detail }],
+    })
+    Object.assign(final, {
+      mode: 'ai',
+      provider: 'nvidia',
+      model: 'meta/llama-3.3-70b-instruct',
+      ai_note: null,
+      provider_switches: ["Groq stopped (the request is larger than Groq's free-plan limit); NVIDIA continued"],
+      evaluation: { winner: 'ai', rule: 'The analysis with the higher score builds the dashboard; a tie goes to the AI analyst.', candidates: [criteria('2 of 2', 100), criteria('1 of 2', 85)] },
+      forecast: {
+        status: 'ok', provider: 'nvidia', model: 'kumo-relational', date_column: 'date', measure: 'revenue', aggregation: 'sum', grain: 'month',
+        shared: '10 monthly sum values of revenue (period totals only, never raw rows)',
+        history: [{ period: '2025-10', start: '2025-10-01', value: 100 }],
+        forecast: [{ step: 1, period: '2025-11', start: '2025-11-01', value: 110 }],
+        backtest: { periods: [{ period: '2025-10', actual: 100, kumo: 100, naive: 90 }], kumo_mae: 0, naive_mae: 10, kumo_better: true },
+        notes: ['A forecast is an estimate from past patterns, not a guarantee; it does not know about future events.'],
+      },
+    })
+    mockServer(ndjson(events))
+    await openAnalyst(user)
+    await user.click(screen.getByRole('button', { name: 'Run the AI analyst' }))
+    await screen.findByRole('heading', { name: 'Analysis of sales.csv' })
+
+    expect(screen.getByText(/Groq stopped/)).toBeInTheDocument()
+    expect(screen.getByText(/AI analyst \(NVIDIA · llama-3.3-70b-instruct\)/)).toBeInTheDocument()
+    const forecast = screen.getByRole('table', { name: 'Forecast values' })
+    expect(within(forecast).getByText('2025-11')).toBeInTheDocument()
+    expect(within(forecast).getByText('110')).toBeInTheDocument()
+    expect(screen.getByText('Kumo was more accurate')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: 'Plan & method' }))
+    const scorecard = screen.getByRole('table', { name: 'Analysis evaluation' })
+    expect(within(scorecard).getByText('2 of 2')).toBeInTheDocument()
+    expect(within(scorecard).getByText(/AI \(NVIDIA\)/)).toBeInTheDocument()
+    expect(within(scorecard).getByText('85')).toBeInTheDocument()
+  })
+
   it('shows a clear error when the stream reports a failure', async () => {
     const user = userEvent.setup()
     mockServer(ndjson([{ type: 'start', mode: 'rules', model: null, phases: [] }, { type: 'error', error: { code: 'agent_failed', message: 'The analysis stopped unexpectedly. Please try again.' } }]))

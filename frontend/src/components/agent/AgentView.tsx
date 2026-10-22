@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Bot, CircleCheck, CircleDashed, CircleSlash, CircleX, Download, FileText, LoaderCircle, Presentation, RotateCcw, ShieldCheck, Sparkles, TriangleAlert, type LucideIcon } from 'lucide-react'
-import { evidenceById, PHASE_STATUS_LABEL, phasesFromEvents, type AgentEvent, type AgentReport, type BusinessContext, type Phase, type PhaseStatus } from '../../lib/agent'
+import { aiAnalystLabel, evidenceById, providerModel, PHASE_STATUS_LABEL, phasesFromEvents, type AgentEvent, type AgentReport, type BusinessContext, type Phase, type PhaseStatus } from '../../lib/agent'
 import type { AnalysisSpec, AppConfig } from '../../lib/types'
 import { saveBlob, type ReportFormat } from '../../lib/api'
+import { formatNumber } from '../../lib/format'
 import { Alert, Badge, Button, Card, labelClass } from '../ui'
 import { BivariatePage, InsightsPage, MultivariatePage, OverviewPage, PlanPage, QualityPage, UnivariatePage, type PageProps } from './AgentPages'
 
@@ -93,7 +94,7 @@ export function AgentView({ config, context, onContext, events, running, report,
         subtitle="Runs your full analytics workflow on this file: business context → data understanding → problem discovery → preparation → EDA → validated insights → dashboard."
         icon={Bot}
         highlight
-        actions={ai ? <Badge tone="accent" icon={Sparkles}>Gemini · {config?.agent?.model}</Badge> : <Badge>Rules-based (AI not configured)</Badge>}
+        actions={ai ? <Badge tone="accent" icon={Sparkles}>{aiAnalystLabel(config?.agent)}</Badge> : <Badge>Rules-based (AI not configured)</Badge>}
       >
         <p className="mb-4 text-sm text-ink-2">
           <strong>Phase 0: business context.</strong> Every field is optional. Gaps are recorded as assumptions in the charter, never invented as facts.
@@ -188,9 +189,22 @@ export function AgentView({ config, context, onContext, events, running, report,
         }
       >
         <PhaseTimeline phases={phases} />
+        {rep.evaluation && (
+          <p className="mt-4 text-sm text-ink-2">
+            <strong className="text-ink">Built by:</strong> {rep.mode === 'ai' ? `AI analyst (${providerModel(rep.provider, rep.model)})` : 'rules-based analyst'}
+            {rep.evaluation.candidates.length > 1 && ` · scored ${rep.evaluation.candidates.map((c) => `${c.mode === 'ai' ? 'AI' : 'rules'} ${formatNumber(c.score)}`).join(' vs ')}`}
+          </p>
+        )}
+        {(rep.provider_switches ?? []).length > 0 && (
+          <div className="mt-4">
+            <Alert kind="info" title="AI provider switched during the run">
+              {(rep.provider_switches ?? []).join('. ')}.
+            </Alert>
+          </div>
+        )}
         {rep.ai_note && (
           <div className="mt-4">
-            <Alert kind="warning" title="AI analyst not used">
+            <Alert kind="warning" title={rep.evaluation?.winner === 'rules' && rep.evaluation.candidates.length > 1 ? 'The rules-based analysis scored higher' : 'AI analyst not used'}>
               {rep.ai_note}
             </Alert>
           </div>

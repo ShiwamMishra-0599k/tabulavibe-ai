@@ -95,8 +95,8 @@ Steps marked **(you)** need your decision or credentials.
    - download the results and cleaned CSVs
    - print the report
    - upload a `.txt` file and confirm it is rejected
-8. Optional AI: redeploy with `--parameter-overrides AiProvider=gemini GeminiApiKey=<key>`.
-   - Use a key from a Google AI Studio project **without billing**.
+8. Optional AI: redeploy with `--parameter-overrides AiProvider=groq,nvidia GroqApiKey=<key> NvidiaApiKey=<nvapi- key> ForecastProvider=kumo`.
+   - Use free developer keys (no payment method on either account).
    - The key is stored as a Lambda environment variable, readable by anyone with Lambda console access to the account.
 
 ## Teardown

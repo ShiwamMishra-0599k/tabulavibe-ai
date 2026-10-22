@@ -82,7 +82,7 @@ Three principles shape every module:
 │   /export/results ────┼─► run_analysis → export.results_csv       │
 │   /export/cleaned ────┼─► export.cleaned_csv                      │
 │   /narrative ─────────┴─► run_analysis → ai.build_payload         │
-│                                        → provider.generate ──────►│ Gemini REST
+│                                        → provider.generate ──────►│ NVIDIA REST
 └───────────────────────────────────────────────────────────────────┘
 ```
 
@@ -118,7 +118,7 @@ tabulavibe-ai/
 │  │  ├─ profiling.py         RawTable → Dataset (typed), profile, label merging
 │  │  ├─ analysis.py          AnalysisSpec → KPIs, groups, chart advice
 │  │  ├─ export.py            CSV writers, formula-injection guard
-│  │  ├─ ai.py                provider protocol, Gemini REST, rate limiter, payload
+│  │  ├─ ai.py                provider protocol, NVIDIA REST, rate limiter, payload
 │  │  ├─ schemas.py           Measure, Filter, AnalysisSpec, CleanOptions
 │  │  ├─ samples.py           sample registry
 │  │  ├─ samples/             retail_sales.csv, service_bookings.xlsx (synthetic)
@@ -206,9 +206,11 @@ class AIError(AppError): 502 · AIDisabledError: 503 · AIQuotaError: 429   # in
 | `max_upload_mb` | `4.0` (0 < x ≤ 5) | `.max_upload_bytes = int(mb·1024²)`. 4 MB × 1.33 base64 ≈ 5.3 MB, under Lambda's 6 MB |
 | `max_rows` / `max_columns` / `max_cells` | 100,000 / 60 / 2,000,000 | Enforced while reading |
 | `max_groups` | 100 | Grouped rows returned |
-| `ai_provider` | `none` | `none` or `gemini` |
-| `gemini_api_key` | `None` | `SecretStr`: never printed in reprs or logs |
-| `gemini_model` | `gemini-3.5-flash-lite` | 2.5 models are restricted to existing users (as of Oct 2026) |
+| `ai_provider` | `none` | `none` or an order of `groq`, `nvidia` (e.g. `groq,nvidia`); a retired `gemini` value starts with AI off |
+| `groq_api_key`, `nvidia_api_key` | `None` | `SecretStr`: never printed in reprs or logs |
+| `groq_model` | `llama-3.3-70b-versatile` | Any Groq chat model with tool calling |
+| `nvidia_model` | `meta/llama-3.3-70b-instruct` | Any NVIDIA API catalog chat model with tool calling |
+| `forecast_provider` | `none` | `kumo`: NVIDIA Kumo Relational forecasting (needs `nvidia_api_key`) |
 | `ai_timeout_seconds` | 20 (≤ 60) | httpx timeout |
 | `ai_requests_per_minute` | 5 | Per-client burst limit |
 
@@ -443,14 +445,14 @@ class NarrativeProvider(Protocol):
     def generate(self, system: str, prompt: str) -> str: ...
 ```
 
-`get_provider(settings)` (`:104`) returns `GeminiProvider` only when the provider is `gemini` **and** the key
-is non-empty; otherwise `None`. The route depends on `get_narrative_provider` (`main.py:212`), which tests
+`get_provider(settings)` returns a `ChainProvider` over the configured providers that have a key (in the
+`ai_provider` order), or `None`. It asks each in turn and reports the one that answered. The route depends on `get_narrative_provider` (`main.py:212`), which tests
 override with fakes.
 
-**GeminiProvider** (`:61`):
-- Calls `POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`.
-- Sends the key in the **`x-goog-api-key` header**, never in the URL, so it cannot leak into URL logs.
-- Request body: `systemInstruction`, `contents`, and `generationConfig {temperature: 0.3, maxOutputTokens: 2048}`.
+**ChatBackend** (one per provider, shared by the commentary and the AI analyst):
+- Calls `POST https://api.groq.com/openai/v1/chat/completions` or `https://integrate.api.nvidia.com/v1/chat/completions` (fixed URLs, not configurable). HTTP 413 (Groq: request larger than the plan's limit) maps to `ai_request_too_large`.
+- Sends the key as **`Authorization: Bearer`**, never in the URL, so it cannot leak into URL logs.
+- Request body: `model`, `messages` (system + user), `temperature: 0.3`, `max_tokens: 2048`, `stream: false`.
 - `httpx.Client(timeout, transport)`: the injectable `transport` lets tests use `httpx.MockTransport`.
 - Error mapping:
 
@@ -464,7 +466,7 @@ override with fakes.
   | unparseable or empty body | `ai_malformed_response` | 502 |
   | AI disabled | `ai_disabled` | 503 |
 
-- Text parts are concatenated, skipping any part marked `thought`.
+- The reply is `choices[0].message.content`; a non-text or missing message is `ai_malformed_response`.
 
 **Data minimisation** (`build_payload` `:131`). The provider receives only:
 - rows analysed;

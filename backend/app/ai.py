@@ -10,6 +10,7 @@ import json
 import threading
 import time
 from collections import deque
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
@@ -58,53 +59,106 @@ class NarrativeProvider(Protocol):
     def generate(self, system: str, prompt: str) -> str: ...
 
 
-class GeminiProvider:
-    name = "gemini"
-    endpoint = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+# Fixed URLs (never configurable), so each server key can only ever be sent to its own provider.
+CHAT_URLS = {
+    "groq": "https://api.groq.com/openai/v1/chat/completions",
+    "nvidia": "https://integrate.api.nvidia.com/v1/chat/completions",
+}
+PROVIDER_LABELS = {"groq": "Groq", "nvidia": "NVIDIA"}
 
-    def __init__(self, api_key: str, model: str, timeout: float, transport: httpx.BaseTransport | None = None):
-        self._api_key = api_key
-        self.model = model
-        self._timeout = timeout
-        self._transport = transport
+
+@dataclass(frozen=True)
+class ChatBackend:
+    """One OpenAI-compatible chat completions provider. `repr` hides the key."""
+
+    name: str
+    model: str
+    api_key: str = field(repr=False)
+    timeout: float = 30
+    transport: httpx.BaseTransport | None = field(default=None, repr=False, compare=False)
+
+    @property
+    def label(self) -> str:
+        return PROVIDER_LABELS.get(self.name, self.name)
+
+    def chat(self, body: dict[str, Any]) -> dict[str, Any]:
+        """POST one chat completion and return the first choice's message (plus `_finish_reason`)."""
+        label = self.label
+        try:
+            with httpx.Client(timeout=self.timeout, transport=self.transport) as client:
+                response = client.post(
+                    CHAT_URLS[self.name],
+                    headers={"Authorization": f"Bearer {self.api_key}", "Accept": "application/json", "Content-Type": "application/json"},
+                    json={**body, "model": self.model},
+                )
+        except httpx.TimeoutException as exc:
+            raise AIError("ai_timeout", f"{label} did not respond in time") from exc
+        except httpx.HTTPError as exc:
+            raise AIError("ai_unavailable", f"{label} could not be reached") from exc
+
+        if response.status_code == 429:
+            raise AIQuotaError("ai_quota_exceeded", f"the {label} rate limit was reached")
+        if response.status_code == 413:  # Groq: the request is larger than the plan's tokens-per-minute limit
+            raise AIQuotaError("ai_request_too_large", f"the request is larger than {label}'s free-plan limit")
+        if response.status_code in (401, 403):
+            raise AIError("ai_auth_failed", f"{label} rejected the server's API key")
+        if response.status_code >= 400:
+            raise AIError("ai_provider_error", f"{label} returned an error (HTTP {response.status_code})")
+        try:
+            choice = response.json()["choices"][0]
+            message = choice["message"]
+            if not isinstance(message, dict):
+                raise TypeError
+        except (ValueError, KeyError, IndexError, TypeError) as exc:
+            raise AIError("ai_malformed_response", f"{label} returned a response that could not be read") from exc
+        return {**message, "_finish_reason": choice.get("finish_reason")}
+
+
+def chat_backends(settings: Settings, timeout: float | None = None) -> list[ChatBackend]:
+    """The configured providers, in order, skipping any without a key."""
+    keys = {"groq": settings.groq_api_key, "nvidia": settings.nvidia_api_key}
+    models = {"groq": settings.groq_model, "nvidia": settings.nvidia_model}
+    backends = []
+    for name in settings.ai_chain:
+        key = keys[name].get_secret_value().strip() if keys[name] else ""
+        if key:
+            backends.append(ChatBackend(name, models[name], key, timeout or settings.ai_timeout_seconds))
+    return backends
+
+
+class ChainProvider:
+    """Narrative provider: asks each backend in order and reports the one that answered."""
+
+    def __init__(self, backends: list[ChatBackend]):
+        self.backends = backends
+        self.name = backends[0].name
+        self.model = backends[0].model
 
     def generate(self, system: str, prompt: str) -> str:
         body = {
-            "systemInstruction": {"parts": [{"text": system}]},
-            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": 0.3, "maxOutputTokens": 2048},
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+            "temperature": 0.3,
+            "max_tokens": 2048,
+            "stream": False,
         }
-        try:
-            with httpx.Client(timeout=self._timeout, transport=self._transport) as client:
-                response = client.post(
-                    self.endpoint.format(model=self.model),
-                    headers={"x-goog-api-key": self._api_key, "Content-Type": "application/json"},
-                    json=body,
-                )
-        except httpx.TimeoutException as exc:
-            raise AIError("ai_timeout", "The AI provider did not respond in time. Please try again later.") from exc
-        except httpx.HTTPError as exc:
-            raise AIError("ai_unavailable", "The AI provider could not be reached.") from exc
-
-        if response.status_code == 429:
-            raise AIQuotaError("ai_quota_exceeded", "The AI provider's free usage limit has been reached. Try again later.")
-        if response.status_code in (401, 403):
-            raise AIError("ai_auth_failed", "The AI provider rejected the server's API key.")
-        if response.status_code >= 400:
-            raise AIError("ai_provider_error", f"The AI provider returned an error (HTTP {response.status_code}).")
-        try:
-            payload = response.json()
-            parts = payload["candidates"][0]["content"]["parts"]
-            text = "".join(p.get("text", "") for p in parts if isinstance(p, dict) and not p.get("thought"))
-        except (ValueError, KeyError, IndexError, TypeError) as exc:
-            raise AIError("ai_malformed_response", "The AI provider returned a response that could not be read.") from exc
-        return text
+        for i, backend in enumerate(self.backends):
+            try:
+                message = backend.chat(body)
+            except AIError:
+                if i == len(self.backends) - 1:
+                    raise
+                continue
+            text = message.get("content")
+            if text is not None and not isinstance(text, str):
+                raise AIError("ai_malformed_response", "The AI provider returned a response that could not be read.")
+            self.name, self.model = backend.name, backend.model
+            return text or ""
+        raise AIDisabledError()
 
 
 def get_provider(settings: Settings) -> NarrativeProvider | None:
-    if settings.ai_provider == "gemini" and settings.gemini_api_key and settings.gemini_api_key.get_secret_value():
-        return GeminiProvider(settings.gemini_api_key.get_secret_value(), settings.gemini_model, settings.ai_timeout_seconds)
-    return None
+    backends = chat_backends(settings)
+    return ChainProvider(backends) if backends else None
 
 
 class RateLimiter:

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { profile } from '../test/fixtures'
 import { api, ApiError } from './api'
+import { aiAnalystLabel, providerModel } from './agent'
 import { formatCompact, formatNumber, formatPercent } from './format'
 import { defaultSpec, suggestedAnalyses, validateSpec } from './spec'
 
@@ -96,5 +97,13 @@ describe('api', () => {
     const body = init!.body as FormData
     expect((body.get('file') as File).name).toBe('data.csv')
     expect(JSON.parse(body.get('spec') as string)).toEqual(spec)
+  })
+})
+
+describe('aiAnalystLabel', () => {
+  it('names the provider order and the model without its publisher prefix', () => {
+    expect(aiAnalystLabel({ mode: 'ai', model: 'm', chain: [{ provider: 'groq', label: 'Groq', model: 'g' }, { provider: 'nvidia', label: 'NVIDIA', model: 'n' }] })).toBe('Groq → NVIDIA')
+    expect(providerModel('nvidia', 'meta/llama-3.3-70b-instruct')).toBe('NVIDIA · llama-3.3-70b-instruct')
+    expect(aiAnalystLabel(undefined)).toBe('AI')
   })
 })

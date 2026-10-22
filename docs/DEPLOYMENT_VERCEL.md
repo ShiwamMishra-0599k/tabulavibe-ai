@@ -79,7 +79,8 @@ npx vercel@65.0.0 deploy --prod
 |---|---|
 | `TABULAVIBE_SUPABASE_URL`, `TABULAVIBE_SUPABASE_ANON_KEY` | Turn on sign-in and saved reports (see [SUPABASE_SETUP.md](SUPABASE_SETUP.md)) |
 | `TABULAVIBE_REQUIRE_SIGN_IN=true` | Only signed-in users can upload or analyse (needs the two Supabase variables) |
-| `TABULAVIBE_AI_PROVIDER=gemini`, `TABULAVIBE_GEMINI_API_KEY` | Turn on AI commentary (mark the key as **Sensitive**) |
+| `TABULAVIBE_AI_PROVIDER=groq,nvidia`, `TABULAVIBE_GROQ_API_KEY`, `TABULAVIBE_NVIDIA_API_KEY` | Turn on the AI Analyst and AI commentary: Groq first, NVIDIA when Groq cannot finish (mark both keys as **Sensitive**). Optional: `TABULAVIBE_GROQ_MODEL`, `TABULAVIBE_NVIDIA_MODEL` (must support tool calling) |
+| `TABULAVIBE_FORECAST_PROVIDER=kumo` | Forecast the AI Analyst's primary measure with NVIDIA Kumo Relational (uses the NVIDIA key; sends period totals only) |
 | `TABULAVIBE_GITHUB_REPO` | Change or hide (empty) the navbar star badge |
 
 Redeploy after changing variables (Deployments → ⋯ → Redeploy).

@@ -1,6 +1,7 @@
 """Final reports as PDF and PowerPoint, for the Manual and the AI Analyst."""
 
 import io
+import json
 import re
 
 import pytest
@@ -132,6 +133,17 @@ def test_export_endpoint_returns_files(client, manual_data, agent_report):
     res = client.post("/api/report/export", json={"format": "pdf", "kind": "agent", "data": agent_report})
     assert res.status_code == 200 and res.headers["content-type"] == "application/pdf"
     assert res.content.startswith(b"%PDF-")
+
+
+def test_lone_surrogates_in_the_request_do_not_break_the_files(client, agent_report):
+    agent_report["findings"][0]["title"] = "Region \udc81 leads"  # e.g. text mis-decoded by a client
+    for fmt in ("pptx", "pdf"):
+        body = json.dumps({"format": fmt, "kind": "agent", "data": agent_report})
+        res = client.post("/api/report/export", content=body, headers={"Content-Type": "application/json"})
+        assert res.status_code == 200, res.text
+    # In the typed title the same text is a clean validation error, never a server error.
+    body = json.dumps({"format": "pdf", "kind": "agent", "title": "Q\udc81", "data": agent_report})
+    assert client.post("/api/report/export", content=body, headers={"Content-Type": "application/json"}).status_code == 422
 
 
 def test_export_endpoint_validates_input(client, manual_data):

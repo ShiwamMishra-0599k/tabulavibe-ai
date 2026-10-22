@@ -1,5 +1,6 @@
 import { ApiError, streamRequest } from './api'
 import type { AnalysisSpec, ResultRow } from './types'
+import type { AppConfig } from './types'
 
 /**
  * The AI analyst (phases 0-8). The backend streams NDJSON progress events and finishes with the
@@ -84,11 +85,51 @@ export interface Hypothesis {
   adjusted_p_value?: number | null
 }
 
+export interface EvaluationCandidate {
+  mode: 'ai' | 'rules'
+  provider: string | null
+  model: string | null
+  /** 0-100: weighted sum of the criteria (weights sum to 100). */
+  score: number
+  criteria: { key: string; label: string; weight: number; value: number; detail: string }[]
+}
+
+export interface ForecastPoint {
+  period: string
+  start: string
+  value: number | null
+  step?: number
+}
+
+/** Predictive forecast of the primary measure by NVIDIA Kumo Relational (history computed by Python). */
+export interface Forecast {
+  status: 'ok' | 'skipped' | 'failed'
+  provider: string
+  model: string
+  note?: string
+  date_column?: string
+  measure?: string
+  aggregation?: string
+  grain?: string
+  shared?: string
+  history?: ForecastPoint[]
+  forecast?: ForecastPoint[]
+  backtest?: { periods: { period: string; actual: number; kumo: number; naive: number }[]; kumo_mae: number; naive_mae: number; kumo_better: boolean } | null
+  notes?: string[]
+}
+
 export interface AgentReport {
   version: number
   app_version: string
   mode: 'ai' | 'rules'
+  /** The AI provider that finished the run (groq or nvidia). */
+  provider?: string | null
   model: string | null
+  /** Why an earlier provider handed the conversation to the next one. */
+  provider_switches?: string[]
+  /** The AI run scored against the rules-based baseline; the winner builds the dashboard. */
+  evaluation?: { winner: 'ai' | 'rules'; rule: string; candidates: EvaluationCandidate[] }
+  forecast?: Forecast
   ai_note: string | null
   generated_at: string
   duration_seconds: number
@@ -219,4 +260,20 @@ export function phasesFromEvents(events: AgentEvent[], running: boolean): Phase[
     if (next && !phases.some((p) => p.status === 'running')) next.status = 'running'
   }
   return phases
+}
+
+export const PROVIDER_LABEL: Record<string, string> = { groq: 'Groq', nvidia: 'NVIDIA' }
+
+/** Badge text for the AI analyst: the providers in the order they are tried, e.g. "Groq → NVIDIA". */
+export function aiAnalystLabel(agent: AppConfig['agent']): string {
+  const chain = agent?.chain ?? []
+  if (chain.length) return chain.map((c) => c.label).join(' → ')
+  return agent?.provider ? (PROVIDER_LABEL[agent.provider] ?? agent.provider) : 'AI'
+}
+
+/** "Groq · llama-3.3-70b-versatile" (the publisher prefix of the model id is dropped). */
+export function providerModel(provider: string | null | undefined, model: string | null | undefined): string {
+  const name = (model ?? '').split('/').pop()
+  const label = provider ? (PROVIDER_LABEL[provider] ?? provider) : 'AI'
+  return name ? `${label} · ${name}` : label
 }

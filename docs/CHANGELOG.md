@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.6.0 — 2026-10-22 (Groq → NVIDIA analyst, best-wins dashboard, Kumo Relational forecasts)
+
+### Changed
+- **AI providers: Groq first, then the NVIDIA API catalog, instead of Google Gemini**, for the AI Analyst and AI commentary. `TABULAVIBE_AI_PROVIDER=groq,nvidia` sets the order; keys `TABULAVIBE_GROQ_API_KEY`, `TABULAVIBE_NVIDIA_API_KEY`; models `TABULAVIBE_GROQ_MODEL` (default `llama-3.3-70b-versatile`), `TABULAVIBE_NVIDIA_MODEL` (default `meta/llama-3.3-70b-instruct`). The `GEMINI_*` settings are removed; a deployment still set to `gemini` starts with AI off instead of failing.
+- When Groq cannot finish a step (rate limit, request too large for the free plan, error), **the same analyst conversation continues on NVIDIA**; the report lists the switch. The commentary also falls back from Groq to NVIDIA.
+- The analyst speaks OpenAI-compatible chat completions with tool calling (`app/agent/llm.py`, `LLMAnalyst`); each request offers only the current stage's functions. Phase gates, grounding checks and the rules-based fallback are unchanged.
+- The analyst badge shows the provider order ("Groq → NVIDIA"); `/api/config` reports `agent.chain` and `agent.forecast`.
+- AWS template parameters: `GroqApiKey`, `NvidiaApiKey`, `NvidiaModel`, `ForecastProvider`.
+
+### Added
+- **Best analysis builds the dashboard:** after an AI run, the rules-based analyst also runs; Python scores both (findings grounded 30, high-priority questions answered 25, phase gates 20, totals reconciled 15, hypotheses resolved 10) and the higher score wins (tie → AI). Scorecard on "Plan & method", in the handover and in PDF/PowerPoint.
+- **Predictive forecast with NVIDIA Kumo Relational** (`TABULAVIBE_FORECAST_PROVIDER=kumo`, NVIDIA key): Python builds period totals of the primary measure (month, week or day, at least 8 complete periods); Kumo predicts up to 6 periods ahead (one regression per horizon, the hosted API's documented multi-table shape); a backtest on the last 3 periods compares its error with "same as last period". Only period totals are sent. Forecast card on the Overview, sections in the handover and PDF/PowerPoint.
+- Handling for open-model quirks: tool calls written as JSON text are accepted, missing tool-call ids are filled in, and invalid argument JSON is sent back to the model.
+- Tests: provider order and keys, Groq → NVIDIA hand-over mid-run (413, 429, 500, 401), all-fail fallback, commentary fallback, evaluation scoring (hand-checked 100) and the rules-wins case, Kumo request shape against the published schema, hand-checked backtest (MAE 0 vs 10), skipped and failed forecasts, exports.
+
+### Fixed
+- Report export no longer fails with a server error when the request text contains lone surrogate characters (e.g. text mis-decoded by a client); they are replaced. Found by the end-to-end smoke test.
+
+### Not verified live
+- No call has been made to Groq, NVIDIA or Kumo Relational: the keys are the owner's to set. In particular, Kumo's hosted endpoint has not yet accepted a request from this app.
+
 ## 0.5.0 — 2026-10-22 (choose your analyst; PDF and PowerPoint reports)
 
 ### Added

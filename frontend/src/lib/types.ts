@@ -13,8 +13,8 @@ export interface AppConfig {
     supported_extensions: string[]
   }
   ai: { enabled: boolean; provider: string | null; model: string | null }
-  /** The analytics agent: Gemini when AI is configured, otherwise the rules-based analyst. */
-  agent?: { mode: 'ai' | 'rules'; model: string | null }
+  /** The analytics agent: AI providers tried in order (e.g. Groq, then NVIDIA), otherwise the rules-based analyst. */
+  agent?: { mode: 'ai' | 'rules'; provider?: string | null; model: string | null; chain?: { provider: string; label: string; model: string }[]; forecast?: 'kumo' | null }
   /** Optional saved reports and sign-in (Supabase). The anon key is public by design. */
   storage?: { enabled: boolean; supabase_url: string | null; supabase_anon_key: string | null; sign_in_required?: boolean }
 }

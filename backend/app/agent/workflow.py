@@ -24,6 +24,7 @@ from typing import Any, Protocol
 from pydantic import BaseModel, ConfigDict, Field
 
 from .. import __version__
+from ..ai import PROVIDER_LABELS
 from ..profiling import Dataset
 from . import stats
 from .tools import Toolbox
@@ -1131,6 +1132,30 @@ def handover_markdown(report: dict[str, Any]) -> str:
         f"- {r['measure']}: engine {r['engine_value']} vs independent {r['independent_value']} → {'reconciled' if r['reconciled'] else 'NOT reconciled'}"
         for r in v["reconciliation"]
     ]
+    ev = report.get("evaluation")
+    if ev:
+        lines += ["", "### Evaluation: which analysis built the dashboard", "", ev["rule"]]
+        lines += [
+            f"- {'AI analyst' if c['mode'] == 'ai' else 'Rules-based analyst'}{' (' + str(c['provider']) + ' · ' + str(c['model']) + ')' if c['mode'] == 'ai' else ''}: "
+            f"score {c['score']} ({'; '.join(f'{x["label"]} {x["detail"]}' for x in c['criteria'])}){' ← used' if c['mode'] == ev['winner'] else ''}"
+            for c in ev["candidates"]
+        ]
+    fc = report.get("forecast")
+    if fc:
+        lines += ["", "### Forecast (NVIDIA Kumo Relational)", ""]
+        if fc["status"] != "ok":
+            lines.append(f"- {fc['note']}")
+        else:
+            lines.append(
+                f"- {fc['measure']} ({fc['aggregation']}) by {fc['grain']}, from '{fc['date_column']}'. Sent to NVIDIA: {fc['shared']}."
+            )
+            lines += [f"- {p['period']}: {p['value']}" for p in fc["forecast"]]
+            bt = fc.get("backtest")
+            if bt:
+                lines.append(
+                    f"- Backtest on the last {len(bt['periods'])} period(s): Kumo mean absolute error {bt['kumo_mae']} vs naive {bt['naive_mae']}."
+                )
+            lines += [f"- {x}" for x in fc["notes"]]
     lines += ["", "## 10. Limitations and outstanding questions", ""] + [
         f"- {x}" for x in report["limitations"] + report["outstanding_questions"]
     ]
@@ -1179,7 +1204,13 @@ def run_workflow(
         while events:
             yield events.pop(0)
 
-    yield {"type": "start", "mode": analyst.name, "model": analyst.model, "phases": [{"id": p, "name": n} for p, n, _ in PHASES]}
+    yield {
+        "type": "start",
+        "mode": analyst.name,
+        "provider": getattr(analyst, "provider", None),
+        "model": analyst.model,
+        "phases": [{"id": p, "name": n} for p, n, _ in PHASES],
+    }
 
     # Phase 1 runs before planning so the analyst works from evidence (rule 3: profile before deciding).
     understanding = data_understanding(toolbox, emit)
@@ -1349,7 +1380,9 @@ def run_workflow(
         "version": 1,
         "app_version": __version__,
         "mode": analyst.name,
+        "provider": getattr(analyst, "provider", None),
         "model": analyst.model,
+        "provider_switches": list(getattr(analyst, "switches", [])),
         "ai_note": ai_note,
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "duration_seconds": round(time.monotonic() - started, 1),
@@ -1361,6 +1394,7 @@ def run_workflow(
         },
         "phases": [phases[p] for p in sorted(phases)],
         "charter": charter,
+        "primary_measure": plan.get("primary_measure"),
         "data_understanding": {k: v for k, v in understanding.items() if k != "overview"},
         "questions": [{k: v for k, v in q.items() if k != "tools"} for q in plan["questions"]],
         "hypotheses": plan["hypotheses"],
@@ -1377,6 +1411,104 @@ def run_workflow(
     report["handover_markdown"] = handover_markdown(report)
     yield {"type": "phase", "phase": 8, "name": phases[8]["name"], "status": phases[8]["status"], "checks": phases[8]["checks"]}
     yield {"type": "report", "report": report}
+
+
+# ---------------------------------------------------------------- evaluation: the best analysis builds the dashboard
+
+# (key, label, weight). Weights sum to 100, so a score is a percentage.
+EVALUATION_CRITERIA = (
+    ("grounded", "Findings whose numbers match their evidence", 30),
+    ("coverage", "High-priority questions answered", 25),
+    ("gates", "Phase gates passed", 20),
+    ("reconciled", "Totals reconcile with an independent recalculation", 15),
+    ("hypotheses", "Hypotheses resolved (supported or not supported)", 10),
+)
+
+
+def evaluate_report(report: dict[str, Any]) -> dict[str, Any]:
+    """Score one finished analysis on measurable quality criteria (0-100). Python only; no AI judgement."""
+    findings = report["findings"]
+    high = [q for q in report["questions"] if q["priority"] == "high"]
+    phases = [p for p in report["phases"] if p["status"] != "skipped"]
+    hypotheses = report["hypotheses"]
+    grounded = sum(1 for f in findings if f.get("grounded"))
+    answered = sum(1 for q in high if q["evidence_ids"])
+    passed = sum(1 for p in phases if p["status"] in ("passed", "passed_with_assumptions"))
+    resolved = sum(1 for h in hypotheses if h["result"] in ("supported", "not_supported"))
+    values = {
+        "grounded": (grounded / len(findings) if findings else 0.0, f"{grounded} of {len(findings)}"),
+        "coverage": (answered / len(high) if high else (1.0 if report["questions"] else 0.0), f"{answered} of {len(high)}"),
+        "gates": (passed / len(phases) if phases else 0.0, f"{passed} of {len(phases)}"),
+        "reconciled": (
+            0.0 if report["validation"]["all_reconciled"] is False else 1.0,
+            "yes" if report["validation"]["all_reconciled"] is not False else "no",
+        ),
+        "hypotheses": (resolved / len(hypotheses) if hypotheses else 0.0, f"{resolved} of {len(hypotheses)}"),
+    }
+    criteria = [
+        {"key": key, "label": label, "weight": weight, "value": round(values[key][0], 4), "detail": values[key][1]}
+        for key, label, weight in EVALUATION_CRITERIA
+    ]
+    return {
+        "mode": report["mode"],
+        "provider": report.get("provider"),
+        "model": report.get("model"),
+        "score": round(sum(c["weight"] * c["value"] for c in criteria), 1),
+        "criteria": criteria,
+    }
+
+
+def run_best(
+    ds: Dataset,
+    file_name: str | None,
+    context: BusinessContext,
+    analyst: Analyst,
+    fallback: Analyst | None = None,
+    deadline_seconds: float = 240,
+    forecaster: Any = None,
+) -> Iterator[dict[str, Any]]:
+    """Run the workflow; when the AI finished it, also run the rules-based baseline on the same file, score
+    both with `evaluate_report`, and deliver the higher-scoring analysis (ties go to the AI). With a
+    forecaster (NVIDIA Kumo Relational), the winning analysis's primary measure is then forecast."""
+    final = None
+    for event in run_workflow(ds, file_name, context, analyst, fallback, deadline_seconds):
+        if event["type"] == "report":
+            final = event["report"]
+        else:
+            yield event
+    assert final is not None
+    candidates = [final]
+    if final["mode"] == "ai" and fallback is not None:
+        yield {"type": "log", "phase": 8, "message": "Scoring the AI analysis against the rules-based baseline."}
+        baseline = next(
+            e["report"] for e in run_workflow(ds, file_name, context, fallback, None, deadline_seconds) if e["type"] == "report"
+        )
+        candidates.append(baseline)
+    scored = [(evaluate_report(r), r) for r in candidates]
+    best_eval, best = max(scored, key=lambda pair: (pair[0]["score"], pair[1]["mode"] == "ai"))
+    best["evaluation"] = {
+        "winner": best_eval["mode"],
+        "rule": "The analysis with the higher score builds the dashboard; a tie goes to the AI analyst.",
+        "candidates": [e for e, _ in scored],
+    }
+    if len(scored) > 1 and best["mode"] != "ai":
+        ai_eval = scored[0][0]
+        best["ai_note"] = (
+            f"The AI analysis ({PROVIDER_LABELS.get(ai_eval['provider'] or '', 'AI')} · {ai_eval['model']}) scored {ai_eval['score']} and the "
+            f"rules-based analysis scored {best_eval['score']}, so the rules-based analysis builds this dashboard."
+        )
+    if forecaster is not None:
+        yield {"type": "log", "phase": 8, "message": "Forecasting the primary measure with NVIDIA Kumo Relational."}
+        try:
+            best["forecast"] = forecaster.forecast(ds, best.get("primary_measure"))
+        except Exception as exc:  # noqa: BLE001 - a forecast failure never breaks the analysis
+            message = getattr(exc, "message", None)
+            if message is None:
+                logger.exception("Forecast failed: %s", type(exc).__name__)
+                message = "it stopped unexpectedly"
+            best["forecast"] = {"status": "failed", "provider": "nvidia", "model": "kumo-relational", "note": f"No forecast: {message}."}
+    best["handover_markdown"] = handover_markdown(best)
+    yield {"type": "report", "report": best}
 
 
 def _ai_failure_note(exc: Exception, stage: str, outcome: str) -> str:

@@ -17,9 +17,10 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from pydantic import BaseModel, ValidationError
 
 from . import __version__
-from .agent.gemini import GeminiAnalyst
-from .agent.workflow import BusinessContext, RulesAnalyst, run_workflow
-from .ai import AIDisabledError, RateLimiter, build_payload, generate_narrative, get_provider
+from .agent.forecast import KumoForecaster
+from .agent.llm import LLMAnalyst
+from .agent.workflow import BusinessContext, RulesAnalyst, run_best
+from .ai import AIDisabledError, RateLimiter, build_payload, chat_backends, generate_narrative, get_provider
 from .analysis import filter_options, run_analysis
 from .auth import SignedInUser
 from .config import Settings, get_settings
@@ -146,6 +147,7 @@ def _register_routes(app: FastAPI) -> None:
     @app.get("/api/config")
     def config(settings: SettingsDep) -> dict[str, Any]:
         provider = get_provider(settings)
+        chain = [{"provider": b.name, "label": b.label, "model": b.model} for b in chat_backends(settings)]
         return {
             "limits": {
                 "max_upload_mb": settings.max_upload_mb,
@@ -162,7 +164,11 @@ def _register_routes(app: FastAPI) -> None:
             },
             "agent": {
                 "mode": "ai" if provider is not None else "rules",
+                "provider": provider.name if provider else None,
                 "model": provider.model if provider else None,
+                # Providers in the order they are tried; the next one continues when one cannot finish.
+                "chain": chain,
+                "forecast": "kumo" if get_forecaster(settings) else None,
             },
             # Public values the browser needs for Supabase sign-in (the anon key is public by design).
             "storage": {
@@ -275,6 +281,7 @@ def _register_routes(app: FastAPI) -> None:
         file: UploadFile = File(...),
         context: str = Form("{}", max_length=4_000),
         factory=Depends(get_agent_factory),
+        forecaster=Depends(get_forecaster),
     ):
         """Run the analytics workflow (phases 0-8). Streams NDJSON progress events, then the report."""
         parsed = _parse_json_field(BusinessContext, context, "context")
@@ -285,7 +292,7 @@ def _register_routes(app: FastAPI) -> None:
 
         def stream():
             try:
-                for event in run_workflow(ds, name, parsed, analyst, fallback, settings.agent_deadline_seconds):
+                for event in run_best(ds, name, parsed, analyst, fallback, settings.agent_deadline_seconds, forecaster):
                     yield json.dumps(event, ensure_ascii=False, default=_json_default) + "\n"
             except Exception as exc:  # noqa: BLE001 - the status line is already sent; report the failure in-stream
                 logger.exception("Agent run failed: %s", type(exc).__name__)
@@ -356,20 +363,19 @@ def get_agent_factory(settings: SettingsDep):
 
     def make(context: BusinessContext):
         rules = RulesAnalyst(context)
-        key = settings.gemini_api_key.get_secret_value() if settings.gemini_api_key else ""
-        if settings.ai_provider == "gemini" and key:
-            ai = GeminiAnalyst(
-                key,
-                settings.gemini_model,
-                context,
-                timeout=max(settings.ai_timeout_seconds, 30),
-                max_steps=settings.agent_max_steps,
-                deadline_seconds=settings.agent_deadline_seconds,
-            )
+        backends = chat_backends(settings, timeout=max(settings.ai_timeout_seconds, 30))
+        if backends:
+            ai = LLMAnalyst(backends, context, max_steps=settings.agent_max_steps, deadline_seconds=settings.agent_deadline_seconds)
             return ai, rules
         return rules, None
 
     return make
+
+
+def get_forecaster(settings: SettingsDep) -> KumoForecaster | None:
+    """FastAPI dependency: NVIDIA Kumo Relational forecasting, when switched on and an NVIDIA key is set."""
+    key = settings.nvidia_api_key.get_secret_value().strip() if settings.nvidia_api_key else ""
+    return KumoForecaster(key) if settings.forecast_provider == "kumo" and key else None
 
 
 def get_report_store(settings: SettingsDep) -> ReportStore:

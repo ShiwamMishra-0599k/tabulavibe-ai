@@ -18,7 +18,7 @@ look and feel, see `DESIGN.md`.
 | Local path | `C:\Users\swath\projects\tabulavibe-ai` |
 | Budget rule | ₹0 software and infrastructure cost wherever possible; never claim "free forever" |
 | Status | **Live on Vercel: https://tabulavibe-ai.vercel.app** (project `shiwam/tabulavibe-ai`, Hobby). AWS prepared but not used |
-| Version | 0.5.0 (choose AI or Manual Analyst; PDF and PowerPoint reports, 2026-10-22) |
+| Version | 0.6.0 (Groq → NVIDIA analyst, best-wins dashboard, Kumo Relational forecasts, 2026-10-22) |
 
 ## 2. Non-negotiable product rules
 
@@ -35,6 +35,10 @@ look and feel, see `DESIGN.md`.
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-10-22 | **Groq first, NVIDIA when Groq cannot** (analyst + commentary), replacing Gemini | Shiwam's choice. Groq's free plan (~8K tokens/min) is smaller than one analyst request (~9K+ tokens), so runs usually switch to NVIDIA at once; same conversation continues (OpenAI-compatible format on both) |
+| 2026-10-22 | **AI run vs rules baseline, higher score builds the dashboard** (Python-scored: grounded 30, coverage 25, gates 20, reconciled 15, hypotheses 10; tie → AI) | Shiwam: "whoever performs best"; chose this over running Groq and NVIDIA both (quota, 300 s limit) |
+| 2026-10-22 | **NVIDIA Kumo Relational forecasts** the primary measure: regression per horizon, period totals only, backtest vs naive | Shiwam chose Kumo over a Python forecaster. Hosted schema lists only classification/regression, so `kind: forecasting` is not used. Spec: `POST https://ai.api.nvidia.com/v1/structured-data/nvidia/kumo-relational/predictions` (Bearer nvapi-) |
+| 2026-10-22 | Retired `TABULAVIBE_AI_PROVIDER=gemini` maps to `none` | An old deployment keeps starting (rules-based analyst) instead of failing validation |
 | 2026-10-22 | **Choice screen** after upload: AI Analyst or Manual Analyst (4 steps); switchable both ways | Shiwam's request; two clear products instead of a 5th tab |
 | 2026-10-22 | Final reports as **PDF (ReportLab) and PowerPoint (python-pptx)**, server-side, native editable charts | Shiwam asked for PDF or PowerPoint; server-side keeps "Python formats every number" and one renderer for Manual, AI and saved reports |
 | 2026-10-22 | PDF embeds **DejaVu Sans** (from the matplotlib wheel on PyPI, licence kept) | Helvetica lacks ₹, →, η, ρ |
@@ -89,6 +93,7 @@ look and feel, see `DESIGN.md`.
 | 2026-10-21 | `docs/TECHNICAL_REFERENCE.md` (+ PDF) reverse-engineered from the code; 10 findings (F1–F10) |
 | 2026-10-21 | UI v2 redesign; `DESIGN.md` and `MEMORY.md` added |
 | 2026-10-21 | Shashank pushed the floating navbar (`4faf22d`) and sign-in dialog (`c390ec6`) to `main` |
+| 2026-10-22 | v0.6.0: Groq → NVIDIA provider chain, evaluation scorecard, Kumo Relational forecasting; 286 pytest, 41 Vitest, 10 E2E |
 | 2026-10-22 | v0.5.0: choice screen, PDF/PowerPoint reports, phone layouts fixed at 320/360/412 px; 253 pytest, 39 Vitest, 10 E2E |
 | 2026-10-22 | Shashank pushed `bdae0d0` (compact phone header, swipeable tabs); pulled and verified (all tests passed) |
 | 2026-10-22 | v0.4.0 AI analyst (Gemini + rules fallback, 13 SciPy tools, phase gates, grounding); 238 pytest, 35 Vitest, 10 E2E |
@@ -143,9 +148,8 @@ look and feel, see `DESIGN.md`.
 |---|---|---|
 | Fix F10 (500 responses without CORS headers) | **High before AWS** | See TECHNICAL_REFERENCE §14 |
 | Deploy to AWS | Optional (Vercel chosen) | Install AWS CLI + SAM, non-root credentials, check Free/Paid plan, follow `docs/DEPLOYMENT.md` |
-| Live-test Gemini | Optional | Needs a key from an AI Studio project **without billing** |
 | Fix F1–F9 | Low–medium | Filter options vs. label merging (F2) is the most user-visible |
-| Live-test the Gemini analyst | Needs a key | AI Studio key without billing → `TABULAVIBE_AI_PROVIDER=gemini` + key in Vercel; watch free-tier limits (one run ≈ 10–20 requests) |
+| Live-test Groq, NVIDIA and Kumo | Needs Shiwam's keys | Shiwam sets `TABULAVIBE_AI_PROVIDER=groq,nvidia`, `TABULAVIBE_GROQ_API_KEY`, `TABULAVIBE_NVIDIA_API_KEY`, `TABULAVIBE_FORECAST_PROVIDER=kumo` in `backend/.env` and Vercel (Sensitive). The NVIDIA and Groq keys pasted in chat on 2026-10-22 must be revoked and replaced. Kumo's hosted endpoint has never accepted a request from this app: first live run is the real test (watch for 422 schema errors) |
 | Update MEMORY.md / DESIGN.md comprehensively for the whole session | Requested by Shiwam | Started 2026-10-22, interrupted by the pull request; partial updates made with each feature |
 | Save AI analyst reports to My reports | Next | Needs a `kind` column (new migration) |
 | Faster ingest for big files | Optional | Parsing (strings first, Python csv) dominates time and memory; pandas C reader or Polars could cut both, but must keep the hand-checked inference behaviour |

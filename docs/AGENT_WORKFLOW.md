@@ -7,7 +7,7 @@ instructions, kept word for word in
 
 ## Who does what
 
-| | Python (always) | Analyst (Gemini, or the rules-based fallback) |
+| | Python (always) | Analyst (LLM via Groq → NVIDIA, or the rules-based fallback) |
 |---|---|---|
 | Phase 0 | Collects the optional business-context form | Writes the charter; states assumptions where context is missing |
 | Phase 1 | Profiles the file: types, grain, keys, missingness, duplicates, gaps | — |
@@ -35,7 +35,7 @@ for correction; any that still fail are flagged "unverified" and kept out of the
 | 7 Quality checks | Reconciliation and grounding reported |
 | 8 Handover | Markdown handover generated; the report downloads as PDF or PowerPoint |
 
-The Gemini analyst also faces gates inside the conversation: analysis tools are refused before a plan is
+The AI analyst also faces gates inside the conversation: analysis tools are refused before a plan is
 registered, the investigation cannot finish while a high-priority question lacks evidence, and only
 `submit_findings` is accepted in phase 5.
 
@@ -57,15 +57,59 @@ registered, the investigation cannot finish while a high-priority question lacks
 Statistics are in `backend/app/agent/stats.py`, tested against hand-computed values
 (`tests/test_agent_stats.py`).
 
-## Data sent to Gemini
+## AI providers: Groq first, then NVIDIA
+
+`TABULAVIBE_AI_PROVIDER=groq,nvidia` sets the order. Both speak OpenAI-compatible chat completions with tool
+calling (`https://api.groq.com/openai/v1/chat/completions`, `https://integrate.api.nvidia.com/v1/chat/completions`;
+fixed in code). Keys: `TABULAVIBE_GROQ_API_KEY`, `TABULAVIBE_NVIDIA_API_KEY`; models: `TABULAVIBE_GROQ_MODEL`
+(default `llama-3.3-70b-versatile`), `TABULAVIBE_NVIDIA_MODEL` (default `meta/llama-3.3-70b-instruct`).
+
+If Groq fails at any step (rate limit, request larger than the plan allows, error), **the same conversation
+continues on NVIDIA**: nothing is repeated, and the report lists the switch. Groq's free plan allows fewer
+tokens a minute than one analyst request (the workflow text alone is about 9,000 tokens), so on that plan runs
+normally switch at the first request. Only if every provider fails does the rules-based analyst take over.
+
+Each request offers only the functions the current stage allows. Open models sometimes write a call as JSON
+text, or send arguments that are not valid JSON: the first is accepted, the second is sent back to the model.
+
+## Evaluation: the best analysis builds the dashboard
+
+After an AI run, the rules-based analyst also runs on the same file. Python scores both (0–100):
+
+| Criterion | Weight |
+|---|---|
+| Findings whose numbers match their evidence | 30 |
+| High-priority questions answered | 25 |
+| Phase gates passed | 20 |
+| Totals reconcile with an independent recalculation | 15 |
+| Hypotheses resolved (supported or not supported) | 10 |
+
+The higher score builds the dashboard (a tie goes to the AI). The scorecard is on the "Plan & method" page,
+in the handover and in the PDF/PowerPoint report.
+
+## Forecast: NVIDIA Kumo Relational
+
+With `TABULAVIBE_FORECAST_PROVIDER=kumo` and an NVIDIA key, the winning analysis's primary measure is forecast
+(`POST https://ai.api.nvidia.com/v1/structured-data/nvidia/kumo-relational/predictions`):
+
+- Python builds the history with the trend tool: the coarsest grain (month, week, day) with at least 8 complete
+  periods, most of them with data. Without a date column or enough history, the forecast is skipped with a reason.
+- Each future period k is a Kumo **regression**: at every past period start, the target is the value k periods
+  later, with up to 52 earlier period totals as context (the hosted API's documented multi-table shape).
+- Horizon: up to 6 periods (a quarter of the history). A **backtest** predicts the last 3 known periods and
+  compares the mean absolute error with "same as last period"; the page says which was more accurate.
+- Only period totals of one measure are sent. NVIDIA's API trial terms allow it to record inputs.
+- A forecast failure never affects the analysis; the report states why there is no forecast.
+
+## Data sent to the AI providers
 
 Column names, the phase-1 profile, tool results (aggregates and statistics) and category labels.
 **Never raw rows**, never values of free-text or identifier columns, and never invalid example values.
-On Gemini's free tier Google may use prompts to improve its products. The page states what is shared.
+The page states what is shared.
 
 ## Without AI
 
-With `TABULAVIBE_AI_PROVIDER=none` (the default), or if Gemini fails mid-run (quota, timeout, step
+With `TABULAVIBE_AI_PROVIDER=none` (the default), or if the AI provider fails mid-run (rate limit, timeout, step
 budget), the **rules-based analyst** completes the same phases with documented, deterministic rules:
 primary KPI from the context or column names, well-filled dimensions with 3–12 values first, additive
 measures summed and prices, rates, percentages and scores averaged, and confidence from Holm-adjusted p-values plus
@@ -75,7 +119,7 @@ effect sizes. The report says which analyst ran and why.
 
 | Setting | Default | Why |
 |---|---|---|
-| `TABULAVIBE_AGENT_MAX_STEPS` | 24 | Gemini requests per run |
+| `TABULAVIBE_AGENT_MAX_STEPS` | 24 | AI requests per run |
 | `TABULAVIBE_AGENT_DEADLINE_SECONDS` | 200 | Stays inside Vercel's 300 s function limit |
 | `TABULAVIBE_AGENT_RUNS_PER_MINUTE` | 4 | Per user (or IP) |
 
