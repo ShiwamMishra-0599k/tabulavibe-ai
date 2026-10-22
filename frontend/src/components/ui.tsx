@@ -71,7 +71,7 @@ export function Card({
               {subtitle && <p className="mt-0.5 text-sm text-ink-muted">{subtitle}</p>}
             </div>
           </div>
-          {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+          {actions && <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">{actions}</div>}
         </div>
       )}
       {children}

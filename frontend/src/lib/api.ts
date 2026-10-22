@@ -96,6 +96,8 @@ function authed(token: string, init: RequestInit = {}): RequestInit {
   return { ...init, headers: { ...init.headers, Authorization: `Bearer ${token}` } }
 }
 
+export type ReportFormat = 'pdf' | 'pptx'
+
 export interface DownloadedFile {
   blob: Blob
   filename: string
@@ -132,6 +134,15 @@ export const api = {
   async exportResults(file: File, spec: AnalysisSpec): Promise<DownloadedFile> {
     const response = await request('/api/export/results', { method: 'POST', body: form(file, { spec }) })
     return { blob: await response.blob(), filename: filenameFrom(response, 'results.csv'), headers: response.headers }
+  },
+  /** Final report as a PDF or PowerPoint file, built by the server from already-computed results. */
+  async exportReport(format: ReportFormat, kind: 'manual' | 'agent', data: unknown, title?: string): Promise<DownloadedFile> {
+    const response = await request('/api/report/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ format, kind, data, ...(title ? { title } : {}) }),
+    })
+    return { blob: await response.blob(), filename: filenameFrom(response, `report.${format}`), headers: response.headers }
   },
   account: async (token: string): Promise<Account> => (await request('/api/account', authed(token))).json(),
   listReports: async (token: string): Promise<ReportSummary[]> => (await request('/api/reports', authed(token))).json(),

@@ -25,6 +25,8 @@ reports and reopen them later.
 - 🌗 Modern, responsive UI with light/dark themes, a 4-step guided workflow and accessible controls (see [DESIGN.md](DESIGN.md))
 - 🧹 Opt-in cleaning: exclude duplicate rows; merge `North` / `north` style label variants
 - 📤 Exports: results CSV, cleaned-data CSV (safe from spreadsheet formula injection), printable report (save as PDF)
+- 🧭 **Choose your analyst** after uploading: the **AI Analyst** runs the full workflow; the **Manual Analyst** walks you through Preview → Data quality → Analyse → Report & export
+- 📑 **Final report as PDF or PowerPoint**: A4 PDF with vector charts, or a 16:9 deck with native, editable PowerPoint charts, for both analysts and for saved reports
 - 🤖 **AI analyst**: runs a 9-phase analytics workflow (business understanding → data understanding → problem discovery → preparation → EDA → validation → dashboard → checks → handover) with enforced phase gates. Gemini plans and explains; Python (pandas, SciPy) computes every number, and every figure in a finding is checked against the calculation it cites. Works without AI via a rules-based analyst ([docs/AGENT_WORKFLOW.md](docs/AGENT_WORKFLOW.md))
 - 👤 Accounts: sign up / sign in with **Google (Gmail) or GitHub** via Supabase Auth; a profile is created on first sign-in
 - 🔐 Optional **sign-in-only uploads** (`TABULAVIBE_REQUIRE_SIGN_IN=true`), enforced by the backend on every upload and analysis request
@@ -40,6 +42,7 @@ reports and reopen them later.
 | Charts | Recharts 3 (validated colour palette, light and dark themes) |
 | Backend | FastAPI 0.156, Uvicorn, Pydantic 2 / pydantic-settings |
 | Data processing | pandas 3.0, NumPy, SciPy 1.18 (statistics), openpyxl (Excel), python-multipart |
+| Reports | ReportLab 5 (PDF, embedded DejaVu Sans), python-pptx 1.0 (PowerPoint with native charts) |
 | Optional LLM | Google Gemini over REST (`httpx`, no SDK) |
 | Optional accounts & database | Supabase: Auth (Google + GitHub OAuth, PKCE) and Postgres with Row Level Security; backend talks to its REST API with `httpx`; `@supabase/supabase-js` (lazy-loaded) in the browser |
 | Hosting | **Vercel** (Services: Vite frontend + FastAPI Python function, one domain) |
@@ -92,6 +95,7 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | `POST /api/export/results` | Download the calculated results as CSV |
 | `POST /api/export/cleaned` | Download the standardised (cleaned) data as CSV |
 | `POST /api/narrative` | Optional AI commentary (returns 503 when AI is disabled) |
+| `POST /api/report/export` | Final report as PDF or PowerPoint (`format`: pdf/pptx, `kind`: manual/agent) from computed results |
 | `POST /api/agent/run` | AI analyst: streams phase progress (NDJSON), then the validated report |
 | `GET /api/account` | Signed-in user's TabulaVibe profile (Bearer token) |
 | `POST /api/reports` | Recalculate from the file and save a report (Bearer token) |

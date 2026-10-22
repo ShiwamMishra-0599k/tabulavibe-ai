@@ -1,13 +1,13 @@
 # DESIGN.md: TabulaVibe AI design system
 
-_Version 2 ("calm confidence"), introduced 2026-10-21. The source of truth for tokens is
+_Version 2 ("calm confidence"), introduced 2026-10-21; choice screen, report files and phone layout rule added 2026-10-22 (v0.5.0). The source of truth for tokens is
 `frontend/src/index.css`; components live in `frontend/src/components/ui.tsx`._
 
 ## 1. Design principles
 
 1. **Clarity before decoration.** Numbers, labels and explanations come first. Gradients, glows and motion only frame them.
 2. **Trust is visible.** Every figure shows how it was calculated (KPI definitions, "values used / excluded", data health). Nothing is hidden behind an icon.
-3. **Guide, don't gate.** A 4-step stepper, suggested analyses, sensible defaults and clear empty states mean a first-time user always knows the next action.
+3. **Guide, don't gate.** A clear choice between the AI and the Manual Analyst, a 4-step stepper, suggested analyses, sensible defaults and clear empty states mean a first-time user always knows the next action.
 4. **Calm confidence.** Brand colour is used sparingly: hero keyword, primary actions, the active step, the lead KPI. Everything else is neutral.
 5. **Accessible by default.** Native controls, visible focus, an icon plus text for every status, and a table for every chart. Reduced motion is respected.
 
@@ -81,14 +81,37 @@ when storage is blocked. Both theme blocks must be kept in sync: the media query
 
 | Screen | Layout |
 |---|---|
-| Landing | Centred hero → upload zone (left, 1.5fr) + sample cards (right, 1fr) → 4-step "how it works" strip → privacy note |
-| Workspace | Sticky glass header (sticky from `sm`; static on phones to save space) → full-width **4-step stepper** → step panel |
+| Header | Floating glass "pill" (`rounded-[2rem]`, `sticky top-3`, `shadow-float`) on every size (Shashank, 2026-10-21). Phones: compact toolbar; below 430 px "New file"/"Sign in" are icon-only (text kept for screen readers); GitHub badge hidden below 640 px |
+| Landing | Centred hero → upload zone (left, 1.5fr) + sample cards (right, 1fr) → 4-step "how it works" strip → privacy note. When sign-in is required and nobody is signed in, the upload zone shows "Sign in to upload your data" and samples are locked |
+| **Choose analyst** (after upload) | Centred question "How would you like to analyse **file**?" + file chips (rows, columns, data health) → two large cards side by side from `md`, stacked on phones: **AI Analyst** (gradient border, gradient icon tile, AI mode badge, primary CTA) and **Manual Analyst** (plain border, soft icon tile, secondary CTA). Each card is one button (accessible names "AI Analyst" / "Manual Analyst") with four ✓ points |
+| Mode bar | One line above either mode: mode name with icon (left) and a ghost "Switch to Manual Analyst" / "Switch to AI Analyst" button (right) |
+| Manual Analyst | Mode bar → **4-step stepper** → step panel |
+| AI Analyst | Mode bar → context form (phase 0) → live phase timeline → report card (PDF, PowerPoint, handover .md, run again) → page tabs (Overview, Data quality, Univariate, Bivariate, Multivariate, Insights, Plan & method) |
 | Analyse | Builder (340 px) beside results from `lg`; stacked below `lg`, where the page scrolls to the results after a run |
-| Report | Download toolbar → document-style report with a gradient title band (it prints as plain dark text) |
+| Report & export | Downloads card: **Download PDF**, **Download PowerPoint** (primary), results CSV, cleaned CSV (secondary), cleaning toggles → document-style on-screen report |
 
 **Stepper:** steps are `role="tab"` buttons with accessible names "1. Preview" … "4. Report & export".
 - Active: gradient icon tile plus accent ring. Done: green tick. Disabled: 45% opacity.
-- Below `md`, each step shows only an icon and a short label (4-column grid, no sideways scrolling).
+- From `sm` a 4-column grid; on phones a swipeable row of 128 px tabs (scrollbar hidden).
+
+**Phone layout rule (all screens fit 320, 360 and 412 px wide phones):**
+- Any single-column grid that can contain a wide table or chart uses `grid-cols-[minmax(0,1fr)]` (a plain `grid` track grows to its widest child and the phone zooms the page out).
+- Wide tables scroll inside their card (`overflow-x-auto`); cards in grids get `min-w-0`.
+- Card action controls take the full card width below `sm`; fixed-width selects become `w-full sm:w-72`.
+- The chart-type switcher becomes a 4-column grid and shows icons only below 380 px.
+- Verify by measurement: at each width, `window.innerWidth` must equal the device width on every screen.
+
+## 6a. Report files (PDF and PowerPoint)
+
+| Element | PowerPoint (16:9) | PDF (A4) |
+|---|---|---|
+| Cover | Full-bleed indigo→violet gradient, "TABULAVIBE AI", title, subtitle, meta line | Brand subtitle in accent, 22 pt title, meta line, 2 pt accent rule |
+| Section | One slide per section, 0.12" accent bar on top, 26 pt title, footer | 14 pt heading kept with the next block |
+| KPIs | White rounded cards, 3 per row (label, 28 pt value, definition) | 3-column grid |
+| Charts | **Native PowerPoint charts** (editable): bars sorted largest on top, data labels, straight trend line, doughnut only when the server allows it; Indian digit grouping | Vector charts (ReportLab) starting at zero, sans-serif labels |
+| Insights | One slide each: title, confidence/kind badge in the confidence colour, the seven questions in two columns | Card with a 3 pt left rule in the confidence colour |
+| Fonts | Theme font (PowerPoint renders Unicode) | Embedded **DejaVu Sans** (₹, →, η, ρ) |
+| Colours | Brand `#4f46e5`/`#7c3aed`, series `#2a78d6`…, ink `#0f1222`/`#474c63`, muted `#676c84` | Same |
 
 ## 7. Components (`ui.tsx`)
 

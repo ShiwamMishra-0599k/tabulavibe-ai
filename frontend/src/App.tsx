@@ -7,13 +7,15 @@ import {
   Eye,
   FileDown,
   FileSpreadsheet,
+  FileText,
   FolderOpen,
   LogIn,
   LogOut,
   Monitor,
   Moon,
-  Printer,
+  Presentation,
   RotateCcw,
+  SlidersHorizontal,
   Stethoscope,
   Sparkles,
   Sun,
@@ -26,6 +28,7 @@ import { SignUpPage } from './components/SignUpPage'
 import { Dashboard } from './components/Dashboard'
 import { DataPreview } from './components/DataPreview'
 import { GitHubStars } from './components/GitHubStars'
+import { ModeChoice, type AnalysisMode } from './components/ModeChoice'
 import { QualityReport } from './components/QualityReport'
 import { ReportView } from './components/ReportView'
 import { ReportsList, SavedReportPage, SaveReportCard } from './components/SavedReports'
@@ -33,7 +36,7 @@ import { SignInDialog } from './components/SignInDialog'
 import { Alert, Button, IconChip, Skeleton, Spinner, Toggle } from './components/ui'
 import { Hero, UploadPanel } from './components/UploadPanel'
 import { EMPTY_CONTEXT, runAgent, type AgentEvent, type AgentReport, type BusinessContext } from './lib/agent'
-import { api, ApiError, saveBlob } from './lib/api'
+import { api, ApiError, saveBlob, type ReportFormat } from './lib/api'
 import { useAuth, type Auth } from './lib/auth'
 import { chartTitle, type ChartKind } from './lib/charts'
 import { formatCount } from './lib/format'
@@ -41,9 +44,9 @@ import { defaultSpec } from './lib/spec'
 import { useTheme, type ThemeChoice } from './lib/theme'
 import type { Account, AnalysisResult, AnalysisSpec, AppConfig, Narrative, Profile, ReportSummary, SampleInfo, SavedReport } from './lib/types'
 
-type Tab = 'preview' | 'quality' | 'analyze' | 'report' | 'agent'
+type Tab = 'preview' | 'quality' | 'analyze' | 'report'
 type View = 'workspace' | 'sign-up' | 'reports' | 'saved'
-const ORDER: Tab[] = ['preview', 'quality', 'analyze', 'report', 'agent']
+const ORDER: Tab[] = ['preview', 'quality', 'analyze', 'report']
 
 function message(error: unknown): string {
   if (error instanceof ApiError) return error.details.length ? `${error.message} (${error.details.join('; ')})` : error.message
@@ -111,6 +114,21 @@ function AccountMenu({ auth, account, onReports, onSignOut }: { auth: Auth; acco
   )
 }
 
+function ModeBar({ mode, onSwitch }: { mode: AnalysisMode; onSwitch: () => void }) {
+  const Icon = mode === 'ai' ? Sparkles : SlidersHorizontal
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
+      <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+        <Icon aria-hidden className="size-4 text-accent" />
+        {mode === 'ai' ? 'AI Analyst' : 'Manual Analyst'}
+      </p>
+      <Button size="sm" variant="ghost" icon={mode === 'ai' ? SlidersHorizontal : Sparkles} onClick={onSwitch}>
+        {mode === 'ai' ? 'Switch to Manual Analyst' : 'Switch to AI Analyst'}
+      </Button>
+    </div>
+  )
+}
+
 function NextButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
   return (
     <div className="flex justify-end">
@@ -135,11 +153,13 @@ export default function App() {
   const [narrative, setNarrative] = useState<Narrative | null>(null)
   const [signInOpen, setSignInOpen] = useState(false)
   const [tab, setTab] = useState<Tab>('preview')
+  // After upload: null = choose; 'ai' = AI Analyst page; 'manual' = Preview → Data quality → Analyse → Report & export
+  const [mode, setMode] = useState<AnalysisMode | null>(null)
   const [chartKind, setChartKind] = useState<ChartKind>('bar')
   const [measureKey, setMeasureKey] = useState('')
 
   const [largeFile, setLargeFile] = useState(false)
-  const [busy, setBusy] = useState<null | 'upload' | 'analyze' | 'export-clean' | 'export-results' | 'narrative'>(null)
+  const [busy, setBusy] = useState<null | 'upload' | 'analyze' | 'export-clean' | 'export-results' | 'narrative' | 'report-pdf' | 'report-pptx' | 'agent-pdf' | 'agent-pptx'>(null)
   const [error, setError] = useState<string | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
   const [exportNotice, setExportNotice] = useState<string | null>(null)
@@ -250,6 +270,7 @@ export default function App() {
 
   function reset() {
     setView('workspace')
+    setMode(null)
     setFile(null)
     setProfile(null)
     setSpec(null)
@@ -348,7 +369,43 @@ export default function App() {
   }
 
   /** Drill-down from an insight: open the Analyse step with the finding's analysis (filters and exports live there). */
+  function chooseMode(next: AnalysisMode) {
+    setMode(next)
+    if (next === 'manual') setTab('preview')
+    window.scrollTo({ top: 0 })
+  }
+
+  async function downloadReport(format: ReportFormat) {
+    if (!profile || !result) return
+    setBusy(format === 'pdf' ? 'report-pdf' : 'report-pptx')
+    setError(null)
+    try {
+      const data = { dataset: profile.dataset, issues: profile.issues, result, narrative, chart_kind: chartKind === 'pie' ? 'pie' : 'bar', measure_key: measureKey }
+      const out = await api.exportReport(format, 'manual', data, chartTitle(result, measureKey))
+      saveBlob(out.blob, out.filename)
+    } catch (e) {
+      setError(message(e))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function downloadAgentReport(format: ReportFormat) {
+    if (!agentReport) return
+    setBusy(format === 'pdf' ? 'agent-pdf' : 'agent-pptx')
+    setError(null)
+    try {
+      const out = await api.exportReport(format, 'agent', agentReport)
+      saveBlob(out.blob, out.filename)
+    } catch (e) {
+      setError(message(e))
+    } finally {
+      setBusy(null)
+    }
+  }
+
   function explore(next: AnalysisSpec) {
+    setMode('manual')
     const full: AnalysisSpec = { ...next, filters: next.filters ?? [], time_grain: next.time_grain ?? 'month', remove_duplicates: next.remove_duplicates ?? false, merge_label_variants: next.merge_label_variants ?? false }
     setSpec(full)
     goTo('analyze')
@@ -411,13 +468,7 @@ export default function App() {
         { id: 'preview', label: 'Preview', hint: `${formatCount(profile.dataset.row_count)} rows · ${profile.dataset.column_count} columns`, icon: Eye },
         { id: 'quality', label: 'Data quality', hint: `${profile.dataset.valid_cell_pct}% healthy`, icon: Stethoscope },
         { id: 'analyze', label: 'Analyse', hint: result ? `${result.kpis.length} KPI(s) ready` : 'Build KPIs and charts', icon: ChartColumn },
-        { id: 'report', label: 'Report & export', hint: result ? 'Print and download' : 'Run an analysis first', icon: FileDown, disabled: !result },
-        {
-          id: 'agent',
-          label: 'AI analyst',
-          hint: agentRunning ? 'Working…' : agentReport ? `${agentReport.findings.length} insight(s)` : 'Run the full workflow',
-          icon: Sparkles,
-        },
+        { id: 'report', label: 'Report & export', hint: result ? 'PDF, PowerPoint and CSV' : 'Run an analysis first', icon: FileDown, disabled: !result },
       ]
     : []
   const isDone = (id: Tab) => ORDER.indexOf(id) < ORDER.indexOf(tab) || (id === 'analyze' && !!result && tab !== 'analyze')
@@ -526,10 +577,32 @@ export default function App() {
           </>
         )}
 
-        {view === 'workspace' && profile && spec && (
-          <div className="grid gap-6">
+        {view === 'workspace' && profile && spec && mode === null && <ModeChoice profile={profile} config={config} onChoose={chooseMode} />}
+
+        {view === 'workspace' && profile && spec && mode === 'ai' && (
+          <div className="grid min-w-0 gap-5">
+            <ModeBar mode="ai" onSwitch={() => chooseMode('manual')} />
+            <AgentView
+              config={config}
+              context={agentContext}
+              onContext={setAgentContext}
+              events={agentEvents}
+              running={agentRunning}
+              report={agentReport}
+              error={agentError}
+              onRun={startAgent}
+              onExplore={explore}
+              onDownload={downloadAgentReport}
+              downloading={busy === 'agent-pdf' ? 'pdf' : busy === 'agent-pptx' ? 'pptx' : null}
+            />
+          </div>
+        )}
+
+        {view === 'workspace' && profile && spec && mode === 'manual' && (
+          <div className="grid min-w-0 gap-6">
+            <ModeBar mode="manual" onSwitch={() => chooseMode('ai')} />
             <nav aria-label="Workflow steps" className="overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden print:hidden">
-              <div role="tablist" className="flex min-w-max gap-2 sm:grid sm:min-w-0 sm:grid-cols-5 sm:gap-3">
+              <div role="tablist" className="flex min-w-max gap-2 sm:grid sm:min-w-0 sm:grid-cols-4 sm:gap-3">
                 {steps.map((step, i) => {
                   const active = tab === step.id
                   const done = isDone(step.id)
@@ -570,32 +643,10 @@ export default function App() {
 
             <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="min-w-0">
               {tab === 'preview' && (
-                <div className="animate-rise grid gap-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-accent/30 bg-accent-soft px-4 py-3">
-                    <p className="text-sm text-ink-2">
-                      <span className="font-semibold text-ink">Let the AI analyst do the whole workflow.</span> It profiles the data, registers questions and
-                      hypotheses, runs the statistics, validates every number and builds a dashboard of what it found.
-                    </p>
-                    <Button variant="primary" size="sm" icon={Sparkles} onClick={() => goTo('agent')}>
-                      Open the AI analyst
-                    </Button>
-                  </div>
+                <div className="animate-rise grid min-w-0 gap-4">
                   <DataPreview profile={profile} />
                   <NextButton onClick={() => goTo('quality')}>Next: check data quality</NextButton>
                 </div>
-              )}
-              {tab === 'agent' && (
-                <AgentView
-                  config={config}
-                  context={agentContext}
-                  onContext={setAgentContext}
-                  events={agentEvents}
-                  running={agentRunning}
-                  report={agentReport}
-                  error={agentError}
-                  onRun={startAgent}
-                  onExplore={explore}
-                />
               )}
               {tab === 'quality' && (
                 <div className="grid gap-4">
@@ -604,7 +655,7 @@ export default function App() {
                 </div>
               )}
               {tab === 'analyze' && (
-                <div className="grid items-start gap-5 lg:grid-cols-[340px_minmax(0,1fr)]">
+                <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[340px_minmax(0,1fr)]">
                   <AnalysisBuilder
                     profile={profile}
                     spec={spec}
@@ -613,7 +664,7 @@ export default function App() {
                     onApplySuggestion={applySuggestion}
                     busy={busy === 'analyze'}
                   />
-                  <div ref={resultsRef} className="grid min-w-0 scroll-mt-4 gap-4 sm:scroll-mt-24">
+                  <div ref={resultsRef} className="grid min-w-0 grid-cols-[minmax(0,1fr)] scroll-mt-4 gap-4 sm:scroll-mt-24">
                     {busy === 'analyze' && (
                       <div className="grid gap-4">
                         <Spinner label="Calculating…" />
@@ -650,9 +701,12 @@ export default function App() {
                       Downloads
                     </h2>
                     <p className="mt-0.5 text-sm text-ink-muted">Everything below matches the numbers in your dashboard.</p>
-                    <div className="mt-4 grid gap-3 md:grid-cols-3">
-                      <Button variant="primary" size="lg" icon={Printer} onClick={() => window.print()}>
-                        Print / save as PDF
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <Button variant="primary" size="lg" icon={FileText} busy={busy === 'report-pdf'} onClick={() => downloadReport('pdf')}>
+                        Download PDF
+                      </Button>
+                      <Button variant="primary" size="lg" icon={Presentation} busy={busy === 'report-pptx'} onClick={() => downloadReport('pptx')}>
+                        Download PowerPoint
                       </Button>
                       <Button size="lg" icon={FileDown} busy={busy === 'export-results'} onClick={exportResults}>
                         Download results (CSV)

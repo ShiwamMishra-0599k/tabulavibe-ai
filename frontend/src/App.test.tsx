@@ -58,6 +58,7 @@ describe('App', () => {
     render(<App />)
 
     await user.click(await screen.findByRole('button', { name: 'Load sample: Retail sales (CSV)' }))
+    await user.click(await screen.findByRole('button', { name: 'Manual Analyst' }))
     expect(await screen.findByText('First 2 of 10 rows')).toBeInTheDocument()
     expect(screen.getByLabelText('Data preview table')).toHaveTextContent('North')
 
@@ -81,7 +82,53 @@ describe('App', () => {
 
     await user.click(screen.getByRole('tab', { name: '4. Report & export' }))
     expect(screen.getByRole('heading', { name: 'Key figures' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Print / save as PDF' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Download PDF' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Download PowerPoint' })).toBeInTheDocument()
+  })
+
+  it('asks the user to choose the AI Analyst or the Manual Analyst after upload, and lets them switch', async () => {
+    const user = userEvent.setup()
+    mockServer()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Load sample: Retail sales (CSV)' }))
+    expect(await screen.findByRole('heading', { name: /How would you like to analyse/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'AI Analyst' })).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: '1. Preview' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Manual Analyst' }))
+    expect(screen.getAllByRole('tab').map((t) => t.getAttribute('aria-label'))).toEqual(['1. Preview', '2. Data quality', '3. Analyse', '4. Report & export'])
+
+    await user.click(screen.getByRole('button', { name: 'Switch to AI Analyst' }))
+    expect(screen.getByRole('button', { name: 'Run the AI analyst' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Switch to Manual Analyst' }))
+    expect(screen.getByRole('tab', { name: '1. Preview' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'New file' }))
+    expect(await screen.findByRole('button', { name: 'Load sample: Retail sales (CSV)' })).toBeInTheDocument()
+  })
+
+  it('downloads the final report as PDF and PowerPoint from the server', async () => {
+    URL.createObjectURL = vi.fn(() => 'blob:report')
+    URL.revokeObjectURL = vi.fn()
+    const user = userEvent.setup()
+    const calls = mockServer({
+      '/api/report/export': () =>
+        new Response(new Blob(['%PDF-1.4']), { status: 200, headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="tabulavibe_report.pdf"' } }),
+    })
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Load sample: Retail sales (CSV)' }))
+    await user.click(await screen.findByRole('button', { name: 'Manual Analyst' }))
+    await user.click(await screen.findByRole('tab', { name: '3. Analyse' }))
+    await user.click(screen.getByRole('button', { name: 'Run analysis' }))
+    await user.click(await screen.findByRole('tab', { name: '4. Report & export' }))
+    await user.click(screen.getByRole('button', { name: 'Download PDF' }))
+    await user.click(screen.getByRole('button', { name: 'Download PowerPoint' }))
+    const exports = calls.filter((c) => c.url === '/api/report/export')
+    expect(exports).toHaveLength(2)
+    const bodies = exports.map((c) => JSON.parse(c.body as unknown as string))
+    expect(bodies.map((b) => b.format)).toEqual(['pdf', 'pptx'])
+    expect(bodies[0]).toMatchObject({ kind: 'manual', data: { result: { kpis: expect.any(Array) }, dataset: { file_name: 'sales.csv' } } })
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(2)
   })
 
   it('rejects unsupported files in the browser before uploading', async () => {
@@ -130,6 +177,7 @@ describe('App', () => {
     })
     render(<App />)
     await user.click(await screen.findByRole('button', { name: 'Load sample: Retail sales (CSV)' }))
+    await user.click(await screen.findByRole('button', { name: 'Manual Analyst' }))
     await user.click(await screen.findByRole('tab', { name: '3. Analyse' }))
     await user.click(screen.getByRole('button', { name: 'Run analysis' }))
     await user.click(await screen.findByRole('button', { name: 'Generate commentary' }))
@@ -142,6 +190,7 @@ describe('App', () => {
     mockServer()
     render(<App />)
     await user.click(await screen.findByRole('button', { name: 'Load sample: Retail sales (CSV)' }))
+    await user.click(await screen.findByRole('button', { name: 'Manual Analyst' }))
     await user.click(await screen.findByRole('tab', { name: '3. Analyse' }))
     await user.selectOptions(screen.getByLabelText('Add a filter'), 'region')
     for (const value of ['East', 'North', 'South', 'West']) await user.click(screen.getByRole('checkbox', { name: value }))
@@ -154,6 +203,7 @@ describe('App', () => {
     const calls = mockServer()
     render(<App />)
     await user.click(await screen.findByRole('button', { name: 'Load sample: Retail sales (CSV)' }))
+    await user.click(await screen.findByRole('button', { name: 'Manual Analyst' }))
     await user.click(await screen.findByRole('tab', { name: '3. Analyse' }))
     await user.click(screen.getByRole('button', { name: /revenue by region/ }))
     expect(await screen.findByText('16,45,592.43')).toBeInTheDocument()
@@ -166,6 +216,7 @@ describe('App', () => {
     mockServer()
     render(<App />)
     await user.click(await screen.findByRole('button', { name: 'Load sample: Retail sales (CSV)' }))
+    await user.click(await screen.findByRole('button', { name: 'Manual Analyst' }))
     await user.click(await screen.findByRole('tab', { name: '2. Data quality' }))
     expect(screen.getByRole('img', { name: 'Data health: 97.5%' })).toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'revenue valid values: 90%' })).toBeInTheDocument()

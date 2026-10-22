@@ -28,8 +28,9 @@ from .export import cleaned_csv, results_csv
 from .github import StarCounter, repo_info
 from .ingest import load_table
 from .profiling import Dataset, build_dataset, build_profile, duplicate_row_count
+from .report_export import agent_doc, manual_doc, render_pdf, render_pptx
 from .samples import SAMPLES, SAMPLES_DIR, list_samples
-from .schemas import AnalysisSpec, CleanOptions, SavedNarrative
+from .schemas import AnalysisSpec, CleanOptions, ReportExportRequest, SavedNarrative
 from .storage import AuthRequiredError, ReportStore, StorageDisabledError, build_record, get_store
 
 logger = logging.getLogger("tabulavibe")
@@ -254,6 +255,17 @@ def _register_routes(app: FastAPI) -> None:
             "columns_with_invalid_values": [c.name for c in ds.columns.values() if c.invalid_count][:10],
         }
         return generate_narrative(provider, build_payload(result, quality))
+
+    @app.post("/api/report/export")
+    def export_report(req: ReportExportRequest, user: SignedInUser) -> Response:
+        """The final report as PDF (A4) or PowerPoint (16:9) with native charts."""
+        doc = agent_doc(req.data) if req.kind == "agent" else manual_doc(req.data, req.title)
+        content = render_pdf(doc) if req.format == "pdf" else render_pptx(doc)
+        slug = "".join(ch if ch.isalnum() else "_" for ch in doc.title.lower()).strip("_")[:60] or "report"
+        media = "application/pdf" if req.format == "pdf" else "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        return Response(
+            content=content, media_type=media, headers={"Content-Disposition": f'attachment; filename="tabulavibe_{slug}.{req.format}"'}
+        )
 
     @app.post("/api/agent/run")
     def agent_run(

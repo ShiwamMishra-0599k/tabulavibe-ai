@@ -76,7 +76,7 @@ export function OverviewPage({ report, ev, onExplore }: PageProps) {
   const seg = segment ? (ev.get(segment.evidence_id)?.result as R) : undefined
   const key = report.dashboard.key_findings.map((id) => report.findings.find((f) => f.id === id)).filter(Boolean) as Finding[]
   return (
-    <div className="grid gap-5">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
       <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(13rem, 1fr))' }}>
         {report.dashboard.kpis.map((k) => (
           <div key={k.label} className="rounded-2xl border border-line bg-surface p-4 shadow-soft" title={k.definition}>
@@ -92,7 +92,7 @@ export function OverviewPage({ report, ev, onExplore }: PageProps) {
           </div>
         ))}
       </div>
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-2">
         {trend && (
           <Card title={`${trend.result.aggregation === 'mean' ? 'Average' : 'Total'} ${trend.result.measure ?? 'rows'} by ${trend.result.grain}`} subtitle={trend.result.partial_periods.length ? `Partial periods (excluded from comparisons): ${trend.result.partial_periods.join(', ')}` : 'All periods complete'} icon={Gauge}>
             <TrendChart rows={rowsOf(trend.result.periods.map((p: R) => ({ group: p.period, rows: p.rows, value: p.value })))} measureKey="v" measureLabel={String(trend.result.measure ?? 'Rows')} height={260} />
@@ -137,7 +137,7 @@ export function QualityPage({ report, ev }: PageProps) {
   const du = report.data_understanding
   const ov = ev.get(du.overview_evidence)?.result as R | undefined
   return (
-    <div className="grid gap-5">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
       {ov && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Stat label="Rows" value={formatCount(ov.rows)} icon={ListChecks} />
@@ -156,7 +156,7 @@ export function QualityPage({ report, ev }: PageProps) {
             <li key={i.issue} className="flex flex-wrap items-start gap-2 rounded-xl border border-line p-3 text-sm">
               <Badge tone={i.severity === 'warning' ? 'warn' : 'neutral'}>{i.severity}</Badge>
               <Badge tone={i.kind === 'needs_investigation' ? 'accent' : 'neutral'}>{i.kind === 'needs_investigation' ? 'Needs investigation' : 'Data quality'}</Badge>
-              <span className="min-w-0 flex-1">
+              <span className="w-full min-w-0 break-words sm:w-auto sm:flex-1">
                 <span className="font-semibold text-ink">{i.issue}. </span>
                 <span className="text-ink-2">{i.detail}</span>
               </span>
@@ -164,7 +164,7 @@ export function QualityPage({ report, ev }: PageProps) {
           ))}
         </ul>
       </Card>
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-2">
         <Card title="Completeness by column" subtitle="Share of rows with a value." icon={CircleHelp}>
           <ul className="grid gap-2">
             {du.data_dictionary.map((d) => (
@@ -178,6 +178,7 @@ export function QualityPage({ report, ev }: PageProps) {
           </ul>
         </Card>
         <Card title="Validation" subtitle={`Holm-Bonferroni correction across ${report.validation.multiple_testing.tests.length} test(s); totals recomputed independently.`} icon={CircleCheck}>
+          <div className="overflow-x-auto">
           <table className="tabular w-full text-sm" aria-label="Reconciliation of totals">
             <thead>
               <tr className="text-left text-xs text-ink-muted">
@@ -200,6 +201,7 @@ export function QualityPage({ report, ev }: PageProps) {
               ))}
             </tbody>
           </table>
+          </div>
         </Card>
       </div>
       <Card title="Cleaning log (phase 3)" subtitle="Non-destructive: the uploaded file is never modified. 'Not applied' means flagged for a decision, not changed." icon={ClipboardList}>
@@ -233,7 +235,7 @@ export function UnivariatePage({ report, ev }: PageProps) {
       subtitle="One variable at a time: distribution, centre, spread and unusual values."
       icon={Sigma}
       actions={
-        <div className="w-60">
+        <div className="w-full sm:w-60">
           <label htmlFor="uni-column" className={labelClass}>
             Variable
           </label>
@@ -249,7 +251,7 @@ export function UnivariatePage({ report, ev }: PageProps) {
     >
       {!r && <p className="text-sm text-ink-muted">No profile for this column.</p>}
       {r && r.type === 'number' && (
-        <div className="grid gap-5">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
           <KeyValues
             items={[
               ['Count', formatCount(r.n)],
@@ -266,7 +268,7 @@ export function UnivariatePage({ report, ev }: PageProps) {
               ['Negative values', formatCount(r.negative_count ?? 0)],
             ]}
           />
-          <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
             <Histogram bins={r.histogram ?? []} label={column} />
             <div className="grid content-center">
               <BoxPlot stats={r as never} label={column} />
@@ -275,7 +277,7 @@ export function UnivariatePage({ report, ev }: PageProps) {
         </div>
       )}
       {r && (r.type === 'category' || r.type === 'boolean') && (
-        <div className="grid gap-4">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
           <KeyValues
             items={[
               ['Values', formatCount(r.n)],
@@ -290,7 +292,7 @@ export function UnivariatePage({ report, ev }: PageProps) {
         </div>
       )}
       {r && r.type === 'date' && (
-        <div className="grid gap-4">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
           <KeyValues items={[['From', r.min], ['To', r.max], ['Span (days)', formatCount(r.span_days)], ['Distinct days', formatCount(r.distinct_days)], ['Missing', formatCount(r.missing)], ['Invalid', formatCount(r.invalid)]]} />
           <BarComparison rows={rowsOf(Object.entries(r.rows_by_weekday as Record<string, number>).map(([d, n]) => ({ group: d, rows: n, value: n })))} measureKey="v" measureLabel="Rows" />
         </div>
@@ -336,7 +338,7 @@ export function BivariatePage({ report, onExplore }: PageProps) {
       subtitle="Relationships the analyst investigated, with the method chosen for each pair of variable types."
       icon={FlaskConical}
       actions={
-        <div className="w-72">
+        <div className="w-full sm:w-72">
           <label htmlFor="bi-analysis" className={labelClass}>
             Analysis
           </label>
@@ -352,7 +354,7 @@ export function BivariatePage({ report, onExplore }: PageProps) {
     >
       {!e && <p className="text-sm text-ink-muted">No bivariate analysis was run.</p>}
       {e && r && (
-        <div className="grid gap-5">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
           {e.tool === 'trend' && (
             <>
               <TrendChart rows={rowsOf(r.periods.map((p: R) => ({ group: p.period, rows: p.rows, value: p.value })))} measureKey="v" measureLabel={String(r.measure ?? 'Rows')} />
@@ -474,7 +476,7 @@ export function MultivariatePage({ report }: PageProps) {
     )
   }
   return (
-    <div className="grid gap-5">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
       {matrix && (
         <Card
           title="Correlation heatmap"
@@ -494,7 +496,7 @@ export function MultivariatePage({ report }: PageProps) {
           <Notes notes={matrix.result.notes} />
         </Card>
       )}
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-2">
         {pca?.result.explained_variance_ratio && (
           <Card title="Principal components" subtitle={`${formatCount(pca.result.n)} complete rows; standardised variables.`} icon={Sigma}>
             <VarianceBars ratios={pca.result.explained_variance_ratio} />
@@ -572,7 +574,7 @@ export function InsightsPage({ report, onExplore }: PageProps) {
   const [kind, setKind] = useState<'all' | Finding['kind']>('all')
   const shown = useMemo(() => report.findings.filter((f) => kind === 'all' || f.kind === kind), [report.findings, kind])
   return (
-    <div className="grid gap-4">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
       <div role="group" aria-label="Filter findings" className="flex w-fit flex-wrap rounded-xl bg-surface-2 p-1 ring-1 ring-inset ring-line">
         {KINDS.map((k) => (
           <button key={k.value} type="button" aria-pressed={kind === k.value} onClick={() => setKind(k.value)} className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${kind === k.value ? 'bg-surface text-ink shadow-soft ring-1 ring-line' : 'text-ink-muted hover:text-ink'}`}>
@@ -634,7 +636,7 @@ export function InsightsPage({ report, onExplore }: PageProps) {
 export function PlanPage({ report }: PageProps) {
   const c = report.charter
   return (
-    <div className="grid gap-5">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
       <Card title="Project charter (phase 0)" subtitle={c.provided_by_user ? 'Based on the business context you provided.' : 'No business context was provided: see the assumptions.'} icon={Target}>
         <KeyValues items={[['Business context', c.business_context], ['Audience', c.stakeholders]]} />
         <div className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
@@ -725,7 +727,7 @@ export function PlanPage({ report }: PageProps) {
           ))}
         </ul>
       </Card>
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-2">
         <Card title="Limitations" icon={TriangleAlert}>
           <ul className="grid gap-1 text-sm text-ink-2">
             {report.limitations.map((l) => (

@@ -121,6 +121,13 @@ def fmt_p(p: float | None) -> str:
     return "< 0.0001" if p < 0.0001 else fmt(p, 4)
 
 
+def p_phrase(p: float | None, label: str = "adjusted p") -> str:
+    """'adjusted p = 0.0451', or 'adjusted p < 0.0001' for tiny values."""
+    if p is not None and p < 0.0001:
+        return f"{label} < 0.0001"
+    return f"{label} = {fmt_p(p)}"
+
+
 def pct(share: float | None) -> str:
     return "n/a" if share is None else f"{fmt(share * 100, 1)}%"
 
@@ -798,6 +805,7 @@ class RulesAnalyst:
         hyp_by_q = {h["question_id"]: h for h in plan["hypotheses"]}
 
         def add(**f):
+            f["title"] = f["title"][:1].upper() + f["title"][1:]  # titles often start with a column name
             f.setdefault("possible_explanations", [])
             f.setdefault("spec", None)
             findings.append({"id": f"F{len(findings) + 1}", **f})
@@ -817,7 +825,7 @@ class RulesAnalyst:
                         hyp["result"] = "supported" if significant else "not_supported" if adj is not None else "inconclusive"
                         hyp.update({"p_value": tr.get("p_value"), "adjusted_p_value": adj})
                     trend_text = (
-                        f"Across {tr['n_periods']} complete months the trend slope is {fmt(tr['slope_per_period'])} per month (adjusted p = {fmt_p(adj)})."
+                        f"Across {tr['n_periods']} complete months the trend slope is {fmt(tr['slope_per_period'])} per month ({p_phrase(adj)})."
                         if tr.get("slope_per_period") is not None
                         else "Too few complete months to test a trend."
                     )
@@ -894,7 +902,7 @@ class RulesAnalyst:
                             if significant and meaningful
                             else f"No reliable difference in average {r['measure']} across {r['group_by']}"
                         ),
-                        what_happened=f"Highest average: '{hi['group']}' at {fmt(hi['mean'])}; lowest: '{lo['group']}' at {fmt(lo['mean'])}. Test: {t['name'].replace('_', ' ')}, adjusted p = {fmt_p(adj)}, {effect_name} = {fmt(effect, 4)}.",
+                        what_happened=f"Highest average: '{hi['group']}' at {fmt(hi['mean'])}; lowest: '{lo['group']}' at {fmt(lo['mean'])}. Test: {t['name'].replace('_', ' ')}, {p_phrase(adj)}, {effect_name} = {fmt(effect, 4)}.",
                         where=r["group_by"],
                         magnitude=f"{effect_name} = {fmt(effect, 4)}",
                         baseline=f"'{lo['group']}': {fmt(lo['mean'])}",
@@ -929,7 +937,7 @@ class RulesAnalyst:
                         continue
                     add(
                         title=f"{strength.capitalize()} {'positive' if rho > 0 else 'negative'} association between {r['x']} and {r['y']}",
-                        what_happened=f"Spearman ρ = {fmt(rho, 4)} (Pearson r = {fmt(r['pearson_r'], 4)}) over {fmt(r['n'], 0)} rows; adjusted p = {fmt_p(adj)}.",
+                        what_happened=f"Spearman ρ = {fmt(rho, 4)} (Pearson r = {fmt(r['pearson_r'], 4)}) over {fmt(r['n'], 0)} rows; {p_phrase(adj)}.",
                         where="All rows with both values",
                         magnitude=f"ρ = {fmt(rho, 4)}",
                         baseline="No association (ρ = 0)",
@@ -953,7 +961,7 @@ class RulesAnalyst:
                         continue
                     add(
                         title=f"{r['row']} and {r['column']} are associated",
-                        what_happened=f"Chi-square = {fmt(t['statistic'], 4)} with {t['df']} degrees of freedom, adjusted p = {fmt_p(adj)}, Cramér's V = {fmt(t['effect_size']['value'], 4)}.",
+                        what_happened=f"Chi-square = {fmt(t['statistic'], 4)} with {t['df']} degrees of freedom, {p_phrase(adj)}, Cramér's V = {fmt(t['effect_size']['value'], 4)}.",
                         where=f"{r['row']} × {r['column']}",
                         magnitude=f"Cramér's V = {fmt(t['effect_size']['value'], 4)}",
                         baseline="Independence",

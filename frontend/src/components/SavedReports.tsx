@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { ArrowLeft, BookmarkCheck, FileSpreadsheet, FolderOpen, LogIn, Printer, Save, Trash2, UploadCloud } from 'lucide-react'
+import { ArrowLeft, BookmarkCheck, FileSpreadsheet, FileText, FolderOpen, LogIn, Presentation, Save, Trash2, UploadCloud } from 'lucide-react'
+import { api, ApiError, saveBlob, type ReportFormat } from '../lib/api'
 import { LOCALE, formatCount } from '../lib/format'
 import type { ChartKind } from '../lib/charts'
 import type { ReportSummary, SavedReport } from '../lib/types'
@@ -101,16 +102,39 @@ export function ReportsList({ reports, error, onOpen, onDelete, onNew }: ListPro
 /** A saved report, rendered from the stored results (no file needed). */
 export function SavedReportPage({ report, onBack }: { report: SavedReport; onBack: () => void }) {
   const chartKind: ChartKind = report.result.chart.recommended === 'line' ? 'line' : 'bar'
+  const [downloading, setDownloading] = useState<ReportFormat | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function download(format: ReportFormat) {
+    setDownloading(format)
+    setError(null)
+    try {
+      const data = { dataset: report.quality.dataset, issues: report.quality.issues, result: report.result, narrative: report.narrative, chart_kind: chartKind, measure_key: report.result.measures[0]?.key }
+      const out = await api.exportReport(format, 'manual', data, report.title)
+      saveBlob(out.blob, out.filename)
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'The report could not be downloaded.')
+    } finally {
+      setDownloading(null)
+    }
+  }
+
   return (
     <div className="animate-rise grid gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <Button variant="ghost" icon={ArrowLeft} onClick={onBack}>
           Back to my reports
         </Button>
-        <Button variant="primary" icon={Printer} onClick={() => window.print()}>
-          Print / save as PDF
-        </Button>
+        <span className="flex flex-wrap gap-2">
+          <Button variant="primary" icon={FileText} busy={downloading === 'pdf'} onClick={() => download('pdf')}>
+            Download PDF
+          </Button>
+          <Button variant="primary" icon={Presentation} busy={downloading === 'pptx'} onClick={() => download('pptx')}>
+            Download PowerPoint
+          </Button>
+        </span>
       </div>
+      {error && <Alert kind="error">{error}</Alert>}
       <div className="print:hidden">
         <Alert kind="info" title={`Saved ${formatDate(report.created_at)}`}>
           Figures were calculated when the report was saved. To change the analysis or download CSVs, upload {report.source_name} again.

@@ -116,7 +116,7 @@ def test_segment_findings_match_hand_totals(sales_ds):
 def test_trend_finding_excludes_partial_months(sales_ds):
     _, report = run(sales_ds)
     # complete months Feb 15, Mar 140, Apr 30 (Jan and May are partial; the invalid date is excluded)
-    f = by_title(report, "revenue down 78.57% in 2025-04 vs 2025-03")
+    f = by_title(report, "Revenue down 78.57% in 2025-04 vs 2025-03")
     assert f["grounded"] and "Partial: 2025-01, 2025-05." in f["limitations"]
 
 

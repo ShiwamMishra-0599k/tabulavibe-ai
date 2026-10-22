@@ -16,7 +16,7 @@ const KPI_ICONS: Record<Kpi['aggregation'], LucideIcon> = {
 
 export function KpiCards({ result }: { result: AnalysisResult }) {
   return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] gap-3">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(15rem,100%),1fr))] gap-3">
       {result.kpis.map((k, i) => (
         <div
           key={k.key}
@@ -118,7 +118,7 @@ export function Dashboard({ result, chartKind, measureKey, onChartKind, onMeasur
   ]
 
   return (
-    <div className="grid gap-4">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
       <div className="flex flex-wrap items-center gap-2 text-sm text-ink-2">
         <Badge tone="accent">
           {formatCount(result.rows_analyzed)} of {formatCount(result.row_count)} rows analysed
@@ -142,7 +142,7 @@ export function Dashboard({ result, chartKind, measureKey, onChartKind, onMeasur
           className="animate-rise"
           title={chartTitle(result, measureKey)}
           actions={
-            <div role="group" aria-label="Chart type" className="flex rounded-xl bg-surface-2 p-1 ring-1 ring-inset ring-line">
+            <div role="group" aria-label="Chart type" className="grid w-full grid-cols-4 rounded-xl bg-surface-2 p-1 ring-1 ring-inset ring-line sm:flex sm:w-auto">
               {kinds.map(({ kind, label, disabled }) => {
                 const Icon = KIND_ICONS[kind]
                 return (
@@ -153,12 +153,12 @@ export function Dashboard({ result, chartKind, measureKey, onChartKind, onMeasur
                     aria-pressed={chartKind === kind}
                     title={disabled ? (result.chart.pie_reason ?? undefined) : undefined}
                     onClick={() => onChartKind(kind)}
-                    className={`flex min-h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-35 ${
+                    className={`flex min-h-8 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition sm:px-3 disabled:cursor-not-allowed disabled:opacity-35 ${
                       chartKind === kind ? 'bg-surface text-ink shadow-soft ring-1 ring-line' : 'text-ink-muted hover:text-ink'
                     }`}
                   >
                     <Icon aria-hidden className={`size-3.5 ${chartKind === kind ? 'text-accent' : ''}`} />
-                    {label}
+                    <span className="max-[379px]:sr-only">{label}</span>
                   </button>
                 )
               })}

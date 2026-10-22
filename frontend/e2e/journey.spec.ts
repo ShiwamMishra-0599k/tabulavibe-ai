@@ -8,6 +8,11 @@ test('full journey with the retail sample: preview → quality → analyse → r
 
   await page.getByRole('button', { name: 'Load sample: Retail sales (CSV)' }).click()
 
+  // 0. Choose how to analyse
+  await expect(page.getByRole('heading', { name: /How would you like to analyse/ })).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('00-choose-mode.png'), fullPage: true })
+  await page.getByRole('button', { name: 'Manual Analyst' }).click()
+
   // 1. Preview
   await expect(page.getByLabel('Data preview table')).toBeVisible()
   await expect(page.getByText('First 50 of 725 rows')).toBeVisible()
@@ -40,6 +45,18 @@ test('full journey with the retail sample: preview → quality → analyse → r
   await expect(page.getByRole('heading', { name: 'Key figures' })).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('04-report.png'), fullPage: true })
 
+  const pdfDownload = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Download PDF' }).click()
+  const pdf = await pdfDownload
+  expect(pdf.suggestedFilename()).toMatch(/^tabulavibe_.+\.pdf$/)
+  expect((await readFile(await pdf.path())).subarray(0, 5).toString()).toBe('%PDF-')
+
+  const pptxDownload = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Download PowerPoint' }).click()
+  const pptx = await pptxDownload
+  expect(pptx.suggestedFilename()).toMatch(/^tabulavibe_.+\.pptx$/)
+  expect((await readFile(await pptx.path())).subarray(0, 2).toString()).toBe('PK') // a .pptx is a zip package
+
   const resultsDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Download results (CSV)' }).click()
   const results = await resultsDownload
@@ -59,6 +76,7 @@ test('full journey with the retail sample: preview → quality → analyse → r
 test('Excel sample groups by month and offers a line chart', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Load sample: Salon bookings (Excel)' }).click()
+  await page.getByRole('button', { name: 'Manual Analyst' }).click()
   await page.getByRole('tab', { name: '3. Analyse' }).click()
   await page.getByRole('button', { name: 'Run analysis' }).click()
   await expect(page.getByRole('img', { name: /line chart of sum of amount \(inr\) over time/i })).toBeVisible()
@@ -85,6 +103,7 @@ test('dark theme and one-click suggestion work end to end', async ({ page }, tes
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
   await page.screenshot({ path: testInfo.outputPath('dark-01-home.png'), fullPage: true })
   await page.getByRole('button', { name: 'Load sample: Retail sales (CSV)' }).click()
+  await page.getByRole('button', { name: 'Manual Analyst' }).click()
   await page.getByRole('tab', { name: '2. Data quality' }).click()
   await expect(page.getByRole('img', { name: /Data health: \d+(\.\d)?%/ })).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('dark-02-quality.png'), fullPage: true })
@@ -101,7 +120,7 @@ test('dark theme and one-click suggestion work end to end', async ({ page }, tes
 test('AI analyst runs the full workflow and drills down into Analyse', async ({ page }, testInfo) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Load sample: Retail sales (CSV)' }).click()
-  await page.getByRole('button', { name: 'Open the AI analyst' }).click()
+  await page.getByRole('button', { name: 'AI Analyst' }).click()
   await page.getByLabel('What does this data describe?').fill('Online and store sales of a home-goods shop')
   await page.getByRole('button', { name: 'Run the AI analyst' }).click()
 
@@ -111,6 +130,11 @@ test('AI analyst runs the full workflow and drills down into Analyse', async ({ 
   // Same independently verified total as the Analyse journey: ₹16,45,592.43.
   await expect(page.getByText('16,45,592.43').first()).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('agent-01-overview.png'), fullPage: true })
+  const deckDownload = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Download PowerPoint' }).click()
+  const deck = await deckDownload
+  expect(deck.suggestedFilename()).toBe('tabulavibe_analysis_of_retail_sales_csv.pptx')
+  expect((await readFile(await deck.path())).subarray(0, 2).toString()).toBe('PK')
 
   await page.getByRole('tab', { name: 'Insights', exact: true }).click()
   const first = page.getByRole('article', { name: 'Insight F1' })

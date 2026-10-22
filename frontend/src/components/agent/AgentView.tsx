@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Bot, CircleCheck, CircleDashed, CircleSlash, CircleX, Download, LoaderCircle, RotateCcw, ShieldCheck, Sparkles, TriangleAlert, type LucideIcon } from 'lucide-react'
+import { Bot, CircleCheck, CircleDashed, CircleSlash, CircleX, Download, FileText, LoaderCircle, Presentation, RotateCcw, ShieldCheck, Sparkles, TriangleAlert, type LucideIcon } from 'lucide-react'
 import { evidenceById, PHASE_STATUS_LABEL, phasesFromEvents, type AgentEvent, type AgentReport, type BusinessContext, type Phase, type PhaseStatus } from '../../lib/agent'
 import type { AnalysisSpec, AppConfig } from '../../lib/types'
-import { saveBlob } from '../../lib/api'
+import { saveBlob, type ReportFormat } from '../../lib/api'
 import { Alert, Badge, Button, Card, labelClass } from '../ui'
 import { BivariatePage, InsightsPage, MultivariatePage, OverviewPage, PlanPage, QualityPage, UnivariatePage, type PageProps } from './AgentPages'
 
@@ -75,9 +75,11 @@ interface Props {
   error: string | null
   onRun: () => void
   onExplore: (spec: AnalysisSpec) => void
+  onDownload: (format: ReportFormat) => void
+  downloading: ReportFormat | null
 }
 
-export function AgentView({ config, context, onContext, events, running, report, error, onRun, onExplore }: Props) {
+export function AgentView({ config, context, onContext, events, running, report, error, onRun, onExplore, onDownload, downloading }: Props) {
   const [page, setPage] = useState('overview')
   const ev = useMemo(() => (report ? evidenceById(report) : new Map()), [report])
   const phases = report ? report.phases : phasesFromEvents(events, running)
@@ -163,13 +165,19 @@ export function AgentView({ config, context, onContext, events, running, report,
   const rep = report as AgentReport
   const Page = (PAGES.find((p) => p.id === page) ?? PAGES[0]).Page
   return (
-    <div className="grid gap-5">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
       <Card
         title={`Analysis of ${rep.dataset.file_name}`}
         subtitle={`${rep.mode === 'ai' ? `AI analyst (${rep.model})` : 'Rules-based analyst'} · ${rep.duration_seconds}s · ${rep.evidence.length} calculations recorded as evidence`}
         icon={Bot}
         actions={
           <>
+            <Button size="sm" variant="primary" icon={FileText} busy={downloading === 'pdf'} onClick={() => onDownload('pdf')}>
+              Download PDF
+            </Button>
+            <Button size="sm" variant="primary" icon={Presentation} busy={downloading === 'pptx'} onClick={() => onDownload('pptx')}>
+              Download PowerPoint
+            </Button>
             <Button size="sm" icon={Download} onClick={() => saveBlob(new Blob([rep.handover_markdown], { type: 'text/markdown;charset=utf-8' }), `tabulavibe_handover_${rep.dataset.file_name.replace(/\.[^.]+$/, '')}.md`)}>
               Download handover (.md)
             </Button>

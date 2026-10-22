@@ -9,6 +9,7 @@ export function DataPreview({ profile }: { profile: Profile }) {
   const types = new Map(columns.map((c) => [c.name, c.inferred_type]))
   return (
     <Card
+      className="min-w-0"
       icon={Eye}
       title="Data preview"
       subtitle="Column types were detected automatically. Check they look right before analysing."

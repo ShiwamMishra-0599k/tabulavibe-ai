@@ -33,7 +33,7 @@ for correction; any that still fail are flagged "unverified" and kept out of the
 | 5 Validation | Totals reconcile; Holm correction applied; every finding cites evidence; every number grounded |
 | 6 Dashboard | Built only from validated results |
 | 7 Quality checks | Reconciliation and grounding reported |
-| 8 Handover | Markdown handover generated |
+| 8 Handover | Markdown handover generated; the report downloads as PDF or PowerPoint |
 
 The Gemini analyst also faces gates inside the conversation: analysis tools are refused before a plan is
 registered, the investigation cannot finish while a high-priority question lacks evidence, and only

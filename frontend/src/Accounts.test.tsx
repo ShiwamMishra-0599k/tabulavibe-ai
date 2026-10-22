@@ -87,6 +87,7 @@ describe('Accounts and saved reports', () => {
     expect(await screen.findByLabelText('Upload CSV or XLSX file')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Sign in to upload your data' })).not.toBeInTheDocument()
     await user.click(await screen.findByRole('button', { name: 'Load sample: Retail sales (CSV)' }))
+    await user.click(await screen.findByRole('button', { name: 'Manual Analyst' }))
     expect(await screen.findByText('First 2 of 10 rows')).toBeInTheDocument()
   })
 
@@ -149,6 +150,7 @@ describe('Accounts and saved reports', () => {
     mockServer()
     render(<App />)
     await user.click(await screen.findByRole('button', { name: 'Load sample: Retail sales (CSV)' }))
+    await user.click(await screen.findByRole('button', { name: 'Manual Analyst' }))
     await user.click(await screen.findByRole('tab', { name: '3. Analyse' }))
     await user.click(screen.getByRole('button', { name: 'Run analysis' }))
     await user.click(await screen.findByRole('tab', { name: '4. Report & export' }))
@@ -165,6 +167,7 @@ describe('Accounts and saved reports', () => {
     expect(await screen.findByText('Shiwam Mishra')).toBeInTheDocument() // name from the TabulaVibe profile
 
     await user.click(await screen.findByRole('button', { name: 'Load sample: Retail sales (CSV)' }))
+    await user.click(await screen.findByRole('button', { name: 'Manual Analyst' }))
     await user.click(await screen.findByRole('tab', { name: '3. Analyse' }))
     await user.click(screen.getByRole('button', { name: 'Run analysis' }))
     await user.click(await screen.findByRole('tab', { name: '4. Report & export' }))

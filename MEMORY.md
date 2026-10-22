@@ -12,13 +12,13 @@ look and feel, see `DESIGN.md`.
 | Item | Value |
 |---|---|
 | Owner | Shiwam Mishra (GitHub `ShiwamMishra-0599k`) |
-| Collaborator | Shashank Chaubey (GitHub `shashank-chaubey`): floating navbar, sign-in dialog (2026-10-21) |
+| Collaborator | Shashank Chaubey (GitHub `shashank-chaubey`): floating navbar, sign-in dialog (2026-10-21), compact phone header and swipeable tabs (2026-10-22, `bdae0d0`) |
 | Purpose | Portfolio project for AI/data engineering roles **and** the foundation for a freelance "dashboards and reporting" service for small businesses (India-first) |
 | Repository | https://github.com/ShiwamMishra-0599k/tabulavibe-ai (public) |
 | Local path | `C:\Users\swath\projects\tabulavibe-ai` |
 | Budget rule | ₹0 software and infrastructure cost wherever possible; never claim "free forever" |
 | Status | **Live on Vercel: https://tabulavibe-ai.vercel.app** (project `shiwam/tabulavibe-ai`, Hobby). AWS prepared but not used |
-| Version | 0.4.0 (AI analyst: analytics workflow phases 0–8, 2026-10-22) |
+| Version | 0.5.0 (choose AI or Manual Analyst; PDF and PowerPoint reports, 2026-10-22) |
 
 ## 2. Non-negotiable product rules
 
@@ -35,6 +35,11 @@ look and feel, see `DESIGN.md`.
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-10-22 | **Choice screen** after upload: AI Analyst or Manual Analyst (4 steps); switchable both ways | Shiwam's request; two clear products instead of a 5th tab |
+| 2026-10-22 | Final reports as **PDF (ReportLab) and PowerPoint (python-pptx)**, server-side, native editable charts | Shiwam asked for PDF or PowerPoint; server-side keeps "Python formats every number" and one renderer for Manual, AI and saved reports |
+| 2026-10-22 | PDF embeds **DejaVu Sans** (from the matplotlib wheel on PyPI, licence kept) | Helvetica lacks ₹, →, η, ρ |
+| 2026-10-22 | **Pillow 13.0.0** despite being < 2 weeks old | 12.3.0 had 20+ advisories fixed only in 13.0.0; security beats the "settled release" rule |
+| 2026-10-22 | Phone rule: single-column grids use `grid-cols-[minmax(0,1fr)]` | Default `auto` tracks grow to the widest table, so phones zoomed out (Preview 1,035 px, Data quality 812 px on a 360 px phone) |
 | 2026-10-22 | Small screens use a compact header toolbar, horizontally scrollable workflow navigation and analyst tabs | Prevents horizontal overflow and oversized navigation while keeping controls touch-friendly |
 | 2026-10-21 | **Sign-in required switched on** (`TABULAVIBE_REQUIRE_SIGN_IN=true` in Vercel Production/Preview and `backend/.env`) | Shiwam confirmed GitHub/Google sign-in and saving a report work on the live site. Takes effect from the next deployment |
 | 2026-10-21 | Supabase project **`xftrxawqcoygrzohaase`** connected (URL + publishable key in Vercel Production/Preview and `backend/.env`); sign-in required stays **off** until Google/GitHub work | Avoid locking visitors out; buttons check provider status first |
@@ -84,6 +89,8 @@ look and feel, see `DESIGN.md`.
 | 2026-10-21 | `docs/TECHNICAL_REFERENCE.md` (+ PDF) reverse-engineered from the code; 10 findings (F1–F10) |
 | 2026-10-21 | UI v2 redesign; `DESIGN.md` and `MEMORY.md` added |
 | 2026-10-21 | Shashank pushed the floating navbar (`4faf22d`) and sign-in dialog (`c390ec6`) to `main` |
+| 2026-10-22 | v0.5.0: choice screen, PDF/PowerPoint reports, phone layouts fixed at 320/360/412 px; 253 pytest, 39 Vitest, 10 E2E |
+| 2026-10-22 | Shashank pushed `bdae0d0` (compact phone header, swipeable tabs); pulled and verified (all tests passed) |
 | 2026-10-22 | v0.4.0 AI analyst (Gemini + rules fallback, 13 SciPy tools, phase gates, grounding); 238 pytest, 35 Vitest, 10 E2E |
 | 2026-10-22 | Responsive navigation follow-up: compact mobile header, swipeable workflow and analyst tabs; production build and 36 Vitest tests passed |
 | 2026-10-21 | Shiwam installed the **Vercel GitHub App** on `tabulavibe-ai` so pushes to `main` deploy automatically |
@@ -121,6 +128,9 @@ look and feel, see `DESIGN.md`.
 - **Shell heredocs:** long multi-line Python heredocs in Bash sometimes fail to parse here. Write the script to the scratchpad and run it.
 - **Shell heredocs mangle backslashes:** `\1`/`\n` in a Bash heredoc became control characters in Python source. Write code containing backslashes with the file tools, not heredocs.
 - **Tests read `backend/.env` unless told not to:** after sign-in was enabled locally, Lambda tests and every Playwright journey failed (uploads locked). Both now set `TABULAVIBE_ENV_FILE=""`.
+- **Check phone layouts by measurement**, not just screenshots: on a mobile viewport `window.innerWidth` grows past the device width when anything overflows (the browser zooms out). Playwright check: load each screen at 320/360/412 px and compare `innerWidth`.
+- **Review generated documents visually:** PowerPoint is installed, so slides can be exported to PNG via COM (read-only) and PDFs rasterised with PyMuPDF in the scratchpad (not a project dependency). This caught charts not starting at zero, an orphaned heading and an overflowing slide.
+- **The agent endpoint is rate-limited** (4 runs/minute per user or IP): repeated local checks hit it; restart the local backend with `TABULAVIBE_AGENT_RUNS_PER_MINUTE=60` for test sessions.
 - **Low memory on this PC (~8 GB):** parallel Playwright + leftover dev servers starved the backend and E2E timed out. Stop old servers and use `--workers=1`.
 - **Supabase SQL Editor:** runs only the selected text if anything is highlighted. Pasted scripts failed twice (clipboard overwritten, fragment run). Open the file in Notepad, Ctrl+A/Ctrl+C, paste into an empty editor, Run with nothing selected; end scripts with a visible check query.
 - **Supabase CLI login** needs a real terminal (TTY): it fails from Claude Code's `!` prompt. Open a separate PowerShell window.
@@ -136,6 +146,7 @@ look and feel, see `DESIGN.md`.
 | Live-test Gemini | Optional | Needs a key from an AI Studio project **without billing** |
 | Fix F1–F9 | Low–medium | Filter options vs. label merging (F2) is the most user-visible |
 | Live-test the Gemini analyst | Needs a key | AI Studio key without billing → `TABULAVIBE_AI_PROVIDER=gemini` + key in Vercel; watch free-tier limits (one run ≈ 10–20 requests) |
+| Update MEMORY.md / DESIGN.md comprehensively for the whole session | Requested by Shiwam | Started 2026-10-22, interrupted by the pull request; partial updates made with each feature |
 | Save AI analyst reports to My reports | Next | Needs a `kind` column (new migration) |
 | Faster ingest for big files | Optional | Parsing (strings first, Python csv) dominates time and memory; pandas C reader or Polars could cut both, but must keep the hand-checked inference behaviour |
 | Report templates | Next feature | Re-apply a saved report's `spec` to a new file |

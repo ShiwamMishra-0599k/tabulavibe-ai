@@ -61,6 +61,18 @@ class CleanOptions(BaseModel):
     merge_label_variants: bool = False
 
 
+class ReportExportRequest(BaseModel):
+    """Download the final report as a PDF or PowerPoint file, built from already-computed results."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    format: Literal["pdf", "pptx"]
+    kind: Literal["manual", "agent"]
+    title: str | None = Field(None, max_length=200)
+    # manual: {dataset, issues, result, narrative?, chart_kind?, measure_key?}; agent: the AI analyst report
+    data: dict[str, Any]
+
+
 class SavedNarrative(BaseModel):
     """AI commentary the user chose to keep with a saved report (as returned by /api/narrative)."""
 

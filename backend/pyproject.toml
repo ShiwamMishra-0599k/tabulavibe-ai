@@ -1,6 +1,6 @@
 [project]
 name = "tabulavibe-backend"
-version = "0.4.0"
+version = "0.5.0"
 description = "TabulaVibe AI API: CSV/XLSX profiling, KPI analysis and exports"
 requires-python = ">=3.13"
 # Runtime dependencies. Keep identical to requirements.txt (tests/test_packaging.py checks this).
@@ -12,6 +12,10 @@ dependencies = [
     "pandas==3.0.6",
     "numpy==2.5.4",
     "scipy==1.18.1",
+    "python-pptx==1.0.2",
+    "reportlab==5.0.1",
+    "lxml==6.1.3",
+    "pillow==13.0.0",
     "openpyxl==3.1.5",
     "python-multipart==0.0.32",
     "httpx==0.28.1",
@@ -27,7 +31,7 @@ build-backend = "setuptools.build_meta"
 include = ["app*"]
 
 [tool.setuptools.package-data]
-app = ["samples/*.csv", "samples/*.xlsx"]
+app = ["samples/*.csv", "samples/*.xlsx", "fonts/*.ttf", "fonts/LICENSE_DEJAVU"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

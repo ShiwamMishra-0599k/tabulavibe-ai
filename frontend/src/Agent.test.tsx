@@ -18,6 +18,7 @@ function mockServer(agentBody: string = ndjson(agentEvents)) {
     if (path === '/api/samples/retail-sales') return new Response('a,b\n1,2\n', { status: 200 })
     if (path === '/api/profile') return jsonResponse(profile)
     if (path === '/api/analyze') return jsonResponse(result)
+    if (path === '/api/report/export') return new Response(new Blob(['PK']), { status: 200, headers: { 'Content-Disposition': 'attachment; filename="tabulavibe_analysis.pptx"' } })
     if (path === '/api/agent/run') return new Response(agentBody, { status: 200, headers: { 'Content-Type': 'application/x-ndjson' } })
     return jsonResponse({ error: { code: 'not_found', message: 'Not found' } }, 404)
   })
@@ -27,7 +28,7 @@ function mockServer(agentBody: string = ndjson(agentEvents)) {
 async function openAnalyst(user: ReturnType<typeof userEvent.setup>) {
   render(<App />)
   await user.click(await screen.findByRole('button', { name: 'Load sample: Retail sales (CSV)' }))
-  await user.click(await screen.findByRole('tab', { name: '5. AI analyst' }))
+  await user.click(await screen.findByRole('button', { name: 'AI Analyst' }))
 }
 
 beforeEach(() => {
@@ -111,6 +112,19 @@ describe('AI analyst', () => {
 
     await user.click(screen.getByRole('button', { name: 'Download handover (.md)' }))
     expect(URL.createObjectURL).toHaveBeenCalledTimes(1)
+  })
+
+  it('downloads the AI analyst report as PowerPoint and PDF', async () => {
+    const user = userEvent.setup()
+    const calls = mockServer()
+    await openAnalyst(user)
+    await user.click(screen.getByRole('button', { name: 'Run the AI analyst' }))
+    await screen.findByRole('heading', { name: 'Analysis of sales.csv' })
+    await user.click(screen.getByRole('button', { name: 'Download PowerPoint' }))
+    await user.click(screen.getByRole('button', { name: 'Download PDF' }))
+    const bodies = calls.filter((c) => c.url === '/api/report/export').map((c) => JSON.parse(c.body as unknown as string))
+    expect(bodies.map((b) => [b.format, b.kind])).toEqual([['pptx', 'agent'], ['pdf', 'agent']])
+    expect(bodies[0].data.findings.length).toBeGreaterThan(0)
   })
 
   it('shows a clear error when the stream reports a failure', async () => {

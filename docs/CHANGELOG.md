@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.5.0 — 2026-10-22 (choose your analyst; PDF and PowerPoint reports)
+
+### Added
+- **Choice screen after upload:** "How would you like to analyse <file>?" with two options, **AI Analyst** (the 9-phase workflow) and **Manual Analyst** (1. Preview → 2. Data quality → 3. Analyse → 4. Report & export). A bar above each mode switches to the other; "Explore in Analyse" still drills from an AI insight into the Manual Analyst.
+- **Final reports as PDF and PowerPoint** (`POST /api/report/export`, sign-in required when enabled), for the Manual report step, the AI Analyst report and saved reports:
+  - PowerPoint (python-pptx): 16:9 deck with a brand cover, KPI cards, **native editable charts** (Indian digit grouping), results and register tables, one slide per insight.
+  - PDF (ReportLab): A4 report with vector charts starting at zero, insight cards, tables and page footers; **DejaVu Sans embedded** so ₹, →, η and ρ render everywhere (`backend/app/fonts`, licence included).
+  - Built from the already-computed results; Python formats every number.
+- Tests: 12 pytest (slide text, native chart values, PDF structure, API, sign-in), 3 Vitest (choice screen, switching, downloads), E2E downloads of real PDF and PPTX files on desktop and mobile.
+
+### Changed
+- The Manual stepper has four steps again ("5. AI analyst" moved to the choice screen); the Preview banner was removed. "Print / save as PDF" is replaced by "Download PDF" and "Download PowerPoint".
+- Finding wording: "adjusted p < 0.0001" instead of "adjusted p = < 0.0001"; finding titles start with a capital letter.
+- Dependencies: python-pptx 1.0.2, ReportLab 5.0.1, lxml 6.1.3, **Pillow 13.0.0** (12.3.0 had 20+ advisories fixed in 13.0.0).
+
+### Fixed
+- **Phone layouts:** every screen (choice, all Manual steps and results, all AI Analyst pages) now fits 320, 360 and 412 px wide phones. Grids that could grow to their widest table now use `grid-cols-[minmax(0,1fr)]`; the chart-type switcher shows icons only below 380 px; card action controls use the full card width on phones. Previously the Preview step was 1,035 px wide on a 360 px phone and Data quality 812 px.
+- Contributed by Shashank Chaubey (`bdae0d0`): compact phone header (icon-only "New file"/"Sign in" below 430 px, GitHub badge hidden below 640 px) and swipeable step and analyst tabs.
+
 ## 0.4.0 — 2026-10-22 (AI analyst: the analytics workflow)
 
 ### Added
