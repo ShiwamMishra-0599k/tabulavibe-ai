@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0 — 2026-10-22 (Ask AI: chat about your data)
+
+### Added
+- **Ask AI**, the first tab of the AI Analyst report: ask questions about the data and get detailed answers (a direct answer, then bullets with caveats and a next step) with up to 3 charts, suggested starter questions and follow-up chips. The conversation survives tab switches.
+- `POST /api/agent/chat` (`app/agent/chat.py`): the model reads a summary of the report and any evidence item, which the server **recomputes from the file** (numbers sent by the browser are never trusted); new questions run the same analysis tools (evidence C1, C2…, continued across follow-ups). Every number in an answer is checked against the cited evidence (one correction allowed, then flagged "Unverified"). Charts are built by Python from evidence results. Groq first, NVIDIA when Groq cannot; 8 questions per minute per user (`TABULAVIBE_CHAT_QUESTIONS_PER_MINUTE`).
+- Tests: 10 pytest (hand-checked answers and chart, tampered evidence ignored, follow-ups, number check, Groq → NVIDIA, chart rules, API, AI off, validation, rate limit), 2 Vitest (AI off; question, chart, checked numbers, history and follow-up payload).
+
 ## 0.6.0 — 2026-10-22 (Groq → NVIDIA analyst, best-wins dashboard, Kumo Relational forecasts)
 
 ### Changed

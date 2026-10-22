@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-10-22 (v0.6.0: Groq → NVIDIA analyst, best-wins dashboard, Kumo Relational forecasts)_
+_Last updated: 2026-10-22 (v0.7.0: Ask AI chat about the analysed data)_
 
 | Milestone | Status | Evidence |
 |---|---|---|
@@ -18,11 +18,11 @@ _Last updated: 2026-10-22 (v0.6.0: Groq → NVIDIA analyst, best-wins dashboard,
 
 | Check | Result |
 |---|---|
-| Backend `pytest` | 286 passed |
+| Backend `pytest` | 296 passed |
 | Backend `ruff check` / `ruff format --check` | clean |
 | Frontend `tsc -b` | clean |
 | Frontend `oxlint` | 0 warnings, 0 errors |
-| Frontend `vitest run` | 41 passed |
+| Frontend `vitest run` | 43 passed |
 | Frontend `vite build` | OK (main JS 207 kB gzipped + lazy supabase-js chunk 54 kB gzipped; Inter Latin font 48 kB; Vite warns about chunk size) |
 | Playwright E2E (Chrome, desktop + Pixel 7 viewport, light + dark) | 10 passed (serially; parallel runs time out on this 8 GB PC) |
 | `cfn-lint infra/template.yaml` | clean |

@@ -211,6 +211,7 @@ class AIError(AppError): 502 · AIDisabledError: 503 · AIQuotaError: 429   # in
 | `groq_model` | `llama-3.3-70b-versatile` | Any Groq chat model with tool calling |
 | `nvidia_model` | `meta/llama-3.3-70b-instruct` | Any NVIDIA API catalog chat model with tool calling |
 | `forecast_provider` | `none` | `kumo`: NVIDIA Kumo Relational forecasting (needs `nvidia_api_key`) |
+| `chat_questions_per_minute` | `8` | Ask AI questions per user (or IP) |
 | `ai_timeout_seconds` | 20 (≤ 60) | httpx timeout |
 | `ai_requests_per_minute` | 5 | Per-client burst limit |
 

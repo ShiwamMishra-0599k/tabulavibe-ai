@@ -8,12 +8,14 @@ import agentEvents from './test/agentEvents.json'
 // agentEvents.json was produced by the real backend workflow on the hand-checked fixture (tests/conftest.py).
 const ndjson = (events: unknown[]) => events.map((e) => JSON.stringify(e)).join('\n') + '\n'
 
-function mockServer(agentBody: string = ndjson(agentEvents)) {
+function mockServer(agentBody: string = ndjson(agentEvents), cfg: unknown = config, chat: unknown[] = []) {
   const calls: { url: string; body?: FormData }[] = []
+  const answers = [...chat]
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
     const path = String(input).replace(/^https?:\/\/[^/]+/, '')
     calls.push({ url: path, body: init?.body as FormData | undefined })
-    if (path === '/api/config') return jsonResponse(config)
+    if (path === '/api/config') return jsonResponse(cfg)
+    if (path === '/api/agent/chat') return jsonResponse(answers.shift())
     if (path === '/api/samples') return jsonResponse([{ id: 'retail-sales', file_name: 'retail_sales.csv', title: 'Retail sales (CSV)', description: 'Synthetic.' }])
     if (path === '/api/samples/retail-sales') return new Response('a,b\n1,2\n', { status: 200 })
     if (path === '/api/profile') return jsonResponse(profile)
@@ -171,6 +173,67 @@ describe('AI analyst', () => {
     expect(within(scorecard).getByText('2 of 2')).toBeInTheDocument()
     expect(within(scorecard).getByText(/AI \(NVIDIA\)/)).toBeInTheDocument()
     expect(within(scorecard).getByText('85')).toBeInTheDocument()
+  })
+
+  it('puts Ask AI first and explains when AI is not switched on', async () => {
+    const user = userEvent.setup()
+    mockServer()
+    await openAnalyst(user)
+    await user.click(screen.getByRole('button', { name: 'Run the AI analyst' }))
+    await screen.findByRole('heading', { name: 'Analysis of sales.csv' })
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)[0]).toBe('Ask AI')
+    expect(screen.getByRole('tab', { name: 'Overview', selected: true })).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Ask AI' }))
+    expect(screen.getByText('Ask AI is not switched on')).toBeInTheDocument()
+    expect(screen.getByLabelText('Your question')).toBeDisabled()
+  })
+
+  it('answers questions with text, a chart and checked numbers, and keeps the conversation', async () => {
+    const user = userEvent.setup()
+    const aiConfig = { ...config, ai: { enabled: true, provider: 'groq', model: 'g' }, agent: { mode: 'ai', provider: 'groq', model: 'g', chain: [], forecast: null } }
+    const first = {
+      answer: 'South brings in the most revenue: 190 of 355.\n- It is the largest region.\n- **Check** whether this holds every month.',
+      evidence_ids: ['E7', 'C1'],
+      charts: [{ evidence_id: 'C1', kind: 'bar', title: 'Revenue by region', measure: 'Total revenue', rows: [{ label: 'South', value: 190 }, { label: 'East', value: 165 }] }],
+      grounded: true,
+      unverified_numbers: [],
+      follow_up_questions: ['How did South change over time?'],
+      provider: 'nvidia',
+      model: 'meta/llama-3.3-70b-instruct',
+      provider_switches: ["Groq stopped (the request is larger than Groq's free-plan limit); NVIDIA continued"],
+      new_evidence: [{ id: 'C1', tool: 'segment_contribution', args: { measure: 'revenue', dimension: 'region' } }],
+    }
+    const second = { ...first, answer: 'It rose and then fell.', evidence_ids: [], charts: [], grounded: false, unverified_numbers: ['42'], follow_up_questions: [], provider_switches: [], new_evidence: [] }
+    const calls = mockServer(ndjson(agentEvents), aiConfig, [first, second])
+    await openAnalyst(user)
+    await user.click(screen.getByRole('button', { name: 'Run the AI analyst' }))
+    await screen.findByRole('heading', { name: 'Analysis of sales.csv' })
+    await user.click(screen.getByRole('tab', { name: 'Ask AI' }))
+
+    await user.click(screen.getByRole('button', { name: 'What are the three most important things in this data?' }))
+    const answer = await screen.findByRole('article', { name: 'AI answer' })
+    expect(within(answer).getByText('South brings in the most revenue: 190 of 355.')).toBeInTheDocument()
+    expect(within(answer).getByText('It is the largest region.')).toBeInTheDocument()
+    expect(within(answer).getByText('Check').tagName).toBe('STRONG')
+    expect(within(answer).getByText('Revenue by region')).toBeInTheDocument()
+    expect(within(answer).getByRole('img', { name: /Bar chart/i })).toBeInTheDocument()
+    expect(within(answer).getByText('Numbers checked')).toBeInTheDocument()
+    expect(within(answer).getByText(/NVIDIA · llama-3.3-70b-instruct/)).toBeInTheDocument()
+
+    const sent = JSON.parse(calls.find((c) => c.url === '/api/agent/chat')!.body!.get('payload') as string)
+    expect(sent.question).toBe('What are the three most important things in this data?')
+    expect(sent.history).toEqual([])
+    expect(sent.report.evidence.every((e: Record<string, unknown>) => !('result' in e))).toBe(true) // the server recomputes evidence
+
+    // The conversation survives switching tabs; a follow-up sends the history and earlier calculations.
+    await user.click(screen.getByRole('tab', { name: 'Overview' }))
+    await user.click(screen.getByRole('tab', { name: 'Ask AI' }))
+    await user.type(screen.getByLabelText('Your question'), 'And over time?{Enter}')
+    expect(await screen.findByText('It rose and then fell.')).toBeInTheDocument()
+    expect(screen.getByText('Unverified: 42')).toBeInTheDocument()
+    const followUp = JSON.parse(calls.filter((c) => c.url === '/api/agent/chat')[1].body!.get('payload') as string)
+    expect(followUp.history.map((m: { role: string }) => m.role)).toEqual(['user', 'assistant'])
+    expect(followUp.chat_evidence).toEqual(first.new_evidence)
   })
 
   it('shows a clear error when the stream reports a failure', async () => {

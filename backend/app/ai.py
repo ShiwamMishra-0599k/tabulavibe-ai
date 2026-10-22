@@ -44,8 +44,8 @@ class AIError(AppError):
 class AIDisabledError(AIError):
     status_code = 503
 
-    def __init__(self) -> None:
-        super().__init__("ai_disabled", "AI commentary is not enabled on this server. All other features work without it.")
+    def __init__(self, message: str = "AI commentary is not enabled on this server. All other features work without it.") -> None:
+        super().__init__("ai_disabled", message)
 
 
 class AIQuotaError(AIError):

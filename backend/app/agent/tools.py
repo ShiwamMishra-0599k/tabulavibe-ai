@@ -45,9 +45,11 @@ class EvidenceItem:
 @dataclass
 class Evidence:
     items: list[EvidenceItem] = field(default_factory=list)
+    prefix: str = "E"  # "C" for calculations made while answering chat questions
+    offset: int = 0  # ids already used by earlier chat answers
 
     def add(self, tool: str, args: dict[str, Any], result: dict[str, Any], phase: int) -> EvidenceItem:
-        item = EvidenceItem(f"E{len(self.items) + 1}", tool, args, result, phase)
+        item = EvidenceItem(f"{self.prefix}{self.offset + len(self.items) + 1}", tool, args, result, phase)
         self.items.append(item)
         return item
 

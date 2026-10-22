@@ -135,6 +135,9 @@ export const api = {
     const response = await request('/api/export/results', { method: 'POST', body: form(file, { spec }) })
     return { blob: await response.blob(), filename: filenameFrom(response, 'results.csv'), headers: response.headers }
   },
+  /** "Ask AI": one question about the analysed file (the answer type lives in lib/agent.ts). */
+  agentChat: async (file: File, payload: unknown): Promise<unknown> =>
+    (await request('/api/agent/chat', { method: 'POST', body: form(file, { payload }) })).json(),
   /** Final report as a PDF or PowerPoint file, built by the server from already-computed results. */
   async exportReport(format: ReportFormat, kind: 'manual' | 'agent', data: unknown, title?: string): Promise<DownloadedFile> {
     const response = await request('/api/report/export', {

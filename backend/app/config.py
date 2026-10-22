@@ -57,6 +57,8 @@ class Settings(BaseSettings):
     agent_max_steps: int = Field(24, ge=4, le=60)
     agent_deadline_seconds: float = Field(200, gt=10, le=280)
     agent_runs_per_minute: int = Field(4, ge=1)
+    # "Ask AI" questions about an analysed file, per user (or IP) per minute.
+    chat_questions_per_minute: int = Field(8, ge=1)
 
     # Optional saved reports (Supabase). Disabled unless both values are set. Use the project's
     # anon/publishable key: it is public by design and Row Level Security protects the data.

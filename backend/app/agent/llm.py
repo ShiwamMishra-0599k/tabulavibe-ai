@@ -254,10 +254,6 @@ ANALYSIS_NAMES = [d["name"] for d in ANALYSIS_DECLS]
 DECLS = {d["name"]: d for d in [*ANALYSIS_DECLS, REGISTER_PLAN, FINISH_INVESTIGATION, SUBMIT_FINDINGS]}
 
 
-def _tool(name: str) -> dict[str, Any]:
-    return {"type": "function", "function": DECLS[name]}
-
-
 def _text_call(content: str, allowed: list[str]) -> dict[str, Any] | None:
     """Some open models occasionally write a tool call as JSON text instead of a tool_calls entry."""
     text = content.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
@@ -287,6 +283,8 @@ def compact(value: Any, depth: int = 0) -> Any:
 
 class LLMAnalyst:
     name = "ai"
+    decls: dict[str, dict[str, Any]] = DECLS  # functions this conversation may offer
+    system_prompt = WORKFLOW + "\n\n" + OPERATING_RULES
 
     def __init__(
         self,
@@ -302,7 +300,7 @@ class LLMAnalyst:
         self.context = context
         self._max_steps = max_steps
         self._deadline = time.monotonic() + deadline_seconds
-        self._messages: list[dict[str, Any]] = [{"role": "system", "content": WORKFLOW + "\n\n" + OPERATING_RULES}]
+        self._messages: list[dict[str, Any]] = [{"role": "system", "content": self.system_prompt}]
         self._steps = 0
         self._columns: set[str] = set()
         self._emit: EmitFn | None = None
@@ -354,7 +352,7 @@ class LLMAnalyst:
         self._steps += 1
         body = {
             "messages": self._messages,
-            "tools": [_tool(name) for name in allowed],
+            "tools": [{"type": "function", "function": self.decls[name]} for name in allowed],
             "tool_choice": "auto",
             "temperature": 0.2,
             "max_tokens": 4096,

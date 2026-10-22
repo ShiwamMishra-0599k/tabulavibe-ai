@@ -5,6 +5,7 @@ import type { AnalysisSpec, AppConfig } from '../../lib/types'
 import { saveBlob, type ReportFormat } from '../../lib/api'
 import { formatNumber } from '../../lib/format'
 import { Alert, Badge, Button, Card, labelClass } from '../ui'
+import { AskAI } from './AskAI'
 import { BivariatePage, InsightsPage, MultivariatePage, OverviewPage, PlanPage, QualityPage, UnivariatePage, type PageProps } from './AgentPages'
 
 const STATUS_ICON: Record<PhaseStatus, { icon: LucideIcon; className: string }> = {
@@ -65,9 +66,13 @@ const PAGES: { id: string; label: string; Page: (p: PageProps) => React.ReactEle
   { id: 'insights', label: 'Insights', Page: InsightsPage },
   { id: 'plan', label: 'Plan & method', Page: PlanPage },
 ]
+/** "Ask AI" comes first; it stays mounted (hidden) so the conversation survives switching tabs. */
+const TABS = [{ id: 'ask', label: 'Ask AI' }, ...PAGES]
 
 interface Props {
   config: AppConfig | null
+  /** The uploaded file: "Ask AI" sends it with each question (the server is stateless). */
+  file: File | null
   context: BusinessContext
   onContext: (context: BusinessContext) => void
   events: AgentEvent[]
@@ -80,7 +85,7 @@ interface Props {
   downloading: ReportFormat | null
 }
 
-export function AgentView({ config, context, onContext, events, running, report, error, onRun, onExplore, onDownload, downloading }: Props) {
+export function AgentView({ config, file, context, onContext, events, running, report, error, onRun, onExplore, onDownload, downloading }: Props) {
   const [page, setPage] = useState('overview')
   const ev = useMemo(() => (report ? evidenceById(report) : new Map()), [report])
   const phases = report ? report.phases : phasesFromEvents(events, running)
@@ -219,7 +224,7 @@ export function AgentView({ config, context, onContext, events, running, report,
       </Card>
       <nav aria-label="Analyst report pages" className="overflow-x-auto print:hidden">
         <div role="tablist" className="flex w-max min-w-full gap-1 rounded-2xl bg-surface-2 p-1 ring-1 ring-inset ring-line">
-          {PAGES.map((p) => (
+          {TABS.map((p) => (
             <button
               key={p.id}
               type="button"
@@ -233,9 +238,14 @@ export function AgentView({ config, context, onContext, events, running, report,
           ))}
         </div>
       </nav>
-      <div role="tabpanel" aria-label={PAGES.find((p) => p.id === page)?.label} className="animate-rise min-w-0">
-        <Page report={rep} ev={ev} onExplore={onExplore} />
+      <div role="tabpanel" aria-label="Ask AI" hidden={page !== 'ask'} className="animate-rise min-w-0">
+        <AskAI key={rep.generated_at} file={file} report={rep} aiEnabled={ai} />
       </div>
+      {page !== 'ask' && (
+        <div role="tabpanel" aria-label={PAGES.find((p) => p.id === page)?.label} className="animate-rise min-w-0">
+          <Page report={rep} ev={ev} onExplore={onExplore} />
+        </div>
+      )}
       <p className="flex items-start gap-2 text-xs text-ink-muted">
         <TriangleAlert aria-hidden className="mt-px size-3.5 shrink-0" />
         Findings describe associations in this file, not causes. Explanations are possibilities to check. For filters, date ranges and exports, use “Explore in Analyse”, which runs on the same metric engine.

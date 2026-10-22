@@ -18,7 +18,7 @@ look and feel, see `DESIGN.md`.
 | Local path | `C:\Users\swath\projects\tabulavibe-ai` |
 | Budget rule | ₹0 software and infrastructure cost wherever possible; never claim "free forever" |
 | Status | **Live on Vercel: https://tabulavibe-ai.vercel.app** (project `shiwam/tabulavibe-ai`, Hobby). AWS prepared but not used |
-| Version | 0.6.0 (Groq → NVIDIA analyst, best-wins dashboard, Kumo Relational forecasts, 2026-10-22) |
+| Version | 0.7.0 (Ask AI chat about the analysed data, 2026-10-22) |
 
 ## 2. Non-negotiable product rules
 
@@ -35,6 +35,7 @@ look and feel, see `DESIGN.md`.
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-10-22 | **Ask AI chat** as the first report tab; server recomputes every evidence item the model reads (browser sends the report without results); Python builds the charts | Shiwam's request (answers with charts); keeps "Python computes every number" and the stateless backend |
 | 2026-10-22 | **Groq first, NVIDIA when Groq cannot** (analyst + commentary), replacing Gemini | Shiwam's choice. Groq's free plan (~8K tokens/min) is smaller than one analyst request (~9K+ tokens), so runs usually switch to NVIDIA at once; same conversation continues (OpenAI-compatible format on both) |
 | 2026-10-22 | **AI run vs rules baseline, higher score builds the dashboard** (Python-scored: grounded 30, coverage 25, gates 20, reconciled 15, hypotheses 10; tie → AI) | Shiwam: "whoever performs best"; chose this over running Groq and NVIDIA both (quota, 300 s limit) |
 | 2026-10-22 | **NVIDIA Kumo Relational forecasts** the primary measure: regression per horizon, period totals only, backtest vs naive | Shiwam chose Kumo over a Python forecaster. Hosted schema lists only classification/regression, so `kind: forecasting` is not used. Spec: `POST https://ai.api.nvidia.com/v1/structured-data/nvidia/kumo-relational/predictions` (Bearer nvapi-) |
@@ -93,6 +94,7 @@ look and feel, see `DESIGN.md`.
 | 2026-10-21 | `docs/TECHNICAL_REFERENCE.md` (+ PDF) reverse-engineered from the code; 10 findings (F1–F10) |
 | 2026-10-21 | UI v2 redesign; `DESIGN.md` and `MEMORY.md` added |
 | 2026-10-21 | Shashank pushed the floating navbar (`4faf22d`) and sign-in dialog (`c390ec6`) to `main` |
+| 2026-10-22 | v0.7.0: Ask AI chat (grounded answers, Python-built charts); 296 pytest, 43 Vitest |
 | 2026-10-22 | v0.6.0: Groq → NVIDIA provider chain, evaluation scorecard, Kumo Relational forecasting; 286 pytest, 41 Vitest, 10 E2E |
 | 2026-10-22 | v0.5.0: choice screen, PDF/PowerPoint reports, phone layouts fixed at 320/360/412 px; 253 pytest, 39 Vitest, 10 E2E |
 | 2026-10-22 | Shashank pushed `bdae0d0` (compact phone header, swipeable tabs); pulled and verified (all tests passed) |

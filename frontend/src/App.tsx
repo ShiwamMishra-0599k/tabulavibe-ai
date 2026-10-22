@@ -584,6 +584,7 @@ export default function App() {
             <ModeBar mode="ai" onSwitch={() => chooseMode('manual')} />
             <AgentView
               config={config}
+              file={file}
               context={agentContext}
               onContext={setAgentContext}
               events={agentEvents}

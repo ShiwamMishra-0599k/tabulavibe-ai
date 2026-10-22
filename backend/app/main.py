@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from pydantic import BaseModel, ValidationError
 
 from . import __version__
+from .agent.chat import ChatAgent
 from .agent.forecast import KumoForecaster
 from .agent.llm import LLMAnalyst
 from .agent.workflow import BusinessContext, RulesAnalyst, run_best
@@ -31,7 +32,7 @@ from .ingest import load_table
 from .profiling import Dataset, build_dataset, build_profile, duplicate_row_count
 from .report_export import agent_doc, manual_doc, render_pdf, render_pptx
 from .samples import SAMPLES, SAMPLES_DIR, list_samples
-from .schemas import AnalysisSpec, CleanOptions, ReportExportRequest, SavedNarrative
+from .schemas import AnalysisSpec, ChatRequest, CleanOptions, ReportExportRequest, SavedNarrative
 from .storage import AuthRequiredError, ReportStore, StorageDisabledError, build_record, get_store
 
 logger = logging.getLogger("tabulavibe")
@@ -67,6 +68,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.rate_limiter = RateLimiter(settings.ai_requests_per_minute)
     app.state.agent_limiter = RateLimiter(
         settings.agent_runs_per_minute, "Too many analyses in a short time. Please wait a minute and try again.", "agent_rate_limited"
+    )
+    app.state.chat_limiter = RateLimiter(
+        settings.chat_questions_per_minute, "Too many questions in a short time. Please wait a minute and try again.", "chat_rate_limited"
     )
     app.state.star_counter = StarCounter()
 
@@ -273,6 +277,27 @@ def _register_routes(app: FastAPI) -> None:
             content=content, media_type=media, headers={"Content-Disposition": f'attachment; filename="tabulavibe_{slug}.{req.format}"'}
         )
 
+    @app.post("/api/agent/chat")
+    def agent_chat(
+        request: Request,
+        settings: SettingsDep,
+        user: SignedInUser,
+        file: UploadFile = File(...),
+        payload: str = Form(..., max_length=600_000),
+        make_chat=Depends(get_chat_factory),
+    ) -> Response:
+        """Answer a question about the uploaded file, grounded in its AI Analyst report ("Ask AI")."""
+        req = _parse_json_field(ChatRequest, payload, "payload")
+        agent = make_chat()
+        if agent is None:
+            raise AIDisabledError(
+                "Ask AI needs an AI provider, which is not switched on for this server. The rest of the report works without it."
+            )
+        request.app.state.chat_limiter.check(f"user:{user.id}" if user else (request.client.host if request.client else "unknown"))
+        ds = _load(file, settings)
+        answer = agent.ask(ds, req.report, req.question, [t.model_dump() for t in req.history], req.chat_evidence)
+        return Response(json.dumps(answer, ensure_ascii=False, default=_json_default), media_type="application/json")
+
     @app.post("/api/agent/run")
     def agent_run(
         request: Request,
@@ -368,6 +393,16 @@ def get_agent_factory(settings: SettingsDep):
             ai = LLMAnalyst(backends, context, max_steps=settings.agent_max_steps, deadline_seconds=settings.agent_deadline_seconds)
             return ai, rules
         return rules, None
+
+    return make
+
+
+def get_chat_factory(settings: SettingsDep):
+    """FastAPI dependency: makes an "Ask AI" agent (Groq, then NVIDIA), or None when AI is off. Overridden in tests."""
+
+    def make() -> ChatAgent | None:
+        backends = chat_backends(settings, timeout=max(settings.ai_timeout_seconds, 30))
+        return ChatAgent(backends) if backends else None
 
     return make
 

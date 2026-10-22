@@ -61,6 +61,33 @@ class CleanOptions(BaseModel):
     merge_label_variants: bool = False
 
 
+class ChatTurn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["user", "assistant"]
+    text: str = Field(max_length=6_000)
+
+
+class ChatRequest(BaseModel):
+    """One "Ask AI" question about an analysed file. The report is sent without evidence results: the
+    server recomputes any evidence it reads from the file."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    question: str = Field(min_length=1, max_length=1_000)
+    history: list[ChatTurn] = Field(default_factory=list, max_length=12)
+    report: dict[str, Any]
+    # Calculations made by earlier answers ({id, tool, args}), so follow-up questions can refer to them.
+    chat_evidence: list[dict[str, Any]] = Field(default_factory=list, max_length=60)
+
+    @model_validator(mode="after")
+    def _strip(self) -> "ChatRequest":
+        self.question = self.question.strip()
+        if not self.question:
+            raise ValueError("question must not be empty")
+        return self
+
+
 class ReportExportRequest(BaseModel):
     """Download the final report as a PDF or PowerPoint file, built from already-computed results."""
 

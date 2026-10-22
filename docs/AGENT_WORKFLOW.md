@@ -101,6 +101,23 @@ With `TABULAVIBE_FORECAST_PROVIDER=kumo` and an NVIDIA key, the winning analysis
 - Only period totals of one measure are sent. NVIDIA's API trial terms allow it to record inputs.
 - A forecast failure never affects the analysis; the report states why there is no forecast.
 
+## Ask AI: questions about the report
+
+The first tab of the report is a chat (`POST /api/agent/chat`, `app/agent/chat.py`). The browser sends the file,
+the report **without evidence results**, the conversation (last 12 messages) and the calculations made by earlier
+answers. The server is stateless and trusts no number from the browser:
+
+- The model sees a summary of the report (findings, KPIs, plan, data dictionary, forecast, scorecard) and an
+  evidence index (id, tool, arguments). `get_evidence` **recomputes** an item from the file with the same tool and
+  arguments; new questions use the same analysis tools (new evidence ids C1, C2…, continuing across follow-ups).
+- `answer` is checked like a finding: every number must appear in the cited evidence (FORECAST and EVALUATION are
+  the report's own values). The model gets one chance to correct; anything still unmatched is shown as
+  "Unverified". Answers without numbers need no evidence (e.g. "this file cannot answer that").
+- Charts are built by Python from evidence results (trend → line, shares → bar or pie, group averages, category
+  counts, histograms, FORECAST); the model only chooses the evidence and the kind. A pie with more than 8 parts or
+  negative values becomes a bar chart; lines are only for time series.
+- Groq answers first and NVIDIA continues if Groq cannot; without AI the tab explains that it is switched off.
+
 ## Data sent to the AI providers
 
 Column names, the phase-1 profile, tool results (aggregates and statistics) and category labels.
@@ -122,6 +139,7 @@ effect sizes. The report says which analyst ran and why.
 | `TABULAVIBE_AGENT_MAX_STEPS` | 24 | AI requests per run |
 | `TABULAVIBE_AGENT_DEADLINE_SECONDS` | 200 | Stays inside Vercel's 300 s function limit |
 | `TABULAVIBE_AGENT_RUNS_PER_MINUTE` | 4 | Per user (or IP) |
+| `TABULAVIBE_CHAT_QUESTIONS_PER_MINUTE` | 8 | Ask AI questions per user (or IP) |
 
 ## Relation to the owner's workflow text
 

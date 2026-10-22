@@ -1,4 +1,4 @@
-import { ApiError, streamRequest } from './api'
+import { api, ApiError, streamRequest } from './api'
 import type { AnalysisSpec, ResultRow } from './types'
 import type { AppConfig } from './types'
 
@@ -130,6 +130,7 @@ export interface AgentReport {
   /** The AI run scored against the rules-based baseline; the winner builds the dashboard. */
   evaluation?: { winner: 'ai' | 'rules'; rule: string; candidates: EvaluationCandidate[] }
   forecast?: Forecast
+  primary_measure?: string | null
   ai_note: string | null
   generated_at: string
   duration_seconds: number
@@ -276,4 +277,59 @@ export function providerModel(provider: string | null | undefined, model: string
   const name = (model ?? '').split('/').pop()
   const label = provider ? (PROVIDER_LABEL[provider] ?? provider) : 'AI'
   return name ? `${label} · ${name}` : label
+}
+
+// ---------------------------------------------------------------- Ask AI
+
+export interface ChatChart {
+  evidence_id: string
+  kind: 'bar' | 'line' | 'pie'
+  title: string
+  measure: string
+  rows: { label: string; value: number }[]
+}
+
+export interface ChatAnswer {
+  answer: string
+  evidence_ids: string[]
+  charts: ChatChart[]
+  /** Every number in the answer matched the evidence it cites. */
+  grounded: boolean
+  unverified_numbers: string[]
+  follow_up_questions: string[]
+  provider: string
+  model: string
+  provider_switches: string[]
+  new_evidence: { id: string; tool: string; args: Record<string, unknown> }[]
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  text: string
+  answer?: ChatAnswer
+}
+
+/** Asks one question. The report goes without evidence results: the server recomputes what it reads. */
+export async function askAgent(file: File, report: AgentReport, question: string, history: ChatMessage[], chatEvidence: ChatAnswer['new_evidence']): Promise<ChatAnswer> {
+  const slim = { ...report, handover_markdown: '', evidence: report.evidence.map(({ id, tool, args, phase }) => ({ id, tool, args, phase })) }
+  const payload = {
+    question,
+    history: history.slice(-12).map((m) => ({ role: m.role, text: m.text.slice(0, 6000) })),
+    report: slim,
+    chat_evidence: chatEvidence.slice(-60),
+  }
+  return (await api.agentChat(file, payload)) as ChatAnswer
+}
+
+/** Starter questions that this report can answer. */
+export function suggestedQuestions(report: AgentReport): string[] {
+  const out = ['What are the three most important things in this data?']
+  const measure = report.primary_measure ?? report.preparation.primary_measure
+  const dims = report.data_understanding.data_dictionary.filter((c) => c.role === 'dimension').map((c) => c.column)
+  const dates = report.data_understanding.data_dictionary.filter((c) => c.type === 'date').map((c) => c.column)
+  if (measure && dims[0]) out.push(`Which ${dims[0]} brings in the most ${measure}?`)
+  if (measure && dates[0]) out.push(`How has ${measure} changed over time?`)
+  if (report.forecast?.status === 'ok') out.push(`What is the forecast for ${report.forecast.measure}, and how reliable is it?`)
+  out.push('Which data-quality problems should I fix first?')
+  return out.slice(0, 5)
 }

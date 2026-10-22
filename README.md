@@ -26,6 +26,7 @@ reports and reopen them later.
 - 🧹 Opt-in cleaning: exclude duplicate rows; merge `North` / `north` style label variants
 - 📤 Exports: results CSV, cleaned-data CSV (safe from spreadsheet formula injection), printable report (save as PDF)
 - 🧭 **Choose your analyst** after uploading: the **AI Analyst** runs the full workflow; the **Manual Analyst** walks you through Preview → Data quality → Analyse → Report & export
+- 💬 **Ask AI** (first tab of the AI Analyst report): ask questions about your data and get detailed answers with charts. Answers come from the report's calculations or new ones run in Python; every number is checked against the evidence it cites
 - 📑 **Final report as PDF or PowerPoint**: A4 PDF with vector charts, or a 16:9 deck with native, editable PowerPoint charts, for both analysts and for saved reports
 - 🤖 **AI analyst**: runs a 9-phase analytics workflow (business understanding → data understanding → problem discovery → preparation → EDA → validation → dashboard → checks → handover) with enforced phase gates. An LLM (Groq, switching to NVIDIA mid-run when Groq cannot finish) plans and explains; Python (pandas, SciPy) computes every number; the AI run is scored against a rules-based baseline and the better one builds the dashboard; NVIDIA Kumo Relational forecasts the primary measure, with a backtest, and every figure in a finding is checked against the calculation it cites. Works without AI via a rules-based analyst ([docs/AGENT_WORKFLOW.md](docs/AGENT_WORKFLOW.md))
 - 👤 Accounts: sign up / sign in with **Google (Gmail) or GitHub** via Supabase Auth; a profile is created on first sign-in
@@ -98,6 +99,7 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | `POST /api/narrative` | Optional AI commentary (returns 503 when AI is disabled) |
 | `POST /api/report/export` | Final report as PDF or PowerPoint (`format`: pdf/pptx, `kind`: manual/agent) from computed results |
 | `POST /api/agent/run` | AI analyst: streams phase progress (NDJSON), then the validated report |
+| `POST /api/agent/chat` | Ask AI: answers a question about the analysed file (file + report + conversation), with checked numbers and charts |
 | `GET /api/account` | Signed-in user's TabulaVibe profile (Bearer token) |
 | `POST /api/reports` | Recalculate from the file and save a report (Bearer token) |
 | `GET /api/reports` · `GET /api/reports/{id}` · `DELETE /api/reports/{id}` | List, open and delete your own saved reports |
