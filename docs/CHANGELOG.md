@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.8.0 — 2026-10-23 (frontend: landing, BI workspace, live analyst timeline, decision-first report)
+
+### Changed
+- **Landing page composition** (upload logic unchanged): concise headline and primary upload zone on the left; an example dashboard (real figures from the Retail sales sample, labelled "Example") and compact sample cards on the right. Phones: headline, upload, then samples.
+- **BI workspace:** scope chips show rows analysed, grouping, active filters and duplicate removal; KPI tiles share one component with aggregation, values used and excluded; chart cards have a descriptive subtitle, an inline measure picker and the chart-type control in the header; tooltips add the group's rank; bar labels size to the longest category; the duplicate results table is one click away (collapsible).
+- **Live analyst timeline:** the current phase, real elapsed time and phases complete; a vertical phase list with exit checks, calculations and failed checks; an activity feed built only from streamed events (phase results, assumptions, provider switches, grouped calculations with evidence ranges, refused calculations); a warning when a phase does not pass. No percentages or invented activity.
+- **Decision-first AI report:** the Overview starts with the top three findings in priority order, each answering what happened, why it may matter, which evidence supports it and what to investigate next, with limits; then supporting KPIs, charts, forecast, and next steps and limitations. **Ask AI about this** on every finding opens Ask AI and asks about it.
+- **Analyst choice:** equal cards with "Best for" and "You provide"; LLM availability shown truthfully ("LLM available: Groq → NVIDIA" only when configured, otherwise the rules-based fallback is explained).
+- **Manual workspace:** stepper shows "Step N of 4", steps done and a progress bar (`aria-current="step"`); data preview summarises detected column types; quality issues are grouped "To review" / "For information"; the builder numbers its sections and marks optional ones.
+- **AI context form:** answered count and an explanation of how blank fields become stated assumptions.
+- **Reports:** the report preview opens with an executive summary (server figures picked by ordering, never recalculated); insight cards separate observed facts or associations, unverified explanations, recommendations and limitations; **My reports** cards add PDF and PowerPoint downloads next to Open and Delete (stored results through the existing export endpoint, user token).
+- **Design system:** new shared `SegmentedControl`, `TabBar`, `KpiTile`, `SectionHeading`, `RefTag`, `inputClass` and a `no-scrollbar` utility; screens reuse them instead of local styles. Light, dark and system themes unchanged.
+
+### Verified
+- 48 Vitest (new: activity feed, live timeline from an open stream, decision-first overview, Ask AI about a finding, truthful mode choice, step state, executive summary, saved-report download), 10 E2E; every screen measured at 320, 360/412 px and desktop with no horizontal overflow, in light and dark.
+
 ## 0.7.1 — 2026-10-23 (AI analyst and Ask AI work on the free plans)
 
 Found by testing with real Groq and NVIDIA keys.

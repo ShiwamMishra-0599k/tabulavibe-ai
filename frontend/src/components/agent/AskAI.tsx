@@ -9,6 +9,8 @@ interface Props {
   file: File | null
   report: AgentReport
   aiEnabled: boolean
+  /** A question sent from elsewhere in the report ("Ask AI about this"); a new nonce asks it once. */
+  seed?: { text: string; nonce: number } | null
 }
 
 /** Inline **bold** only; everything else is plain text (never HTML). */
@@ -87,7 +89,7 @@ function Answer({ answer, onAsk, busy }: { answer: ChatAnswer; onAsk: (q: string
   )
 }
 
-export function AskAI({ file, report, aiEnabled }: Props) {
+export function AskAI({ file, report, aiEnabled, seed }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [evidence, setEvidence] = useState<ChatAnswer['new_evidence']>([])
   const [question, setQuestion] = useState('')
@@ -98,6 +100,16 @@ export function AskAI({ file, report, aiEnabled }: Props) {
   useEffect(() => {
     endRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
   }, [messages, busy])
+
+  const handledSeed = useRef<number | null>(null)
+  useEffect(() => {
+    if (!seed || !aiEnabled || handledSeed.current === seed.nonce) return
+    handledSeed.current = seed.nonce
+    // While another answer is on its way, put the question in the box instead of dropping it.
+    if (busy) setQuestion(seed.text)
+    else void ask(seed.text)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per seed
+  }, [seed, aiEnabled])
 
   async function ask(text: string) {
     const q = text.trim()

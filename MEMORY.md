@@ -18,7 +18,7 @@ look and feel, see `DESIGN.md`.
 | Local path | `C:\Users\swath\projects\tabulavibe-ai` |
 | Budget rule | ₹0 software and infrastructure cost wherever possible; never claim "free forever" |
 | Status | **Live on Vercel: https://tabulavibe-ai.vercel.app** (project `shiwam/tabulavibe-ai`, Hobby). AWS prepared but not used |
-| Version | 0.7.1 (AI analyst and Ask AI tested live on the free plans, 2026-10-23) |
+| Version | 0.8.0 (landing, BI workspace, live analyst timeline, decision-first report, 2026-10-23) |
 
 ## 2. Non-negotiable product rules
 
@@ -35,6 +35,7 @@ look and feel, see `DESIGN.md`.
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-10-23 | **Frontend v0.8.0:** two-column landing with an example dashboard (real Retail sample figures); shared `KpiTile`/`SegmentedControl`/`TabBar`; live timeline from streamed events only (no % progress); report Overview leads with top 3 findings + "Ask AI about this" | Shiwam's five frontend upgrades; Ask AI stays the way to investigate a finding |
 | 2026-10-23 | Default models **Groq `openai/gpt-oss-120b`, NVIDIA `nvidia/nemotron-3.5-lightning-30b-a3b`** | Llama 3.3 70B retired on both (404/410). Live tool-calling probe: Nemotron answered an analyst-sized request in 28 s; NVIDIA gpt-oss-20b and Nemotron Ultra timed out; Kimi, Mistral Large 2, Nemotron Super/Nano/70B are 404 for free accounts |
 | 2026-10-23 | Analyst skips Groq when a request exceeds 8,000 tokens; Ask AI request trimmed to ~2,900 tokens | Groq free plan = 8,000 tokens/min on every model (read from response headers); analyst request ~7,600 tokens |
 | 2026-10-22 | **Ask AI chat** as the first report tab; server recomputes every evidence item the model reads (browser sends the report without results); Python builds the charts | Shiwam's request (answers with charts); keeps "Python computes every number" and the stateless backend |
@@ -142,6 +143,7 @@ look and feel, see `DESIGN.md`.
 - **Review generated documents visually:** PowerPoint is installed, so slides can be exported to PNG via COM (read-only) and PDFs rasterised with PyMuPDF in the scratchpad (not a project dependency). This caught charts not starting at zero, an orphaned heading and an overflowing slide.
 - **The agent endpoint is rate-limited** (4 runs/minute per user or IP): repeated local checks hit it; restart the local backend with `TABULAVIBE_AGENT_RUNS_PER_MINUTE=60` for test sessions.
 - **Test AI changes live, not only with scripted fakes:** the first live run found retired models, Groq's size limit and two crash paths (JSON-text arguments, engine-rejected `kpi` arguments) that no fake had produced. Diagnostic scripts in the scratchpad print key lengths and limits, never keys.
+- **Review real screens, not only tests:** Playwright full-page screenshots can capture an `animate-rise` element blank (the landing preview); confirm with a viewport screenshot or computed styles before "fixing" it. To review the running analyst, replay recorded NDJSON through an overridden `fetch` that keeps the stream open (rules-only runs finish in under a second).
 - **Windows 11 Notepad keeps unsaved tabs between sessions:** a tab can look saved when it is not. Check the file on disk (modified time, line lengths) before assuming an edit landed.
 - **Low memory on this PC (~8 GB):** parallel Playwright + leftover dev servers starved the backend and E2E timed out. Stop old servers and use `--workers=1`.
 - **Supabase SQL Editor:** runs only the selected text if anything is highlighted. Pasted scripts failed twice (clipboard overwritten, fragment run). Open the file in Notepad, Ctrl+A/Ctrl+C, paste into an empty editor, Run with nothing selected; end scripts with a visible check query.

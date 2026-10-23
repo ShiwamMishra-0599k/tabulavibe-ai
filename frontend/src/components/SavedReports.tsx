@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { ArrowLeft, BookmarkCheck, FileSpreadsheet, FileText, FolderOpen, LogIn, Presentation, Save, Trash2, UploadCloud } from 'lucide-react'
 import { api, ApiError, saveBlob, type ReportFormat } from '../lib/api'
 import { LOCALE, formatCount } from '../lib/format'
-import type { ChartKind } from '../lib/charts'
 import type { ReportSummary, SavedReport } from '../lib/types'
 import { ReportView } from './ReportView'
+import { savedExportData } from '../lib/reports'
 import { Alert, Badge, Button, Card, IconChip, Skeleton, Spinner, labelClass } from './ui'
 
 const formatDate = (iso: string) =>
@@ -16,12 +16,25 @@ interface ListProps {
   onOpen: (id: string) => void
   onDelete: (id: string) => Promise<void>
   onNew: () => void
+  /** Download a saved report as PDF or PowerPoint without opening it. */
+  onExport?: (id: string, format: ReportFormat) => Promise<void>
 }
 
 /** "My reports": the signed-in user's saved reports, newest first. */
-export function ReportsList({ reports, error, onOpen, onDelete, onNew }: ListProps) {
+export function ReportsList({ reports, error, onOpen, onDelete, onNew, onExport }: ListProps) {
   const [confirming, setConfirming] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
+  const [exporting, setExporting] = useState<string | null>(null)
+
+  async function download(id: string, format: ReportFormat) {
+    if (!onExport) return
+    setExporting(`${id}:${format}`)
+    try {
+      await onExport(id, format)
+    } finally {
+      setExporting(null)
+    }
+  }
 
   async function remove(id: string) {
     setDeleting(id)
@@ -62,35 +75,52 @@ export function ReportsList({ reports, error, onOpen, onDelete, onNew }: ListPro
         </div>
       )}
       {reports && reports.length > 0 && (
-        <ul aria-label="Saved reports" className="grid gap-2">
+        <ul aria-label="Saved reports" className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-2">
           {reports.map((r) => (
-            <li key={r.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-line p-3 transition hover:border-accent/40 hover:bg-surface-2">
-              <IconChip icon={FileSpreadsheet} size="sm" />
-              <button type="button" onClick={() => onOpen(r.id)} className="min-w-0 flex-1 text-left">
-                <span className="block truncate text-sm font-semibold text-ink">{r.title}</span>
-                <span className="block truncate text-xs text-ink-muted">
-                  {r.source_name} · {formatCount(r.row_count)} rows · {formatDate(r.created_at)}
-                </span>
-              </button>
-              <Badge>{r.source_type.toUpperCase()}</Badge>
-              {confirming === r.id ? (
-                <span className="flex items-center gap-2">
-                  <span className="text-xs text-ink-2">Delete permanently?</span>
-                  <Button size="sm" variant="ghost" onClick={() => setConfirming(null)}>
-                    Keep
-                  </Button>
-                  <Button size="sm" icon={Trash2} busy={deleting === r.id} onClick={() => remove(r.id)} aria-label={`Confirm delete ${r.title}`}>
-                    Delete
-                  </Button>
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <Button size="sm" variant="soft" onClick={() => onOpen(r.id)} aria-label={`Open ${r.title}`}>
-                    Open
-                  </Button>
-                  <Button size="sm" variant="ghost" icon={Trash2} onClick={() => setConfirming(r.id)} aria-label={`Delete ${r.title}`} />
-                </span>
-              )}
+            <li key={r.id} className="flex min-w-0 flex-col rounded-2xl border border-line bg-surface p-4 shadow-soft transition hover:border-accent/40 hover:shadow-card">
+              <div className="flex min-w-0 items-start gap-3">
+                <IconChip icon={FileSpreadsheet} size="sm" />
+                <button type="button" onClick={() => onOpen(r.id)} className="min-w-0 flex-1 text-left">
+                  <span className="block truncate text-sm font-semibold text-ink hover:text-accent-text">{r.title}</span>
+                  <span className="block truncate text-xs text-ink-muted">{r.source_name}</span>
+                </button>
+                <Badge>{r.source_type.toUpperCase()}</Badge>
+              </div>
+              <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-muted">
+                <span className="tabular">{formatCount(r.row_count)} rows</span>
+                <span className="tabular">{formatCount(r.column_count)} columns</span>
+                <span>Saved {formatDate(r.created_at)}</span>
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+                {confirming === r.id ? (
+                  <>
+                    <span className="text-xs font-medium text-bad">Delete permanently?</span>
+                    <Button size="sm" variant="ghost" onClick={() => setConfirming(null)}>
+                      Keep
+                    </Button>
+                    <Button size="sm" icon={Trash2} busy={deleting === r.id} onClick={() => remove(r.id)} aria-label={`Confirm delete ${r.title}`}>
+                      Delete
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button size="sm" variant="soft" icon={FolderOpen} onClick={() => onOpen(r.id)} aria-label={`Open ${r.title}`}>
+                      Open
+                    </Button>
+                    {onExport && (
+                      <>
+                        <Button size="sm" variant="ghost" icon={FileText} busy={exporting === `${r.id}:pdf`} onClick={() => download(r.id, 'pdf')} aria-label={`Download PDF of ${r.title}`}>
+                          PDF
+                        </Button>
+                        <Button size="sm" variant="ghost" icon={Presentation} busy={exporting === `${r.id}:pptx`} onClick={() => download(r.id, 'pptx')} aria-label={`Download PowerPoint of ${r.title}`}>
+                          PowerPoint
+                        </Button>
+                      </>
+                    )}
+                    <Button size="sm" variant="ghost" icon={Trash2} className="ml-auto" onClick={() => setConfirming(r.id)} aria-label={`Delete ${r.title}`} />
+                  </>
+                )}
+              </div>
             </li>
           ))}
         </ul>
@@ -101,7 +131,7 @@ export function ReportsList({ reports, error, onOpen, onDelete, onNew }: ListPro
 
 /** A saved report, rendered from the stored results (no file needed). */
 export function SavedReportPage({ report, onBack }: { report: SavedReport; onBack: () => void }) {
-  const chartKind: ChartKind = report.result.chart.recommended === 'line' ? 'line' : 'bar'
+  const chartKind = savedExportData(report).chart_kind
   const [downloading, setDownloading] = useState<ReportFormat | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -109,8 +139,7 @@ export function SavedReportPage({ report, onBack }: { report: SavedReport; onBac
     setDownloading(format)
     setError(null)
     try {
-      const data = { dataset: report.quality.dataset, issues: report.quality.issues, result: report.result, narrative: report.narrative, chart_kind: chartKind, measure_key: report.result.measures[0]?.key }
-      const out = await api.exportReport(format, 'manual', data, report.title)
+      const out = await api.exportReport(format, 'manual', savedExportData(report), report.title)
       saveBlob(out.blob, out.filename)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'The report could not be downloaded.')

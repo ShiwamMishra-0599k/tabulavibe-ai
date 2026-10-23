@@ -42,3 +42,6 @@ backend/build/
 
 # Supabase CLI cache
 supabase/.temp/
+
+# Local notes with API keys: never commit
+*API Keys*.txt

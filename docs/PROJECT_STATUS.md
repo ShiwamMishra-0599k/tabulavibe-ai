@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-10-23 (v0.7.1: AI analyst and Ask AI tested live on the free plans)_
+_Last updated: 2026-10-23 (v0.8.0: landing, BI workspace, live analyst timeline, decision-first report)_
 
 | Milestone | Status | Evidence |
 |---|---|---|
@@ -22,7 +22,7 @@ _Last updated: 2026-10-23 (v0.7.1: AI analyst and Ask AI tested live on the free
 | Backend `ruff check` / `ruff format --check` | clean |
 | Frontend `tsc -b` | clean |
 | Frontend `oxlint` | 0 warnings, 0 errors |
-| Frontend `vitest run` | 43 passed |
+| Frontend `vitest run` | 48 passed |
 | Frontend `vite build` | OK (main JS 207 kB gzipped + lazy supabase-js chunk 54 kB gzipped; Inter Latin font 48 kB; Vite warns about chunk size) |
 | Playwright E2E (Chrome, desktop + Pixel 7 viewport, light + dark) | 10 passed (serially; parallel runs time out on this 8 GB PC) |
 | `cfn-lint infra/template.yaml` | clean |

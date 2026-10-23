@@ -1,4 +1,4 @@
-import { ArrowRight, Check, SlidersHorizontal, Sparkles, type LucideIcon } from 'lucide-react'
+import { ArrowRight, Check, Cpu, SlidersHorizontal, Sparkles, type LucideIcon } from 'lucide-react'
 import { aiAnalystLabel } from '../lib/agent'
 import { formatCount } from '../lib/format'
 import type { AppConfig, Profile } from '../lib/types'
@@ -11,6 +11,8 @@ interface Option {
   name: string
   icon: LucideIcon
   tagline: string
+  bestFor: string
+  youProvide: string
   points: string[]
   cta: string
 }
@@ -20,12 +22,14 @@ const OPTIONS: Option[] = [
     mode: 'ai',
     name: 'AI Analyst',
     icon: Sparkles,
-    tagline: 'Let the analyst run the full workflow and hand you a validated dashboard.',
+    tagline: 'Guided analysis: the analyst runs the full workflow and hands you a validated report.',
+    bestFor: 'A quick, complete picture when you are not sure where to start.',
+    youProvide: 'Optional business context (what the data is, who it is for).',
     points: [
-      'Understands the data, finds problems and tests hypotheses',
-      'Every number is calculated in Python and checked',
-      'Dashboard with KPIs, charts and insight cards',
-      'Final report as PDF or PowerPoint',
+      'Profiles the data, registers questions and tests hypotheses',
+      'Every number is calculated in Python and checked against its evidence',
+      'Findings with evidence, recommendations and limitations; Ask AI follow-ups',
+      'Final report as PDF, PowerPoint or a Markdown handover',
     ],
     cta: 'Start with the AI Analyst',
   },
@@ -33,8 +37,10 @@ const OPTIONS: Option[] = [
     mode: 'manual',
     name: 'Manual Analyst',
     icon: SlidersHorizontal,
-    tagline: 'Explore step by step and build exactly the analysis you want.',
-    points: ['Preview the data and check its quality', 'Choose your own KPIs, groupings and filters', 'Download results and cleaned data as CSV', 'Final report as PDF or PowerPoint'],
+    tagline: 'Hands-on exploration: four steps where you choose exactly what to calculate.',
+    bestFor: 'A specific question, or checking a figure yourself.',
+    youProvide: 'Your choice of measures, grouping, filters and cleaning options.',
+    points: ['1. Preview the data', '2. Check its quality', '3. Build KPIs and charts with suggestions', '4. Report as PDF or PowerPoint, data as CSV'],
     cta: 'Analyse manually',
   },
 ]
@@ -61,30 +67,47 @@ export function ModeChoice({ profile, config, onChoose }: { profile: Profile; co
           </li>
         </ul>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 md:grid-cols-2">
         {OPTIONS.map((o) => (
           <button
             key={o.mode}
             type="button"
             aria-label={o.name}
             onClick={() => onChoose(o.mode)}
-            className={`group flex min-w-0 flex-col rounded-3xl p-6 text-left shadow-card transition hover:-translate-y-0.5 hover:shadow-float focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent ${
-              o.mode === 'ai' ? 'gradient-border' : 'border border-line bg-surface hover:border-accent/40'
-            }`}
+            className="group flex min-w-0 flex-col rounded-3xl border border-line bg-surface p-5 text-left shadow-card transition hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-float focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent sm:p-6"
           >
-            <span className="flex items-start justify-between gap-3">
+            <span className="flex flex-wrap items-start justify-between gap-3">
               <span aria-hidden className={`grid size-12 place-items-center rounded-2xl ${o.mode === 'ai' ? 'brand-gradient text-white shadow-[0_10px_24px_-10px_rgb(79_70_229/0.8)]' : 'bg-accent-soft text-accent-text'}`}>
                 <o.icon className="size-6" />
               </span>
-              {o.mode === 'ai' && (
-                <Badge tone="accent" icon={Sparkles}>
-                  {ai ? aiAnalystLabel(config?.agent) : 'Rules-based (AI not configured)'}
-                </Badge>
-              )}
+              {o.mode === 'ai' &&
+                (ai ? (
+                  <Badge tone="good" icon={Sparkles}>
+                    LLM available: {aiAnalystLabel(config?.agent)}
+                  </Badge>
+                ) : (
+                  <Badge icon={Cpu}>Rules-based (AI not configured)</Badge>
+                ))}
             </span>
             <span className="mt-4 text-xl font-bold tracking-tight text-ink">{o.name}</span>
             <span className="mt-1 text-sm text-ink-2">{o.tagline}</span>
-            <ul className="mt-4 grid gap-2">
+            {o.mode === 'ai' && !ai && (
+              <span className="mt-3 rounded-xl bg-surface-2 px-3 py-2 text-xs text-ink-2">
+                No language model is configured on this server, so the same nine-phase workflow runs with documented rules. Findings, checks and
+                exports work the same; Ask AI needs a model.
+              </span>
+            )}
+            <dl className="mt-4 grid gap-2 text-sm">
+              <div>
+                <dt className="text-xs font-semibold text-ink-muted">Best for</dt>
+                <dd className="text-ink-2">{o.bestFor}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-semibold text-ink-muted">You provide</dt>
+                <dd className="text-ink-2">{o.youProvide}</dd>
+              </div>
+            </dl>
+            <ul className="mt-4 grid gap-2 border-t border-line pt-4">
               {o.points.map((pt) => (
                 <li key={pt} className="flex items-start gap-2 text-sm text-ink-2">
                   <Check aria-hidden className="mt-0.5 size-4 shrink-0 text-good" />
@@ -92,11 +115,7 @@ export function ModeChoice({ profile, config, onChoose }: { profile: Profile; co
                 </li>
               ))}
             </ul>
-            <span
-              className={`mt-6 inline-flex w-fit items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                o.mode === 'ai' ? 'brand-gradient text-white group-hover:brightness-110' : 'border border-line-strong bg-surface text-ink group-hover:border-accent/50'
-              }`}
-            >
+            <span className="brand-gradient mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition group-hover:brightness-110 sm:w-fit">
               {o.cta}
               <ArrowRight aria-hidden className="size-4 transition group-hover:translate-x-0.5" />
             </span>

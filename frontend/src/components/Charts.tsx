@@ -17,10 +17,24 @@ interface Datum {
   group: string
   value: number | null
   rows: number
+  /** 1-based position by value among the groups shown (ordering only; nothing is calculated). */
+  rank?: number
+  of?: number
 }
 
 function toData(rows: ResultRow[], key: string): Datum[] {
   return rows.map((r) => ({ group: r.group, value: r.values[key], rows: r.row_count }))
+}
+
+function ranked(data: Datum[]): Datum[] {
+  const order = [...data].filter((d) => d.value !== null).sort((a, b) => (b.value ?? 0) - (a.value ?? 0))
+  return data.map((d) => (d.value === null ? d : { ...d, rank: order.indexOf(d) + 1, of: order.length }))
+}
+
+/** Width of the category axis from the longest label shown (bounded so bars keep most of the space). */
+function labelWidth(data: Datum[]): number {
+  const longest = data.reduce((m, d) => Math.max(m, d.group.length), 0)
+  return Math.min(160, Math.max(56, Math.round(longest * 7.4) + 10))
 }
 
 interface TooltipProps {
@@ -38,7 +52,9 @@ function ChartTooltip({ active, payload, measureLabel }: TooltipProps) {
       <p className="tabular mt-0.5 text-ink-2">
         {measureLabel}: <span className="font-semibold text-ink">{formatNumber(datum.value)}</span>
       </p>
-      <p className="tabular text-ink-muted">{formatCount(datum.rows)} rows</p>
+      <p className="tabular text-ink-muted">
+        {formatCount(datum.rows)} rows{datum.rank ? ` · rank ${datum.rank} of ${datum.of}` : ''}
+      </p>
     </div>
   )
 }
@@ -83,7 +99,7 @@ export function TrendChart({ rows, measureKey, measureLabel, height = 320 }: Cha
 }
 
 export function BarComparison({ rows, measureKey, measureLabel }: ChartProps) {
-  const data = toData(rows, measureKey).slice(0, MAX_BARS)
+  const data = ranked(toData(rows, measureKey)).slice(0, MAX_BARS)
   const height = Math.max(160, data.length * 36 + 40)
   return (
     <div role="img" aria-label={`Bar chart of ${measureLabel} by group`} style={{ height }}>
@@ -91,7 +107,7 @@ export function BarComparison({ rows, measureKey, measureLabel }: ChartProps) {
         <BarChart data={data} layout="vertical" margin={{ top: 4, right: 64, bottom: 4, left: 4 }} barCategoryGap={6}>
           <CartesianGrid stroke="var(--line)" horizontal={false} />
           <XAxis type="number" tick={axisTick} tickLine={false} axisLine={false} tickFormatter={formatCompact} />
-          <YAxis type="category" dataKey="group" tick={{ ...axisTick, fill: 'var(--ink-2)' }} tickLine={false} axisLine={{ stroke: 'var(--line-strong)' }} width={120} />
+          <YAxis type="category" dataKey="group" tick={{ ...axisTick, fill: 'var(--ink-2)' }} tickLine={false} axisLine={{ stroke: 'var(--line-strong)' }} width={labelWidth(data)} />
           <Tooltip
             content={(props) => <ChartTooltip active={props.active} payload={props.payload} measureLabel={measureLabel} />}
             cursor={{ fill: 'var(--surface-2)', radius: 8 }}
@@ -111,7 +127,7 @@ export function BarComparison({ rows, measureKey, measureLabel }: ChartProps) {
 }
 
 export function ShareChart({ rows, measureKey, measureLabel, total }: ChartProps & { total: number | null }) {
-  const data = toData(rows, measureKey)
+  const data = ranked(toData(rows, measureKey))
   const sum = data.reduce((acc, d) => acc + (d.value ?? 0), 0)
   return (
     <div className="grid items-center gap-6 sm:grid-cols-[1fr_1fr]">

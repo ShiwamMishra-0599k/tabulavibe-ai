@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react'
 import {
   ArrowUpRight,
+  ChevronDown,
+  ChevronUp,
   CircleCheck,
   CircleHelp,
   ClipboardList,
   FlaskConical,
   Gauge,
-  Lightbulb,
   ListChecks,
+  MessagesSquare,
   Scale,
   ScanSearch,
   Sigma,
@@ -16,7 +18,7 @@ import {
   TriangleAlert,
 } from 'lucide-react'
 import { BarComparison, TrendChart } from '../Charts'
-import { Alert, Badge, Button, Card, Meter, Stat, selectClass, labelClass } from '../ui'
+import { Alert, Badge, Button, Card, KpiTile, Meter, RefTag, SectionHeading, SegmentedControl, Stat, selectClass, labelClass } from '../ui'
 import { formatCount, formatNumber, TYPE_LABELS } from '../../lib/format'
 import { formatP, KIND_LABEL, PROVIDER_LABEL, rowsOf, type AgentReport, type Evidence, type Finding, type Forecast } from '../../lib/agent'
 import type { AnalysisSpec } from '../../lib/types'
@@ -29,6 +31,8 @@ export interface PageProps {
   report: AgentReport
   ev: Map<string, Evidence>
   onExplore: (spec: AnalysisSpec) => void
+  /** Opens Ask AI with a question about this report (absent when AI is off). */
+  onAsk?: (question: string) => void
 }
 
 const CONFIDENCE_TONE = { high: 'good', medium: 'accent', low: 'warn' } as const
@@ -58,10 +62,99 @@ function KeyValues({ items }: { items: [string, React.ReactNode][] }) {
 }
 
 function EvidenceTag({ id }: { id: string }) {
+  return <RefTag title="Evidence: a Python calculation recorded during the analysis">{id}</RefTag>
+}
+
+const ARG_ORDER = ['measure', 'column', 'x', 'y', 'dimension', 'group_by', 'date_column', 'row', 'target', 'grain']
+
+/** "segment contribution · revenue · product": what an evidence item calculated, from its tool and arguments. */
+function evidenceSummary(e: Evidence | undefined): string {
+  if (!e) return ''
+  const parts = ARG_ORDER.map((k) => e.args[k]).filter((v): v is string => typeof v === 'string' && v.length > 0)
+  return [e.tool.replace(/_/g, ' '), ...parts].join(' · ')
+}
+
+const CONFIDENCE_ORDER = { high: 0, medium: 1, low: 2 } as const
+const TOP_FINDINGS = 3
+
+/** Key findings in priority order: the analyst's key findings, highest confidence first (stable). */
+function priorityFindings(report: AgentReport): Finding[] {
+  const key = report.dashboard.key_findings.map((id) => report.findings.find((f) => f.id === id)).filter(Boolean) as Finding[]
+  return key.map((f, i) => ({ f, i })).sort((a, b) => CONFIDENCE_ORDER[a.f.confidence] - CONFIDENCE_ORDER[b.f.confidence] || a.i - b.i).map(({ f }) => f)
+}
+
+function askQuestion(f: Finding): string {
+  return `Explain finding ${f.id}: "${f.title}". What evidence supports it, how reliable is it, and what should I check next?`
+}
+
+function FindingBrief({ f, rank, ev, onExplore, onAsk }: { f: Finding; rank: number; ev: Map<string, Evidence>; onExplore: PageProps['onExplore']; onAsk?: PageProps['onAsk'] }) {
+  const why = f.magnitude || [f.baseline, f.comparison].filter(Boolean).join(' → ')
+  const next = [f.recommended_action, f.success_metric ? `Measure success by: ${f.success_metric}` : ''].filter(Boolean)
   return (
-    <span className="tabular rounded-md bg-surface-2 px-1.5 py-0.5 text-[11px] font-semibold text-ink-2 ring-1 ring-inset ring-line" title="Evidence: a Python calculation recorded during the analysis">
-      {id}
-    </span>
+    <article aria-label={`Key finding ${f.id}`} className={`print-avoid-break rounded-2xl p-4 shadow-card sm:p-5 ${rank === 1 ? 'gradient-border' : 'border border-line bg-surface'}`}>
+      <div className="flex items-start gap-3">
+        <span aria-hidden className={`tabular grid size-8 shrink-0 place-items-center rounded-xl text-sm font-bold ${rank === 1 ? 'brand-gradient text-white' : 'bg-surface-2 text-ink-2'}`}>
+          {rank}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge tone={CONFIDENCE_TONE[f.confidence]}>{f.confidence} confidence</Badge>
+            <Badge>{KIND_LABEL[f.kind]}</Badge>
+          </div>
+          <h3 className="mt-1.5 text-base font-semibold tracking-tight text-ink">{f.title}</h3>
+        </div>
+      </div>
+      <dl className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+        <div>
+          <dt className="text-xs font-semibold text-ink-muted">What happened</dt>
+          <dd className="mt-0.5 text-ink-2">{f.what_happened || '—'}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-semibold text-ink-muted">Why it may matter</dt>
+          <dd className="mt-0.5 text-ink-2">{why || f.where || '—'}</dd>
+        </div>
+        <div>
+          <dt className="text-xs font-semibold text-ink-muted">Evidence</dt>
+          <dd className="mt-1 grid gap-1">
+            {f.evidence_ids.length === 0 && <span className="text-ink-muted">No calculation cited.</span>}
+            {f.evidence_ids.map((id) => (
+              <span key={id} className="flex min-w-0 items-center gap-2 text-xs text-ink-2">
+                <EvidenceTag id={id} />
+                <span className="truncate">{evidenceSummary(ev.get(id))}</span>
+              </span>
+            ))}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs font-semibold text-ink-muted">What to investigate next</dt>
+          <dd className="mt-0.5 grid gap-0.5 text-ink-2">
+            {next.length ? next.map((n) => <span key={n}>{n}</span>) : '—'}
+          </dd>
+        </div>
+      </dl>
+      {f.limitations && (
+        <p className="mt-3 flex items-start gap-1.5 text-xs text-ink-muted">
+          <TriangleAlert aria-hidden className="mt-px size-3.5 shrink-0" />
+          <span>
+            <span className="font-semibold">Limits:</span> {f.limitations}
+          </span>
+        </p>
+      )}
+      {(f.spec || onAsk) && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {onAsk && (
+            <Button size="sm" variant="soft" icon={MessagesSquare} onClick={() => onAsk(askQuestion(f))}>
+              Ask AI about this
+            </Button>
+          )}
+          {f.spec && (
+            <Button size="sm" variant="ghost" icon={ArrowUpRight} onClick={() => onExplore(f.spec as AnalysisSpec)}>
+              Explore in Analyse
+            </Button>
+          )}
+        </div>
+      )}
+    </article>
   )
 }
 
@@ -125,63 +218,107 @@ function ForecastCard({ forecast: fc }: { forecast: Forecast }) {
   )
 }
 
-export function OverviewPage({ report, ev, onExplore }: PageProps) {
+export function OverviewPage({ report, ev, onExplore, onAsk }: PageProps) {
   const trend = trendOf(report, ev)
   const segment = report.dashboard.charts.find((c) => c.type === 'bar')
   const seg = segment ? (ev.get(segment.evidence_id)?.result as R) : undefined
-  const key = report.dashboard.key_findings.map((id) => report.findings.find((f) => f.id === id)).filter(Boolean) as Finding[]
+  const findings = priorityFindings(report)
+  const [showAll, setShowAll] = useState(false)
+  const visible = showAll ? findings : findings.slice(0, TOP_FINDINGS)
+  const nextSteps = [...new Set([...findings.map((f) => f.recommended_action).filter(Boolean), ...report.outstanding_questions])].slice(0, 6)
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
-      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(13rem, 1fr))' }}>
-        {report.dashboard.kpis.map((k) => (
-          <div key={k.label} className="rounded-2xl border border-line bg-surface p-4 shadow-soft" title={k.definition}>
-            <p className="text-xs font-medium text-ink-muted">{k.label}</p>
-            <p className="tabular mt-1 text-2xl font-semibold tracking-tight text-ink">
-              {formatNumber(k.value)}
-              {k.unit === '%' ? '%' : ''}
-            </p>
-            <p className="mt-1 text-[11px] leading-snug text-ink-muted">{k.definition}</p>
-            <div className="mt-2">
-              <EvidenceTag id={k.evidence_id} />
-            </div>
-          </div>
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
+      <section aria-labelledby="top-findings" className="grid gap-3">
+        <SectionHeading
+          id="top-findings"
+          title="What the analysis found"
+          description="Highest-priority findings first. Every figure was computed in Python and cites the calculation behind it."
+        />
+        {findings.length === 0 && (
+          <p className="rounded-2xl border border-line bg-surface p-4 text-sm text-ink-muted">No finding met the evidence threshold. See Data quality and Plan & method for what was checked.</p>
+        )}
+        {visible.map((f, i) => (
+          <FindingBrief key={f.id} f={f} rank={i + 1} ev={ev} onExplore={onExplore} onAsk={onAsk} />
         ))}
-      </div>
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-2">
-        {trend && (
-          <Card title={`${trend.result.aggregation === 'mean' ? 'Average' : 'Total'} ${trend.result.measure ?? 'rows'} by ${trend.result.grain}`} subtitle={trend.result.partial_periods.length ? `Partial periods (excluded from comparisons): ${trend.result.partial_periods.join(', ')}` : 'All periods complete'} icon={Gauge}>
-            <TrendChart rows={rowsOf(trend.result.periods.map((p: R) => ({ group: p.period, rows: p.rows, value: p.value })))} measureKey="v" measureLabel={String(trend.result.measure ?? 'Rows')} height={260} />
-          </Card>
+        {findings.length > TOP_FINDINGS && (
+          <Button className="w-full sm:w-auto sm:justify-self-start" icon={showAll ? ChevronUp : ChevronDown} aria-expanded={showAll} onClick={() => setShowAll((v) => !v)}>
+            {showAll ? 'Show the top findings only' : `Show ${findings.length - TOP_FINDINGS} more finding${findings.length - TOP_FINDINGS === 1 ? '' : 's'}`}
+          </Button>
         )}
-        {seg && (
-          <Card title={`${seg.measure} by ${seg.dimension}`} subtitle={`Top segment share ${formatNumber((seg.top_share ?? 0) * 100)}% · top 3 share ${formatNumber((seg.top_3_share ?? 0) * 100)}%`} icon={Target}>
-            <BarComparison rows={rowsOf(seg.segments.slice(0, 12).map((s: R) => ({ group: s.segment, rows: s.rows, value: s.total })))} measureKey="v" measureLabel={`Total ${seg.measure}`} />
-          </Card>
-        )}
-      </div>
+      </section>
+
+      {report.dashboard.kpis.length > 0 && (
+        <section aria-labelledby="supporting-kpis" className="grid gap-3">
+          <SectionHeading id="supporting-kpis" title="Supporting KPIs" description="Reconciled with an independent recalculation." />
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(13rem,100%),1fr))] gap-3">
+            {report.dashboard.kpis.map((k, i) => (
+              <KpiTile
+                key={k.label}
+                label={k.label}
+                value={`${formatNumber(k.value)}${k.unit === '%' ? '%' : ''}`}
+                lead={i === 0}
+                delay={i * 40}
+                definition={k.definition}
+                footer={<EvidenceTag id={k.evidence_id} />}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {(trend || seg) && (
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-2">
+          {trend && (
+            <Card
+              title={`${trend.result.aggregation === 'mean' ? 'Average' : 'Total'} ${trend.result.measure ?? 'rows'} by ${trend.result.grain}`}
+              subtitle={trend.result.partial_periods.length ? `Partial periods (excluded from comparisons): ${trend.result.partial_periods.join(', ')}` : 'All periods complete · hover a point for details'}
+              icon={Gauge}
+              actions={<EvidenceTag id={trend.id} />}
+            >
+              <TrendChart rows={rowsOf(trend.result.periods.map((p: R) => ({ group: p.period, rows: p.rows, value: p.value })))} measureKey="v" measureLabel={String(trend.result.measure ?? 'Rows')} height={260} />
+            </Card>
+          )}
+          {seg && segment && (
+            <Card
+              title={`Total ${seg.measure} by ${seg.dimension}`}
+              subtitle={`Largest segment ${formatNumber((seg.top_share ?? 0) * 100)}% of the total · top 3 ${formatNumber((seg.top_3_share ?? 0) * 100)}%`}
+              icon={Target}
+              actions={<EvidenceTag id={segment.evidence_id} />}
+            >
+              <BarComparison rows={rowsOf(seg.segments.slice(0, 12).map((s: R) => ({ group: s.segment, rows: s.rows, value: s.total })))} measureKey="v" measureLabel={`Total ${seg.measure}`} />
+            </Card>
+          )}
+        </div>
+      )}
+
       {report.forecast && <ForecastCard forecast={report.forecast} />}
-      <Card title="Key findings" subtitle="Validated findings only; every figure was computed in Python and cites its evidence." icon={Lightbulb}>
-        {key.length === 0 && <p className="text-sm text-ink-muted">No finding met the evidence threshold.</p>}
-        <ol className="grid gap-3">
-          {key.map((f) => (
-            <li key={f.id} className="rounded-xl border border-line p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge tone={CONFIDENCE_TONE[f.confidence]}>{f.confidence} confidence</Badge>
-                <Badge>{KIND_LABEL[f.kind]}</Badge>
-              </div>
-              <p className="mt-2 text-sm font-semibold text-ink">{f.title}</p>
-              <p className="mt-1 text-sm text-ink-2">
-                <span className="font-medium text-ink">Action: </span>
-                {f.recommended_action}
-              </p>
-              {f.spec && (
-                <Button className="mt-2" size="sm" variant="ghost" icon={ArrowUpRight} onClick={() => onExplore(f.spec as AnalysisSpec)}>
-                  Explore in Analyse
-                </Button>
-              )}
-            </li>
-          ))}
-        </ol>
+
+      <Card title="Next steps and limitations" subtitle="What to act on or confirm, and what this analysis cannot tell you." icon={ListChecks}>
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-2">
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Investigate next</h3>
+            <ul className="mt-2 grid gap-2 text-sm text-ink-2">
+              {nextSteps.length === 0 && <li className="text-ink-muted">No open actions.</li>}
+              {nextSteps.map((n) => (
+                <li key={n} className="flex items-start gap-2">
+                  <CircleCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-accent" />
+                  <span>{n}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Limitations</h3>
+            <ul className="mt-2 grid gap-2 text-sm text-ink-2">
+              {report.limitations.slice(0, 6).map((l) => (
+                <li key={l} className="flex items-start gap-2">
+                  <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-warn" />
+                  <span>{l}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
       </Card>
     </div>
   )
@@ -626,18 +763,17 @@ const KINDS: { value: 'all' | Finding['kind']; label: string }[] = [
   { value: 'data_quality', label: 'Data quality' },
 ]
 
-export function InsightsPage({ report, onExplore }: PageProps) {
+export function InsightsPage({ report, onExplore, onAsk }: PageProps) {
   const [kind, setKind] = useState<'all' | Finding['kind']>('all')
   const shown = useMemo(() => report.findings.filter((f) => kind === 'all' || f.kind === kind), [report.findings, kind])
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
-      <div role="group" aria-label="Filter findings" className="flex w-fit flex-wrap rounded-xl bg-surface-2 p-1 ring-1 ring-inset ring-line">
-        {KINDS.map((k) => (
-          <button key={k.value} type="button" aria-pressed={kind === k.value} onClick={() => setKind(k.value)} className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${kind === k.value ? 'bg-surface text-ink shadow-soft ring-1 ring-line' : 'text-ink-muted hover:text-ink'}`}>
-            {k.label} ({k.value === 'all' ? report.findings.length : report.findings.filter((f) => f.kind === k.value).length})
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        label="Filter findings"
+        value={kind}
+        onChange={setKind}
+        options={KINDS.map((k) => ({ value: k.value, label: `${k.label} (${k.value === 'all' ? report.findings.length : report.findings.filter((f) => f.kind === k.value).length})` }))}
+      />
       {shown.length === 0 && <p className="text-sm text-ink-muted">No findings of this kind.</p>}
       {shown.map((f) => (
         <article key={f.id} aria-label={`Insight ${f.id}`} className="rounded-2xl border border-line bg-surface p-5 shadow-card">
@@ -657,29 +793,77 @@ export function InsightsPage({ report, onExplore }: PageProps) {
               </Alert>
             </div>
           )}
-          <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
-            {(
-              [
-                ['What happened?', f.what_happened],
-                ['Where?', f.where],
-                ['How large?', f.magnitude || '—'],
-                ['Compared with', [f.baseline, f.comparison].filter(Boolean).join(' → ') || '—'],
-                ['What might explain it? (not verified)', f.possible_explanations.length ? f.possible_explanations.join('; ') : '—'],
-                ['What action to consider?', f.recommended_action],
-                ['How to measure success?', f.success_metric || '—'],
-                ['Limitations', f.limitations || '—'],
-              ] as [string, string][]
-            ).map(([q, a]) => (
-              <div key={q}>
-                <dt className="text-xs font-semibold text-ink-muted">{q}</dt>
-                <dd className="mt-0.5 text-ink-2">{a}</dd>
-              </div>
-            ))}
-          </dl>
-          {f.spec && (
-            <Button className="mt-3" size="sm" variant="soft" icon={ArrowUpRight} onClick={() => onExplore(f.spec as AnalysisSpec)}>
-              Explore in Analyse
-            </Button>
+          <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-2">
+            <section aria-label="Observed" className="rounded-xl border border-line p-3">
+              <h4 className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">{f.kind === 'statistical_association' ? 'Observed association' : 'Observed fact'}</h4>
+              <dl className="mt-2 grid gap-2 text-sm">
+                {(
+                  [
+                    ['What happened?', f.what_happened],
+                    ['Where?', f.where || '—'],
+                    ['How large?', f.magnitude || '—'],
+                    ['Compared with', [f.baseline, f.comparison].filter(Boolean).join(' → ') || '—'],
+                  ] as [string, string][]
+                ).map(([q, ans]) => (
+                  <div key={q}>
+                    <dt className="text-xs font-semibold text-ink-muted">{q}</dt>
+                    <dd className="mt-0.5 text-ink-2">{ans}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+            <div className="grid content-start gap-3">
+              <section aria-label="Possible explanations" className="rounded-xl border border-dashed border-line-strong p-3">
+                <dl className="text-sm">
+                  <dt className="flex items-center gap-2 text-xs font-semibold text-ink-muted">
+                    What might explain it? (not verified)
+                  </dt>
+                  <dd className="mt-1 text-ink-2">
+                    {f.possible_explanations.length ? (
+                      <ul className="grid gap-1">
+                        {f.possible_explanations.map((x) => (
+                          <li key={x}>• {x}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      '—'
+                    )}
+                  </dd>
+                </dl>
+              </section>
+              <section aria-label="Recommendation" className="rounded-xl bg-accent-soft/60 p-3">
+                <dl className="grid gap-2 text-sm">
+                  <div>
+                    <dt className="text-xs font-semibold text-accent-text">What action to consider?</dt>
+                    <dd className="mt-0.5 text-ink">{f.recommended_action || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold text-accent-text">How to measure success?</dt>
+                    <dd className="mt-0.5 text-ink-2">{f.success_metric || '—'}</dd>
+                  </div>
+                </dl>
+              </section>
+            </div>
+          </div>
+          <p className="mt-3 flex items-start gap-1.5 text-xs text-ink-muted">
+            <TriangleAlert aria-hidden className="mt-px size-3.5 shrink-0" />
+            <span>
+              <span className="font-semibold">Limitations:</span> {f.limitations || '—'}
+            </span>
+          </p>
+          {(f.spec || onAsk) && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {onAsk && (
+                <Button size="sm" variant="soft" icon={MessagesSquare} onClick={() => onAsk(askQuestion(f))}>
+                  Ask AI about this
+                </Button>
+              )}
+              {f.spec && (
+                <Button size="sm" variant="ghost" icon={ArrowUpRight} onClick={() => onExplore(f.spec as AnalysisSpec)}>
+                  Explore in Analyse
+                </Button>
+              )}
+            </div>
           )}
         </article>
       ))}

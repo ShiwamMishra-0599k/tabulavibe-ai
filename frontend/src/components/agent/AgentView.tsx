@@ -1,10 +1,42 @@
-import { useMemo, useState } from 'react'
-import { Bot, CircleCheck, CircleDashed, CircleSlash, CircleX, Download, FileText, LoaderCircle, Presentation, RotateCcw, ShieldCheck, Sparkles, TriangleAlert, type LucideIcon } from 'lucide-react'
-import { aiAnalystLabel, evidenceById, providerModel, PHASE_STATUS_LABEL, phasesFromEvents, type AgentEvent, type AgentReport, type BusinessContext, type Phase, type PhaseStatus } from '../../lib/agent'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  Bot,
+  CircleCheck,
+  CircleDashed,
+  CircleSlash,
+  CircleX,
+  Clock,
+  Download,
+  FileText,
+  Info,
+  LoaderCircle,
+  MessagesSquare,
+  Presentation,
+  RotateCcw,
+  ShieldCheck,
+  Sigma,
+  Sparkles,
+  TriangleAlert,
+  type LucideIcon,
+} from 'lucide-react'
+import {
+  activityFromEvents,
+  aiAnalystLabel,
+  evidenceById,
+  providerModel,
+  PHASE_STATUS_LABEL,
+  phasesFromEvents,
+  type ActivityItem,
+  type AgentEvent,
+  type AgentReport,
+  type BusinessContext,
+  type Phase,
+  type PhaseStatus,
+} from '../../lib/agent'
 import type { AnalysisSpec, AppConfig } from '../../lib/types'
 import { saveBlob, type ReportFormat } from '../../lib/api'
 import { formatNumber } from '../../lib/format'
-import { Alert, Badge, Button, Card, labelClass } from '../ui'
+import { Alert, Badge, Button, Card, IconChip, TabBar, inputClass, labelClass } from '../ui'
 import { AskAI } from './AskAI'
 import { BivariatePage, InsightsPage, MultivariatePage, OverviewPage, PlanPage, QualityPage, UnivariatePage, type PageProps } from './AgentPages'
 
@@ -17,6 +49,9 @@ const STATUS_ICON: Record<PhaseStatus, { icon: LucideIcon; className: string }> 
   skipped: { icon: CircleSlash, className: 'text-ink-muted' },
 }
 
+const DONE: PhaseStatus[] = ['passed', 'passed_with_assumptions', 'blocked', 'skipped']
+
+/** Compact strip of the nine phases (used on the finished report). */
 export function PhaseTimeline({ phases }: { phases: Phase[] }) {
   return (
     <ol aria-label="Workflow phases" className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-9">
@@ -49,6 +84,97 @@ export function PhaseTimeline({ phases }: { phases: Phase[] }) {
   )
 }
 
+/** Vertical phase list with exit checks, shown while the analyst runs. */
+function PhaseSteps({ phases, calculations }: { phases: Phase[]; calculations: Map<number, number> }) {
+  return (
+    <ol aria-label="Workflow phases" className="grid">
+      {phases.map((p, i) => {
+        const { icon: Icon, className } = STATUS_ICON[p.status]
+        const passed = p.checks.filter((c) => c.passed).length
+        const failed = p.checks.filter((c) => !c.passed)
+        const n = calculations.get(p.id) ?? 0
+        const last = i === phases.length - 1
+        return (
+          <li key={p.id} aria-label={`Phase ${p.id}: ${p.name}, ${PHASE_STATUS_LABEL[p.status]}`} className="relative flex gap-3 pb-3">
+            {!last && <span aria-hidden className={`absolute left-[9px] top-6 bottom-0 w-px ${DONE.includes(p.status) ? 'bg-good/40' : 'bg-line'}`} />}
+            <Icon aria-hidden className={`relative mt-0.5 size-[19px] shrink-0 rounded-full bg-surface ${className}`} />
+            <div className={`min-w-0 flex-1 ${p.status === 'running' ? 'rounded-xl bg-accent-soft/60 px-2.5 py-1.5 ring-1 ring-accent/20' : ''}`}>
+              <p className={`text-sm ${p.status === 'pending' ? 'text-ink-muted' : 'font-semibold text-ink'}`}>
+                {p.id}. {p.name}
+              </p>
+              <p className="text-xs text-ink-muted">
+                {p.status === 'running'
+                  ? `In progress${n ? ` · ${n} calculation${n === 1 ? '' : 's'} so far` : ''}`
+                  : p.status === 'pending'
+                    ? 'Waiting'
+                    : `${PHASE_STATUS_LABEL[p.status]}${p.checks.length ? ` · ${passed} of ${p.checks.length} checks` : ''}${n ? ` · ${n} calculation${n === 1 ? '' : 's'}` : ''}`}
+              </p>
+              {failed.map((c) => (
+                <p key={c.check} className="mt-0.5 text-xs text-bad">
+                  ✗ {c.check}
+                  {c.detail ? `: ${c.detail}` : ''}
+                </p>
+              ))}
+            </div>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+const TONE: Record<ActivityItem['tone'], { icon: LucideIcon; className: string }> = {
+  good: { icon: CircleCheck, className: 'text-good' },
+  info: { icon: Info, className: 'text-accent-text' },
+  warn: { icon: TriangleAlert, className: 'text-warn' },
+  bad: { icon: CircleX, className: 'text-bad' },
+  neutral: { icon: CircleDashed, className: 'text-ink-muted' },
+  calc: { icon: Sigma, className: 'text-accent-text' },
+}
+
+function ActivityFeed({ items }: { items: ActivityItem[] }) {
+  const recent = items.slice(-14).reverse()
+  return (
+    <ol aria-label="Analyst activity" aria-live="polite" className="grid gap-2">
+      {recent.length === 0 && <li className="text-sm text-ink-muted">Reading and profiling the file…</li>}
+      {recent.map((item, i) => {
+        const { icon: Icon, className } = TONE[item.tone]
+        return (
+          <li key={`${items.length - i}`} className={`flex gap-2.5 rounded-xl px-2.5 py-2 text-sm ${i === 0 ? 'bg-surface-2' : ''}`}>
+            <Icon aria-hidden className={`mt-0.5 size-4 shrink-0 ${className}`} />
+            <div className="min-w-0">
+              <p className="text-ink">
+                {item.phase !== null && <span className="tabular mr-1.5 text-xs font-semibold text-ink-muted">P{item.phase}</span>}
+                {item.text}
+              </p>
+              {item.detail && <p className="mt-0.5 break-words text-xs text-ink-muted">{item.detail}</p>}
+            </div>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+function elapsedText(seconds: number): string {
+  return seconds < 60 ? `${seconds} s` : `${Math.floor(seconds / 60)} min ${seconds % 60} s`
+}
+
+/** Real elapsed seconds since `running` became true (nothing estimated); resets when a run ends. */
+function useElapsed(running: boolean): number {
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    if (!running) return
+    const start = Date.now()
+    const timer = window.setInterval(() => setElapsed(Math.round((Date.now() - start) / 1000)), 1000)
+    return () => {
+      window.clearInterval(timer)
+      setElapsed(0)
+    }
+  }, [running])
+  return elapsed
+}
+
 const FIELDS: { key: keyof BusinessContext; label: string; placeholder: string; multiline?: boolean }[] = [
   { key: 'domain', label: 'What does this data describe?', placeholder: 'e.g. Online orders of a home-goods shop, Jan–Dec 2025' },
   { key: 'audience', label: 'Who will use the dashboard?', placeholder: 'e.g. The owner and the store manager' },
@@ -67,7 +193,7 @@ const PAGES: { id: string; label: string; Page: (p: PageProps) => React.ReactEle
   { id: 'plan', label: 'Plan & method', Page: PlanPage },
 ]
 /** "Ask AI" comes first; it stays mounted (hidden) so the conversation survives switching tabs. */
-const TABS = [{ id: 'ask', label: 'Ask AI' }, ...PAGES]
+const TABS = [{ id: 'ask', label: 'Ask AI', icon: MessagesSquare }, ...PAGES.map(({ id, label }) => ({ id, label }))]
 
 interface Props {
   config: AppConfig | null
@@ -87,10 +213,17 @@ interface Props {
 
 export function AgentView({ config, file, context, onContext, events, running, report, error, onRun, onExplore, onDownload, downloading }: Props) {
   const [page, setPage] = useState('overview')
+  const [askSeed, setAskSeed] = useState<{ text: string; nonce: number } | null>(null)
   const ev = useMemo(() => (report ? evidenceById(report) : new Map()), [report])
   const phases = report ? report.phases : phasesFromEvents(events, running)
   const ai = config?.agent?.mode === 'ai'
-  const activity = events.filter((e) => e.type === 'tool' || e.type === 'log').slice(-5)
+  const elapsed = useElapsed(running)
+  const activity = useMemo(() => activityFromEvents(events), [events])
+  const calculations = useMemo(() => {
+    const counts = new Map<number, number>()
+    for (const e of events) if (e.type === 'tool' && !e.error) counts.set(e.phase, (counts.get(e.phase) ?? 0) + (e.count ?? 1))
+    return counts
+  }, [events])
 
   if (!report && !running) {
     return (
@@ -101,9 +234,22 @@ export function AgentView({ config, file, context, onContext, events, running, r
         highlight
         actions={ai ? <Badge tone="accent" icon={Sparkles}>{aiAnalystLabel(config?.agent)}</Badge> : <Badge>Rules-based (AI not configured)</Badge>}
       >
-        <p className="mb-4 text-sm text-ink-2">
-          <strong>Phase 0: business context.</strong> Every field is optional. Gaps are recorded as assumptions in the charter, never invented as facts.
-        </p>
+        <div className="mb-4 grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <p className="text-sm text-ink-2">
+            <strong className="text-ink">Phase 0: business context.</strong> Every field is optional; the more you add, the more focused the questions and
+            recommendations.{' '}
+            <span className="tabular text-ink-muted">
+              {FIELDS.filter((f) => context[f.key].trim()).length} of {FIELDS.length} answered.
+            </span>
+          </p>
+          <div className="flex items-start gap-2 rounded-xl bg-surface-2 p-3 text-xs text-ink-2">
+            <Info aria-hidden className="mt-px size-3.5 shrink-0 text-accent-text" />
+            <p>
+              <strong className="text-ink">If you leave a field blank,</strong> the analyst states an assumption instead of inventing a fact. Phase 0 then
+              shows “Passed (assumptions)” and the assumptions are listed under Plan &amp; method for you to confirm.
+            </p>
+          </div>
+        </div>
         <div className="grid gap-3 md:grid-cols-2">
           {FIELDS.map((f) => (
             <div key={f.key} className={f.multiline ? 'md:col-span-2' : ''}>
@@ -118,7 +264,7 @@ export function AgentView({ config, file, context, onContext, events, running, r
                   value={context[f.key]}
                   placeholder={f.placeholder}
                   onChange={(e) => onContext({ ...context, [f.key]: e.target.value })}
-                  className="w-full rounded-xl border border-line-strong bg-surface px-3 py-2 text-sm text-ink shadow-soft transition hover:border-accent/50 focus:border-accent"
+                  className={`${inputClass} py-2`}
                 />
               ) : (
                 <input
@@ -127,7 +273,7 @@ export function AgentView({ config, file, context, onContext, events, running, r
                   maxLength={f.key === 'audience' ? 200 : f.key === 'objective' ? 500 : 300}
                   placeholder={f.placeholder}
                   onChange={(e) => onContext({ ...context, [f.key]: e.target.value })}
-                  className="min-h-10 w-full rounded-xl border border-line-strong bg-surface px-3 text-sm text-ink shadow-soft transition hover:border-accent/50 focus:border-accent"
+                  className={inputClass}
                 />
               )}
             </div>
@@ -136,16 +282,16 @@ export function AgentView({ config, file, context, onContext, events, running, r
         {error && (
           <div className="mt-4">
             <Alert kind="error" title="The analysis could not run">
-              {error}
+              <span>{error}</span> <span>Select <strong>Run the AI analyst</strong> to try again.</span>
             </Alert>
           </div>
         )}
         <div className="mt-5 flex flex-wrap items-center gap-3">
-          <Button variant="primary" size="lg" icon={Sparkles} onClick={onRun}>
+          <Button variant="primary" size="lg" icon={Sparkles} onClick={onRun} className="w-full sm:w-auto">
             Run the AI analyst
           </Button>
           <span className="flex items-center gap-1.5 text-xs text-ink-muted">
-            <ShieldCheck aria-hidden className="size-3.5" />
+            <ShieldCheck aria-hidden className="size-3.5 shrink-0" />
             {ai ? 'The AI sees column names, statistics and category labels, never raw rows. Every number is calculated in Python.' : 'Every number is calculated in Python; nothing is stored.'}
           </span>
         </div>
@@ -154,22 +300,63 @@ export function AgentView({ config, file, context, onContext, events, running, r
   }
 
   if (running) {
+    const current = phases.find((p) => p.status === 'running')
+    const done = phases.filter((p) => DONE.includes(p.status)).length
+    const blocked = phases.filter((p) => p.status === 'blocked')
     return (
-      <Card title="The analyst is working" subtitle="Each phase must pass its exit checks before the next one starts." icon={Bot}>
-        <PhaseTimeline phases={phases} />
-        <ul aria-label="Analyst activity" aria-live="polite" className="mt-4 grid gap-1 text-xs text-ink-muted">
-          {activity.map((e, i) => (
-            <li key={i} className="tabular">
-              {e.type === 'tool' ? `Phase ${e.phase}: ${e.name.replace(/_/g, ' ')}${e.evidence_id ? ` → ${e.evidence_id}` : ''}${e.error ? ` (refused: ${e.error})` : ''}${e.count ? ` × ${e.count}` : ''}` : e.type === 'log' ? e.message : ''}
-            </li>
-          ))}
-        </ul>
+      <Card
+        title="The analyst is working"
+        subtitle="Each phase must pass its exit checks before the next one starts. Updates appear as they happen."
+        icon={Bot}
+        actions={
+          <span className="flex items-center gap-1.5 text-xs text-ink-muted">
+            <Clock aria-hidden className="size-3.5" />
+            <span className="tabular">{elapsedText(elapsed)} elapsed</span>
+          </span>
+        }
+      >
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-surface-2/60 p-3">
+          <IconChip icon={current ? LoaderCircle : CircleCheck} tone={current ? 'brand' : 'good'} />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-ink-muted">Now</p>
+            <p className="text-sm font-semibold text-ink" aria-live="polite">
+              {current ? `Phase ${current.id} · ${current.name}` : 'Finishing the report'}
+            </p>
+          </div>
+          <Badge tone="accent">
+            {done} of {phases.length} phases complete
+          </Badge>
+        </div>
+        {blocked.length > 0 && (
+          <div className="mb-4">
+            <Alert kind="warning" title={`${blocked.length === 1 ? 'A phase' : `${blocked.length} phases`} did not pass ${blocked.length === 1 ? 'its' : 'their'} exit checks`}>
+              The analyst continues and the report marks what is affected: {blocked.map((p) => `phase ${p.id} (${p.name})`).join(', ')}.
+            </Alert>
+          </div>
+        )}
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          <div className="min-w-0">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-muted">Phases</h3>
+            <PhaseSteps phases={phases} calculations={calculations} />
+          </div>
+          <div className="min-w-0">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-muted">Activity (newest first)</h3>
+            <ActivityFeed items={activity} />
+          </div>
+        </div>
       </Card>
     )
   }
 
   const rep = report as AgentReport
   const Page = (PAGES.find((p) => p.id === page) ?? PAGES[0]).Page
+  const passed = rep.phases.filter((p) => p.status === 'passed' || p.status === 'passed_with_assumptions').length
+  const askAbout = ai
+    ? (question: string) => {
+        setAskSeed({ text: question, nonce: Date.now() })
+        setPage('ask')
+      }
+    : undefined
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
       <Card
@@ -193,13 +380,18 @@ export function AgentView({ config, file, context, onContext, events, running, r
           </>
         }
       >
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-ink-2">
+          <Badge tone={passed === rep.phases.length ? 'good' : 'warn'} icon={passed === rep.phases.length ? CircleCheck : TriangleAlert}>
+            {passed} of {rep.phases.length} phases passed
+          </Badge>
+          {rep.evaluation && (
+            <span>
+              <strong className="text-ink">Built by:</strong> {rep.mode === 'ai' ? `AI analyst (${providerModel(rep.provider, rep.model)})` : 'rules-based analyst'}
+              {rep.evaluation.candidates.length > 1 && ` · scored ${rep.evaluation.candidates.map((c) => `${c.mode === 'ai' ? 'AI' : 'rules'} ${formatNumber(c.score)}`).join(' vs ')}`}
+            </span>
+          )}
+        </div>
         <PhaseTimeline phases={phases} />
-        {rep.evaluation && (
-          <p className="mt-4 text-sm text-ink-2">
-            <strong className="text-ink">Built by:</strong> {rep.mode === 'ai' ? `AI analyst (${providerModel(rep.provider, rep.model)})` : 'rules-based analyst'}
-            {rep.evaluation.candidates.length > 1 && ` · scored ${rep.evaluation.candidates.map((c) => `${c.mode === 'ai' ? 'AI' : 'rules'} ${formatNumber(c.score)}`).join(' vs ')}`}
-          </p>
-        )}
         {(rep.provider_switches ?? []).length > 0 && (
           <div className="mt-4">
             <Alert kind="info" title="AI provider switched during the run">
@@ -222,28 +414,13 @@ export function AgentView({ config, file, context, onContext, events, running, r
           </div>
         )}
       </Card>
-      <nav aria-label="Analyst report pages" className="overflow-x-auto print:hidden">
-        <div role="tablist" className="flex w-max min-w-full gap-1 rounded-2xl bg-surface-2 p-1 ring-1 ring-inset ring-line">
-          {TABS.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              role="tab"
-              aria-selected={page === p.id}
-              onClick={() => setPage(p.id)}
-              className={`shrink-0 rounded-xl px-3 py-2 text-sm font-semibold transition ${page === p.id ? 'bg-surface text-ink shadow-soft ring-1 ring-line' : 'text-ink-muted hover:text-ink'}`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </nav>
+      <TabBar label="Analyst report pages" tabs={TABS} value={page} onChange={setPage} />
       <div role="tabpanel" aria-label="Ask AI" hidden={page !== 'ask'} className="animate-rise min-w-0">
-        <AskAI key={rep.generated_at} file={file} report={rep} aiEnabled={ai} />
+        <AskAI key={rep.generated_at} file={file} report={rep} aiEnabled={ai} seed={askSeed} />
       </div>
       {page !== 'ask' && (
         <div role="tabpanel" aria-label={PAGES.find((p) => p.id === page)?.label} className="animate-rise min-w-0">
-          <Page report={rep} ev={ev} onExplore={onExplore} />
+          <Page report={rep} ev={ev} onExplore={onExplore} onAsk={askAbout} />
         </div>
       )}
       <p className="flex items-start gap-2 text-xs text-ink-muted">

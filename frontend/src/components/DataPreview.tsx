@@ -1,5 +1,5 @@
 import { Eye } from 'lucide-react'
-import type { Profile } from '../lib/types'
+import type { InferredType, Profile } from '../lib/types'
 import { formatCount, TYPE_LABELS } from '../lib/format'
 import { TYPE_ICONS } from '../lib/icons'
 import { Badge, Card } from './ui'
@@ -7,6 +7,8 @@ import { Badge, Card } from './ui'
 export function DataPreview({ profile }: { profile: Profile }) {
   const { preview, columns } = profile
   const types = new Map(columns.map((c) => [c.name, c.inferred_type]))
+  const counts = new Map<InferredType, number>()
+  for (const c of columns) counts.set(c.inferred_type, (counts.get(c.inferred_type) ?? 0) + 1)
   return (
     <Card
       className="min-w-0"
@@ -19,6 +21,18 @@ export function DataPreview({ profile }: { profile: Profile }) {
         </Badge>
       }
     >
+      <ul className="mb-3 flex flex-wrap items-center gap-1.5" aria-label="Detected column types">
+        {[...counts.entries()].map(([type, n]) => (
+          <li key={type}>
+            <Badge icon={TYPE_ICONS[type]} tone={type === 'number' ? 'accent' : 'neutral'}>
+              {n} {TYPE_LABELS[type]}
+            </Badge>
+          </li>
+        ))}
+        <li className="text-xs text-ink-muted">
+          · <span className="rounded bg-surface-2 px-1.5 py-0.5 text-[11px] italic">empty</span> marks a missing value
+        </li>
+      </ul>
       <div className="max-h-[520px] overflow-auto rounded-xl border border-line" tabIndex={0} aria-label="Data preview table">
         <table className="w-full border-collapse text-left text-sm">
           <caption className="sr-only">First rows of the uploaded data</caption>

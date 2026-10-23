@@ -1,6 +1,6 @@
 # DESIGN.md: TabulaVibe AI design system
 
-_Version 2 ("calm confidence"), introduced 2026-10-21; choice screen, report files and phone layout rule added 2026-10-22 (v0.5.0). The source of truth for tokens is
+_Version 2 ("calm confidence"), introduced 2026-10-21; choice screen, report files and phone layout rule added 2026-10-22 (v0.5.0); landing, BI workspace, live analyst timeline and decision-first report added 2026-10-23 (v0.8.0). The source of truth for tokens is
 `frontend/src/index.css`; components live in `frontend/src/components/ui.tsx`._
 
 ## 1. Design principles
@@ -82,16 +82,23 @@ when storage is blocked. Both theme blocks must be kept in sync: the media query
 | Screen | Layout |
 |---|---|
 | Header | Floating glass "pill" (`rounded-[2rem]`, `sticky top-3`, `shadow-float`) on every size (Shashank, 2026-10-21). Phones: compact toolbar; below 430 px "New file"/"Sign in" are icon-only (text kept for screen readers); GitHub badge hidden below 640 px |
-| Landing | Centred hero → upload zone (left, 1.5fr) + sample cards (right, 1fr) → 4-step "how it works" strip → privacy note. When sign-in is required and nobody is signed in, the upload zone shows "Sign in to upload your data" and samples are locked |
-| **Choose analyst** (after upload) | Centred question "How would you like to analyse **file**?" + file chips (rows, columns, data health) → two large cards side by side from `md`, stacked on phones: **AI Analyst** (gradient border, gradient icon tile, AI mode badge, primary CTA) and **Manual Analyst** (plain border, soft icon tile, secondary CTA). Each card is one button (accessible names "AI Analyst" / "Manual Analyst") with four ✓ points |
+| Landing | From `lg` two columns (1.1fr / 1fr): **left** concise headline (left-aligned, `text-3xl sm:text-4xl xl:text-5xl`) → primary upload zone; **right** an example dashboard preview (window chrome, 3 KPI tiles, "Revenue by category" bars, one checked AI insight; real figures from the Retail sales sample, labelled "Example", `role="img"`) → compact sample rows (icon, title, two-line description, "Load sample" on the right). Below `md` the preview is hidden and the order is headline → upload → samples. Then a compact 4-step strip and the privacy note. Sign-in lock unchanged |
+| **Choose analyst** (after upload) | Centred question "How would you like to analyse **file**?" + file chips (rows, columns, data health) → two equal cards side by side from `md`, stacked on phones, same border and the same primary action style: **AI Analyst** ("Guided analysis") and **Manual Analyst** ("Hands-on exploration"), each with *Best for* / *You provide* and four ✓ points. AI availability is stated truthfully: a green "LLM available: Groq → NVIDIA" badge only when a model is configured; otherwise a neutral "Rules-based (AI not configured)" badge plus a note that the same workflow runs with documented rules and Ask AI needs a model. Each card is one button (accessible names "AI Analyst" / "Manual Analyst") |
 | Mode bar | One line above either mode: mode name with icon (left) and a ghost "Switch to Manual Analyst" / "Switch to AI Analyst" button (right) |
 | Manual Analyst | Mode bar → **4-step stepper** → step panel |
-| AI Analyst | Mode bar → context form (phase 0) → live phase timeline → report card (PDF, PowerPoint, handover .md, run again) → page tabs (**Ask AI**, Overview, Data quality, Univariate, Bivariate, Multivariate, Insights, Plan & method; Overview selected first) |
+| AI Analyst | Mode bar → context form (phase 0) → **live timeline** while running → report card (PDF, PowerPoint, handover .md, run again; "N of 9 phases passed", phase strip, alerts) → `TabBar` (**Ask AI**, Overview, Data quality, Univariate, Bivariate, Multivariate, Insights, Plan & method; Overview selected first) |
+| Live timeline | "Now: Phase N · name" strip with "k of 9 phases complete" and real elapsed seconds (no percentages, no invented activity) → two columns from `lg`: vertical **Phases** list (status icon, checks passed, calculations so far, failed checks with detail; current phase tinted) and **Activity (newest first)** built only from streamed events: phase results, assumptions, provider switches, grouped calculations with evidence ranges, refused calculations. A blocked phase raises a warning alert |
+| Report overview (decision-first) | **What the analysis found**: top 3 key findings (high confidence first; "Show N more findings"), each a card with rank, confidence/kind badges, title, then *What happened · Why it may matter · Evidence (id + what was calculated) · What to investigate next*, limits, and **Ask AI about this** (opens Ask AI and asks about that finding) + Explore in Analyse → **Supporting KPIs** (`KpiTile` with evidence tag) → trend and segment charts (evidence tag top right) → forecast → **Next steps and limitations** |
 | Ask AI (chat) | One card: suggested-question chips (empty state) → conversation log (`role="log"`): user bubbles right (`bg-accent-soft`, `rounded-br-md`), answers left (`bg-surface-2/60`, `rounded-bl-md`, "AI analyst" label) with paragraphs and bullets, charts in bordered figures (two columns from `lg`, evidence id top right), a "Numbers checked" (good) or "Unverified: …" (warn) badge, evidence tags, provider · model, follow-up chips → question textarea + primary "Ask" button (Enter sends, Shift+Enter new line). Stays mounted while hidden so the conversation survives tab switches. Without AI: info alert and disabled input |
-| Analyse | Builder (340 px) beside results from `lg`; stacked below `lg`, where the page scrolls to the results after a run |
-| Report & export | Downloads card: **Download PDF**, **Download PowerPoint** (primary), results CSV, cleaned CSV (secondary), cleaning toggles → document-style on-screen report |
+| Analyse | Builder (340 px) beside results from `lg`; stacked below `lg`, where the page scrolls to the results after a run. Results: scope chips (rows analysed, grouping, active filters or "No filters", duplicates removed) → `KpiTile`s (lead tile highlighted; aggregation, values used, excluded) → chart card (title "Measure by group", subtitle with aggregation, group count and "hover for details"; inline measure select + chart-type `SegmentedControl`) → collapsible **Results table** (the Table chart type shows it inline) |
+| Report & export | Downloads card: **Download PDF**, **Download PowerPoint** (primary), results CSV, cleaned CSV (secondary), cleaning toggles → document-style on-screen report that opens with an **Executive summary** panel (key figures, highest and lowest group for the charted measure, latest period for dates, data health; "observed figures … not why") before Scope, Key figures, Chart, Detailed results, Commentary and Data quality |
+| Insight card (AI Insights tab) | Badges (id, confidence, kind, evidence) → title → two columns from `lg`: **Observed fact / Observed association** box (What happened? Where? How large? Compared with) │ **Possible explanations (not verified)** in a dashed box + **Recommendation** in an accent-tinted box (What action to consider? How to measure success?) → limitations line → Ask AI about this / Explore in Analyse |
+| My reports | Card grid (2 columns from `lg`): file icon, title (opens), source, type badge, rows · columns · saved date, then actions **Open**, **PDF**, **PowerPoint** (download the stored results through the same export endpoint, with the user's token) and a delete icon with an inline "Delete permanently? Keep / Delete" confirmation |
 
-**Stepper:** steps are `role="tab"` buttons with accessible names "1. Preview" … "4. Report & export".
+**Stepper:** steps are `role="tab"` buttons with accessible names "1. Preview" … "4. Report & export", `aria-current="step"` on the active one, above them "Step N of 4 · name", "k done" and a thin progress bar for the current position. A locked step says "Run an analysis first"; done steps show their hint in the success colour.
+- Data preview: a "Detected column types" chip row (count per type, with the type icon) and a key for the *empty* marker above the table.
+- Data quality: issues grouped under "To review (n)" (warnings) and "For information (n)".
+- Analysis builder: sections numbered 1–4 with "Required" (measures) or "Optional" (grouping, filters, cleaning) tags.
 - Active: gradient icon tile plus accent ring. Done: green tick. Disabled: 45% opacity.
 - From `sm` a 4-column grid; on phones a swipeable row of 128 px tabs (scrollbar hidden).
 
@@ -128,6 +135,11 @@ when storage is blocked. Both theme blocks must be kept in sync: the media query
 | `Meter` | Per-column completeness bar with the same thresholds |
 | `Toggle` | A **native checkbox** restyled as a switch (`.switch`), so keyboard, screen-reader and test behaviour stays native |
 | `Skeleton` | Shimmer placeholder for loading states |
+| `SegmentedControl` | Pressed-button group (`role="group"`, `aria-pressed`) for view switches: chart type, finding kind. `stretch` makes an equal-width grid on phones; `compactBelow380` hides labels (not icons) below 380 px |
+| `TabBar` | Page-level tabs (`role="tablist"`), horizontal scroll with hidden scrollbar (`no-scrollbar`) |
+| `KpiTile` | Shared KPI card: label, icon chip, large tabular value (formatted by the caller), meta badges, two-line definition, footer (e.g. evidence tag); `lead` adds the gradient border |
+| `SectionHeading`, `Eyebrow`, `RefTag` | Section title with description/actions; small uppercase label; evidence-id tag |
+| `inputClass` | Shared text-input style (with `selectClass`, `labelClass`) |
 
 Icons come from **lucide-react** (v1 names, e.g. `ChartColumn`, `TriangleAlert`, `LoaderCircle`). Decorative
 icons are `aria-hidden`. Column types have fixed icons (`lib/icons.ts`): number `Hash`, date `Calendar`,
@@ -141,7 +153,8 @@ yes/no `ToggleLeft`, category `Tag`, text `Type`, empty `CircleDashed`.
 - **Share:** donut (62–92% radius, 1.5° gaps, rounded ends).
   - Only when the server allows it (one sum or count measure, non-negative, 2–8 groups).
   - The centre shows the server's KPI total. The legend is HTML with percentages.
-- **Tooltips:** frosted glass, group name, formatted value and row count.
+- **Tooltips:** frosted glass, group name, formatted value, row count and the group's rank by value ("rank 2 of 7"; ordering only, nothing calculated).
+- **Bar labels:** the category axis is sized from the longest label shown (56–160 px).
 - Every chart has `role="img"` with a descriptive `aria-label`, and a table view one click away.
 - Animations are off on charts (stable screenshots and printing).
 

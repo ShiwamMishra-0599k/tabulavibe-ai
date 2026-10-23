@@ -82,6 +82,8 @@ describe('App', () => {
 
     await user.click(screen.getByRole('tab', { name: '4. Report & export' }))
     expect(screen.getByRole('heading', { name: 'Key figures' })).toBeInTheDocument()
+    const summary = screen.getByRole('heading', { name: 'Executive summary' }).closest('section')!
+    expect(within(summary).getByText(/^Highest .+: South \(190\)$/)).toBeInTheDocument() // picked from the server's values, not recalculated
     expect(screen.getByRole('button', { name: 'Download PDF' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Download PowerPoint' })).toBeInTheDocument()
   })
@@ -94,9 +96,15 @@ describe('App', () => {
     expect(await screen.findByRole('heading', { name: /How would you like to analyse/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'AI Analyst' })).toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: '1. Preview' })).not.toBeInTheDocument()
+    // No model configured: the card says so instead of implying an LLM.
+    expect(screen.getByText('Rules-based (AI not configured)')).toBeInTheDocument()
+    expect(screen.getByText(/No language model is configured on this server/)).toBeInTheDocument()
+    expect(screen.queryByText(/LLM available/)).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Manual Analyst' }))
     expect(screen.getAllByRole('tab').map((t) => t.getAttribute('aria-label'))).toEqual(['1. Preview', '2. Data quality', '3. Analyse', '4. Report & export'])
+    expect(screen.getByRole('tab', { name: '1. Preview' })).toHaveAttribute('aria-current', 'step')
+    expect(screen.getByRole('list', { name: 'Detected column types' }).textContent).toMatch(/\d+ Number/)
 
     await user.click(screen.getByRole('button', { name: 'Switch to AI Analyst' }))
     expect(screen.getByRole('button', { name: 'Run the AI analyst' })).toBeInTheDocument()

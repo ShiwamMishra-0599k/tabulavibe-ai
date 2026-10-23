@@ -32,6 +32,7 @@ import { ModeChoice, type AnalysisMode } from './components/ModeChoice'
 import { QualityReport } from './components/QualityReport'
 import { ReportView } from './components/ReportView'
 import { ReportsList, SavedReportPage, SaveReportCard } from './components/SavedReports'
+import { savedExportData } from './lib/reports'
 import { SignInDialog } from './components/SignInDialog'
 import { Alert, Button, IconChip, Skeleton, Spinner, Toggle } from './components/ui'
 import { Hero, UploadPanel } from './components/UploadPanel'
@@ -232,6 +233,17 @@ export default function App() {
       setSavedReport(await api.getReport(await auth.token(), id))
       setView('saved')
       window.scrollTo({ top: 0 })
+    } catch (e) {
+      setReportsError(message(e))
+    }
+  }
+
+  async function exportSavedReport(id: string, format: ReportFormat) {
+    setReportsError(null)
+    try {
+      const report = await api.getReport(await auth.token(), id)
+      const out = await api.exportReport(format, 'manual', savedExportData(report), report.title)
+      saveBlob(out.blob, out.filename)
     } catch (e) {
       setReportsError(message(e))
     }
@@ -546,14 +558,14 @@ export default function App() {
         {view === 'sign-up' && (
           <SignUpPage onSignUp={auth.signIn} onSignInInstead={() => setSignInOpen(true)} onBack={() => setView('workspace')} hasOpenWork={!!profile} />
         )}
-        {view === 'reports' && <ReportsList reports={reports} error={reportsError} onOpen={openReport} onDelete={deleteReport} onNew={reset} />}
+        {view === 'reports' && <ReportsList reports={reports} error={reportsError} onOpen={openReport} onDelete={deleteReport} onNew={reset} onExport={exportSavedReport} />}
         {view === 'saved' && savedReport && <SavedReportPage report={savedReport} onBack={openReports} />}
 
         {view === 'workspace' && !profile && (
           <>
-            <Hero signInRequired={signInRequired} />
             {busy === 'upload' ? (
               <div className="grid gap-4 rounded-3xl border border-line bg-surface p-8 shadow-card">
+                <Hero signInRequired={signInRequired} />
                 <Spinner label={largeFile ? 'Reading and checking your file… large files can take up to a minute.' : 'Reading and checking your file…'} />
                 <Skeleton className="h-8 w-1/3" />
                 <Skeleton className="h-40" />
@@ -572,6 +584,7 @@ export default function App() {
                 onFile={loadFile}
                 onSample={loadSample}
                 locked={uploadsLocked ? { onSignIn: () => setSignInOpen(true), onSignUp: openSignUp } : undefined}
+                hero={<Hero signInRequired={signInRequired} />}
               />
             )}
           </>
@@ -602,7 +615,19 @@ export default function App() {
         {view === 'workspace' && profile && spec && mode === 'manual' && (
           <div className="grid min-w-0 gap-6">
             <ModeBar mode="manual" onSwitch={() => chooseMode('ai')} />
-            <nav aria-label="Workflow steps" className="overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden print:hidden">
+            <div className="grid gap-2 print:hidden">
+              <div className="flex items-center justify-between gap-3 text-xs text-ink-muted">
+                <span>
+                  Step <span className="tabular font-semibold text-ink">{ORDER.indexOf(tab) + 1}</span> of {steps.length} ·{' '}
+                  <span className="font-semibold text-ink">{steps.find((s) => s.id === tab)?.label}</span>
+                </span>
+                <span className="tabular">{steps.filter((s) => isDone(s.id)).length} done</span>
+              </div>
+              <div className="h-1 overflow-hidden rounded-full bg-surface-3" aria-hidden>
+                <div className="brand-gradient h-full rounded-full transition-[width] duration-300" style={{ width: `${((ORDER.indexOf(tab) + 1) / steps.length) * 100}%` }} />
+              </div>
+            </div>
+            <nav aria-label="Workflow steps" className="no-scrollbar -mt-3 overflow-x-auto pb-1 print:hidden">
               <div role="tablist" className="flex min-w-max gap-2 sm:grid sm:min-w-0 sm:grid-cols-4 sm:gap-3">
                 {steps.map((step, i) => {
                   const active = tab === step.id
@@ -614,6 +639,7 @@ export default function App() {
                       id={`tab-${step.id}`}
                       aria-label={`${i + 1}. ${step.label}`}
                       aria-selected={active}
+                      aria-current={active ? 'step' : undefined}
                       aria-controls={`panel-${step.id}`}
                       disabled={step.disabled}
                       onClick={() => goTo(step.id)}
@@ -634,7 +660,7 @@ export default function App() {
                           <span className="hidden text-ink-muted md:inline">{i + 1}. </span>
                           {step.label}
                         </span>
-                        <span className="hidden truncate text-xs text-ink-muted md:block">{step.hint}</span>
+                        <span className={`hidden truncate text-xs md:block ${done && !active ? 'text-good' : 'text-ink-muted'}`}>{step.disabled ? 'Run an analysis first' : step.hint}</span>
                       </span>
                     </button>
                   )

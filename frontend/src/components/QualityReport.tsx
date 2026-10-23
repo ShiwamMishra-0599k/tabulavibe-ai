@@ -90,23 +90,33 @@ export function QualityReport({ profile }: { profile: Profile }) {
             duplicates are kept unless you choose to remove them in the analysis.
           </p>
         </div>
-        <div className="grid gap-2">
+        <div className="grid gap-4">
           {warnings.length === 0 && infos.length === 0 && <Alert kind="success" title="No data-quality issues were detected." />}
-          {warnings.map((issue, i) => (
-            <Alert key={`w${i}`} kind="warning">
-              {issue.message}
-            </Alert>
-          ))}
-          {infos.map((issue, i) => (
-            <Alert key={`i${i}`} kind="info">
-              {issue.message}
-            </Alert>
-          ))}
-          {notes.map((note, i) => (
-            <Alert key={`n${i}`} kind="info">
-              {note}
-            </Alert>
-          ))}
+          {warnings.length > 0 && (
+            <div className="grid gap-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-warn">To review ({warnings.length})</h3>
+              {warnings.map((issue, i) => (
+                <Alert key={`w${i}`} kind="warning">
+                  {issue.message}
+                </Alert>
+              ))}
+            </div>
+          )}
+          {infos.length + notes.length > 0 && (
+            <div className="grid gap-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-muted">For information ({infos.length + notes.length})</h3>
+              {infos.map((issue, i) => (
+                <Alert key={`i${i}`} kind="info">
+                  {issue.message}
+                </Alert>
+              ))}
+              {notes.map((note, i) => (
+                <Alert key={`n${i}`} kind="info">
+                  {note}
+                </Alert>
+              ))}
+            </div>
+          )}
         </div>
       </Card>
 

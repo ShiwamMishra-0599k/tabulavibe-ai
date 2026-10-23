@@ -47,6 +47,7 @@ function mockServer(cfg: unknown = storageConfig) {
       saved = []
       return new Response(null, { status: 204 })
     }
+    if (path === '/api/report/export') return new Response(new Blob(['%PDF-']), { status: 200, headers: { 'Content-Disposition': 'attachment; filename="tabulavibe_q1.pdf"' } })
     if (path === `/api/reports/${summary.id}`)
       return jsonResponse({ ...summary, spec: result.spec, result, quality: { dataset: profile.dataset, issues: profile.issues }, narrative: null, app_version: '0.3.0' })
     return jsonResponse({ error: { code: 'not_found', message: 'Not found' } }, 404)
@@ -195,5 +196,32 @@ describe('Accounts and saved reports', () => {
     expect(await screen.findByText('No saved reports yet')).toBeInTheDocument()
     const del = calls.find((c) => c.init?.method === 'DELETE')!
     expect(authHeader(del.init)).toBe('Bearer user-token')
+  })
+
+  it('downloads a saved report as PDF straight from My reports, with the stored results and the user token', async () => {
+    authMock.state = signedIn()
+    URL.createObjectURL = vi.fn(() => 'blob:saved')
+    URL.revokeObjectURL = vi.fn()
+    const user = userEvent.setup()
+    const calls = mockServer()
+    render(<App />)
+    await screen.findByText('Shiwam Mishra')
+    await user.click(await screen.findByRole('button', { name: 'Load sample: Retail sales (CSV)' }))
+    await user.click(await screen.findByRole('button', { name: 'Manual Analyst' }))
+    await user.click(await screen.findByRole('tab', { name: '3. Analyse' }))
+    await user.click(screen.getByRole('button', { name: 'Run analysis' }))
+    await user.click(await screen.findByRole('tab', { name: '4. Report & export' }))
+    await user.click(screen.getByRole('button', { name: 'Save to my reports' }))
+    await screen.findByText('Saved. Find it any time under My reports.')
+
+    await user.click(screen.getByRole('button', { name: 'My reports' }))
+    await user.click(await screen.findByRole('button', { name: 'Download PDF of Revenue by region' }))
+    await vi.waitFor(() => expect(URL.createObjectURL).toHaveBeenCalledTimes(1))
+    const fetched = calls.find((c) => c.url === `/api/reports/${summary.id}` && (c.init?.method ?? 'GET') === 'GET')!
+    expect(authHeader(fetched.init)).toBe('Bearer user-token')
+    const exported = calls.find((c) => c.url === '/api/report/export')!
+    const body = JSON.parse(exported.init!.body as string)
+    expect([body.format, body.kind]).toEqual(['pdf', 'manual'])
+    expect(body.data.result).toEqual(result) // the stored, validated results
   })
 })

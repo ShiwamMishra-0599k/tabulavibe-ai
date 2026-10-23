@@ -236,6 +236,78 @@ describe('AI analyst', () => {
     expect(followUp.chat_evidence).toEqual(first.new_evidence)
   })
 
+  it('shows the live timeline from streamed events: current phase, checks, assumptions and a blocked phase', async () => {
+    const user = userEvent.setup()
+    const lines = ndjson([
+      { type: 'start', mode: 'rules', model: null, phases: [] },
+      { type: 'tool', phase: 1, name: 'dataset_overview', evidence_id: 'E1' },
+      { type: 'phase', phase: 0, name: 'Business understanding', status: 'passed_with_assumptions', checks: [{ check: 'Business context documented', passed: true, detail: '' }] },
+      { type: 'phase', phase: 1, name: 'Data understanding', status: 'passed', checks: [{ check: 'Rows and columns profiled', passed: true, detail: '' }] },
+      { type: 'phase', phase: 2, name: 'Business problem discovery', status: 'blocked', checks: [{ check: 'Questions registered', passed: false, detail: 'no questions' }] },
+      { type: 'tool', phase: 4, name: 'trend', evidence_id: 'E12' },
+    ])
+    let controller: ReadableStreamDefaultController<Uint8Array> | undefined
+    mockServer()
+    const fetchMock = vi.mocked(globalThis.fetch)
+    const fallback = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation(async (input, init) => {
+      if (String(input).endsWith('/api/agent/run')) {
+        const body = new ReadableStream<Uint8Array>({
+          start(c) {
+            controller = c
+            c.enqueue(new TextEncoder().encode(lines))
+          },
+        })
+        return new Response(body, { status: 200, headers: { 'Content-Type': 'application/x-ndjson' } })
+      }
+      return fallback(input, init)
+    })
+    await openAnalyst(user)
+    await user.click(screen.getByRole('button', { name: 'Run the AI analyst' }))
+
+    expect(await screen.findByText('Phase 4 · Exploratory analysis')).toBeInTheDocument()
+    expect(screen.getByText('3 of 9 phases complete')).toBeInTheDocument()
+    expect(screen.getByLabelText('Phase 0: Business understanding, Passed (assumptions)')).toBeInTheDocument()
+    expect(screen.getByText('A phase did not pass its exit checks')).toBeInTheDocument()
+    const activity = screen.getByRole('list', { name: 'Analyst activity' })
+    expect(within(activity).getByText('Phase 2 did not pass: Business problem discovery')).toBeInTheDocument()
+    expect(within(activity).getByText('Questions registered: no questions')).toBeInTheDocument()
+    expect(within(activity).getByText('Ran 1 calculation: trend')).toBeInTheDocument()
+    expect(screen.queryByText(/\d+%/)).not.toBeInTheDocument() // no invented percentage progress
+    controller?.close()
+  })
+
+  it('leads the report with prioritised findings, their evidence and next steps', async () => {
+    const user = userEvent.setup()
+    mockServer()
+    await openAnalyst(user)
+    await user.click(screen.getByRole('button', { name: 'Run the AI analyst' }))
+    expect(await screen.findByRole('heading', { name: 'What the analysis found' })).toBeInTheDocument()
+    const briefs = screen.getAllByRole('article', { name: /^Key finding/ })
+    expect(briefs.map((b) => b.getAttribute('aria-label'))).toEqual(['Key finding F1', 'Key finding F2', 'Key finding F3']) // the top three first
+    await user.click(screen.getByRole('button', { name: 'Show 2 more findings' }))
+    expect(screen.getAllByRole('article', { name: /^Key finding/ })).toHaveLength(5)
+    for (const label of ['What happened', 'Why it may matter', 'Evidence', 'What to investigate next']) expect(within(briefs[0]).getByText(label)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Supporting KPIs' })).toBeInTheDocument()
+    expect(screen.getByText('Next steps and limitations')).toBeInTheDocument()
+    expect(within(briefs[0]).queryByRole('button', { name: 'Ask AI about this' })).not.toBeInTheDocument() // AI is off
+  })
+
+  it('opens Ask AI with a question about a finding', async () => {
+    const user = userEvent.setup()
+    const aiConfig = { ...config, ai: { enabled: true, provider: 'groq', model: 'g' }, agent: { mode: 'ai', provider: 'groq', model: 'g', chain: [], forecast: null } }
+    const answer = { answer: 'B leads.', evidence_ids: [], charts: [], grounded: true, unverified_numbers: [], follow_up_questions: [], provider: 'groq', model: 'g', provider_switches: [], new_evidence: [] }
+    const calls = mockServer(ndjson(agentEvents), aiConfig, [answer])
+    await openAnalyst(user)
+    await user.click(screen.getByRole('button', { name: 'Run the AI analyst' }))
+    const first = (await screen.findAllByRole('article', { name: /^Key finding/ }))[0]
+    await user.click(within(first).getByRole('button', { name: 'Ask AI about this' }))
+    expect(await screen.findByText('B leads.')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Ask AI', selected: true })).toBeInTheDocument()
+    const sent = JSON.parse(calls.find((c) => c.url === '/api/agent/chat')!.body!.get('payload') as string)
+    expect(sent.question.startsWith('Explain finding F1: ')).toBe(true)
+  })
+
   it('shows a clear error when the stream reports a failure', async () => {
     const user = userEvent.setup()
     mockServer(ndjson([{ type: 'start', mode: 'rules', model: null, phases: [] }, { type: 'error', error: { code: 'agent_failed', message: 'The analysis stopped unexpectedly. Please try again.' } }]))

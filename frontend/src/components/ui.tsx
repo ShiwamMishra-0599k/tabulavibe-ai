@@ -217,3 +217,162 @@ export function Toggle({ checked, onChange, label, description }: { checked: boo
 export const selectClass =
   'min-h-10 w-full rounded-xl border border-line-strong bg-surface px-3 text-sm text-ink shadow-soft transition hover:border-accent/50 focus:border-accent disabled:opacity-50'
 export const labelClass = 'mb-1.5 block text-xs font-semibold text-ink-2'
+export const inputClass =
+  'min-h-10 w-full rounded-xl border border-line-strong bg-surface px-3 text-sm text-ink shadow-soft transition placeholder:text-ink-muted hover:border-accent/50 focus:border-accent'
+
+/** Small uppercase label above a section title. */
+export function Eyebrow({ children }: { children: ReactNode }) {
+  return <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">{children}</p>
+}
+
+/** Heading for a group of cards inside a page (h2 by default). */
+export function SectionHeading({ title, description, actions, level = 2, id }: { title: ReactNode; description?: ReactNode; actions?: ReactNode; level?: 2 | 3; id?: string }) {
+  const H = level === 2 ? 'h2' : 'h3'
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-2">
+      <div className="min-w-0">
+        <H id={id} className="text-base font-semibold tracking-tight text-ink sm:text-lg">
+          {title}
+        </H>
+        {description && <p className="mt-0.5 text-sm text-ink-muted">{description}</p>}
+      </div>
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+    </div>
+  )
+}
+
+export interface SegmentOption<T extends string> {
+  value: T
+  label: string
+  icon?: LucideIcon
+  disabled?: boolean
+  title?: string
+}
+
+/**
+ * Pressed-button group for switching a view (chart type, finding kind). Each option is a real button with
+ * `aria-pressed`, so names stay stable for tests and screen readers. `compactBelow380` hides labels on very
+ * small phones (icons remain, the label stays available to screen readers).
+ */
+export function SegmentedControl<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+  compactBelow380 = false,
+  stretch = false,
+}: {
+  label: string
+  options: SegmentOption<T>[]
+  value: T
+  onChange: (value: T) => void
+  compactBelow380?: boolean
+  stretch?: boolean
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      className={`rounded-xl bg-surface-2 p-1 ring-1 ring-inset ring-line ${stretch ? 'grid w-full sm:flex sm:w-auto' : 'flex w-fit max-w-full flex-wrap'}`}
+      style={stretch ? { gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` } : undefined}
+    >
+      {options.map((o) => {
+        const active = value === o.value
+        return (
+          <button
+            key={o.value}
+            type="button"
+            disabled={o.disabled}
+            aria-pressed={active}
+            title={o.title}
+            onClick={() => onChange(o.value)}
+            className={`flex min-h-8 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-35 sm:px-3 ${
+              active ? 'bg-surface text-ink shadow-soft ring-1 ring-line' : 'text-ink-muted hover:text-ink'
+            }`}
+          >
+            {o.icon && <o.icon aria-hidden className={`size-3.5 shrink-0 ${active ? 'text-accent' : ''}`} />}
+            <span className={compactBelow380 && o.icon ? 'max-[379px]:sr-only' : ''}>{o.label}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Tab bar for page-level views (`role="tablist"`); scrolls horizontally on phones. */
+export function TabBar<T extends string>({ label, tabs, value, onChange }: { label: string; tabs: { id: T; label: string; icon?: LucideIcon }[]; value: T; onChange: (id: T) => void }) {
+  return (
+    <nav aria-label={label} className="no-scrollbar overflow-x-auto print:hidden">
+      <div role="tablist" className="flex w-max min-w-full gap-1 rounded-2xl bg-surface-2 p-1 ring-1 ring-inset ring-line">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={value === t.id}
+            onClick={() => onChange(t.id)}
+            className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+              value === t.id ? 'bg-surface text-ink shadow-soft ring-1 ring-line' : 'text-ink-muted hover:text-ink'
+            }`}
+          >
+            {t.icon && <t.icon aria-hidden className={`size-4 ${value === t.id ? 'text-accent' : ''}`} />}
+            {t.label}
+          </button>
+        ))}
+      </div>
+    </nav>
+  )
+}
+
+/**
+ * KPI tile shared by the Manual Analyst dashboard and the AI report. The value is already formatted by the
+ * caller (the frontend formats, never calculates). `lead` marks the one most important KPI in a row.
+ */
+export function KpiTile({
+  label,
+  value,
+  icon,
+  lead = false,
+  meta,
+  definition,
+  footer,
+  delay = 0,
+}: {
+  label: string
+  value: ReactNode
+  icon?: LucideIcon
+  lead?: boolean
+  meta?: ReactNode
+  definition?: string
+  footer?: ReactNode
+  delay?: number
+}) {
+  return (
+    <div
+      className={`animate-rise print-avoid-break flex min-w-0 flex-col rounded-2xl p-4 shadow-card sm:p-5 ${lead ? 'gradient-border' : 'border border-line bg-surface'}`}
+      style={delay ? { animationDelay: `${delay}ms` } : undefined}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <p className="min-w-0 text-sm font-medium text-ink-2">{label}</p>
+        {icon && <IconChip icon={icon} tone={lead ? 'brand' : 'accent'} size="sm" />}
+      </div>
+      <p className="tabular mt-2 break-words text-2xl font-bold tracking-tight text-ink sm:text-3xl">{value}</p>
+      {meta && <div className="mt-2 flex flex-wrap gap-1.5">{meta}</div>}
+      {definition && (
+        <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-ink-muted" title={definition}>
+          {definition}
+        </p>
+      )}
+      {footer && <div className="mt-auto pt-3">{footer}</div>}
+    </div>
+  )
+}
+
+/** Inline code-like tag for evidence ids and similar references. */
+export function RefTag({ children, title }: { children: ReactNode; title?: string }) {
+  return (
+    <span className="tabular rounded-md bg-surface-2 px-1.5 py-0.5 text-[11px] font-semibold text-ink-2 ring-1 ring-inset ring-line" title={title}>
+      {children}
+    </span>
+  )
+}

@@ -263,6 +263,56 @@ export function phasesFromEvents(events: AgentEvent[], running: boolean): Phase[
   return phases
 }
 
+export interface ActivityItem {
+  tone: 'good' | 'info' | 'warn' | 'bad' | 'neutral' | 'calc'
+  phase: number | null
+  text: string
+  detail?: string
+}
+
+/**
+ * The activity feed shown while the analyst runs, built only from streamed events (oldest first).
+ * Consecutive calculations in one phase are grouped into a single line with their evidence ids.
+ */
+export function activityFromEvents(events: AgentEvent[]): ActivityItem[] {
+  const items: ActivityItem[] = []
+  let group: { phase: number; names: string[]; ids: string[]; refused: string[] } | null = null
+  const flush = () => {
+    if (!group) return
+    const done = group.names.length
+    const names = [...new Set(group.names)].map((n) => n.replace(/_/g, ' '))
+    const ids = group.ids.length > 1 ? `${group.ids[0]}–${group.ids[group.ids.length - 1]}` : group.ids[0]
+    if (done) items.push({ tone: 'calc', phase: group.phase, text: `Ran ${done} calculation${done === 1 ? '' : 's'}: ${names.join(', ')}`, detail: ids ? `Evidence ${ids}` : undefined })
+    for (const r of group.refused) items.push({ tone: 'neutral', phase: group.phase, text: 'A calculation was refused by input checks and retried', detail: r })
+    group = null
+  }
+  for (const e of events) {
+    if (e.type === 'tool') {
+      if (group && group.phase !== e.phase) flush()
+      group ??= { phase: e.phase, names: [], ids: [], refused: [] }
+      if (e.error) group.refused.push(e.error)
+      else {
+        for (let i = 0; i < (e.count ?? 1); i++) group.names.push(e.name)
+        if (e.evidence_id) group.ids.push(e.evidence_id)
+      }
+      continue
+    }
+    flush()
+    if (e.type === 'log') items.push({ tone: /switching|could not|waiting|limit/i.test(e.message) ? 'warn' : 'info', phase: e.phase ?? null, text: e.message })
+    if (e.type === 'phase') {
+      const failed = e.checks.filter((c) => !c.passed)
+      if (e.status === 'passed') items.push({ tone: 'good', phase: e.phase, text: `Phase ${e.phase} passed: ${e.name}`, detail: e.checks.length ? `${e.checks.length} exit check(s) passed` : undefined })
+      else if (e.status === 'passed_with_assumptions')
+        items.push({ tone: 'info', phase: e.phase, text: `Phase ${e.phase} passed with assumptions: ${e.name}`, detail: 'Assumptions are recorded in the charter; confirm them in Plan & method.' })
+      else if (e.status === 'blocked')
+        items.push({ tone: 'bad', phase: e.phase, text: `Phase ${e.phase} did not pass: ${e.name}`, detail: failed.map((c) => `${c.check}${c.detail ? `: ${c.detail}` : ''}`).join('; ') })
+      else if (e.status === 'skipped') items.push({ tone: 'neutral', phase: e.phase, text: `Phase ${e.phase} skipped: ${e.name}` })
+    }
+  }
+  flush()
+  return items
+}
+
 export const PROVIDER_LABEL: Record<string, string> = { groq: 'Groq', nvidia: 'NVIDIA' }
 
 /** Badge text for the AI analyst: the providers in the order they are tried, e.g. "Groq → NVIDIA". */

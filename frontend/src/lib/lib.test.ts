@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { profile } from '../test/fixtures'
 import { api, ApiError } from './api'
-import { aiAnalystLabel, providerModel } from './agent'
+import { activityFromEvents, aiAnalystLabel, providerModel, type AgentEvent } from './agent'
 import { formatCompact, formatNumber, formatPercent } from './format'
 import { defaultSpec, suggestedAnalyses, validateSpec } from './spec'
 
@@ -105,5 +105,29 @@ describe('aiAnalystLabel', () => {
     expect(aiAnalystLabel({ mode: 'ai', model: 'm', chain: [{ provider: 'groq', label: 'Groq', model: 'g' }, { provider: 'nvidia', label: 'NVIDIA', model: 'n' }] })).toBe('Groq → NVIDIA')
     expect(providerModel('nvidia', 'openai/gpt-oss-20b')).toBe('NVIDIA · gpt-oss-20b')
     expect(aiAnalystLabel(undefined)).toBe('AI')
+  })
+})
+
+describe('activityFromEvents', () => {
+  it('describes only streamed events, grouping calculations per phase', () => {
+    const events: AgentEvent[] = [
+      { type: 'start', mode: 'ai', model: 'm', phases: [] },
+      { type: 'tool', phase: 1, name: 'dataset_overview', evidence_id: 'E1' },
+      { type: 'tool', phase: 1, name: 'describe_column', count: 3 },
+      { type: 'phase', phase: 0, name: 'Business understanding', status: 'passed_with_assumptions', checks: [{ check: 'a', passed: true, detail: '' }] },
+      { type: 'log', phase: 0, message: 'Groq could not continue (limit). Switching to NVIDIA (n).' },
+      { type: 'tool', phase: 4, name: 'trend', evidence_id: 'E12' },
+      { type: 'tool', phase: 4, name: 'kpi', error: 'Rating is a number column' },
+      { type: 'tool', phase: 4, name: 'segment_contribution', evidence_id: 'E13' },
+      { type: 'phase', phase: 5, name: 'Validation and insights', status: 'blocked', checks: [{ check: 'Every number is grounded', passed: false, detail: '1 of 2 grounded' }] },
+    ]
+    expect(activityFromEvents(events)).toEqual([
+      { tone: 'calc', phase: 1, text: 'Ran 4 calculations: dataset overview, describe column', detail: 'Evidence E1' },
+      { tone: 'info', phase: 0, text: 'Phase 0 passed with assumptions: Business understanding', detail: 'Assumptions are recorded in the charter; confirm them in Plan & method.' },
+      { tone: 'warn', phase: 0, text: 'Groq could not continue (limit). Switching to NVIDIA (n).' },
+      { tone: 'calc', phase: 4, text: 'Ran 2 calculations: trend, segment contribution', detail: 'Evidence E12–E13' },
+      { tone: 'neutral', phase: 4, text: 'A calculation was refused by input checks and retried', detail: 'Rating is a number column' },
+      { tone: 'bad', phase: 5, text: 'Phase 5 did not pass: Validation and insights', detail: 'Every number is grounded: 1 of 2 grounded' },
+    ])
   })
 })

@@ -1,6 +1,6 @@
 import { ChartNoAxesColumn } from 'lucide-react'
 import type { AnalysisResult, Issue, Narrative, Profile } from '../lib/types'
-import { formatCount, formatPercent, LOCALE } from '../lib/format'
+import { formatCount, formatNumber, formatPercent, LOCALE } from '../lib/format'
 import { chartTitle, type ChartKind } from '../lib/charts'
 import { ChartView, KpiCards, ResultsTable } from './Dashboard'
 import { NarrativeText } from './AiNarrative'
@@ -25,10 +25,31 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   )
 }
 
+/** Headline facts for the executive summary: values the server calculated, picked by ordering only. */
+function summaryPoints(result: AnalysisResult, measureKey: string, dataset: Props['dataset']): string[] {
+  const points = result.kpis.slice(0, 3).map((k) => `${k.label}: ${formatNumber(k.value)}`)
+  const measure = result.measures.find((m) => m.key === measureKey) ?? result.measures[0]
+  const rows = result.rows.filter((r) => r.values[measure.key] !== null)
+  if (result.grouping && rows.length > 1) {
+    const sorted = [...rows].sort((a, b) => (b.values[measure.key] ?? 0) - (a.values[measure.key] ?? 0))
+    const top = sorted[0]
+    const low = sorted[sorted.length - 1]
+    points.push(`Highest ${measure.label}: ${top.group} (${formatNumber(top.values[measure.key])})`)
+    points.push(`Lowest ${measure.label}: ${low.group} (${formatNumber(low.values[measure.key])})`)
+    if (result.grouping.type === 'date') {
+      const latest = rows[rows.length - 1]
+      points.push(`Latest period: ${latest.group} (${formatNumber(latest.values[measure.key])})`)
+    }
+  }
+  points.push(`Data health ${dataset.valid_cell_pct}%: ${formatCount(dataset.missing_cell_count)} missing cells and ${formatCount(dataset.duplicate_row_count)} duplicate rows detected.`)
+  return points
+}
+
 /** Management-report layout. Printed via the browser (Print → Save as PDF). */
 export function ReportView({ dataset, issues, result, narrative, chartKind, measureKey, preparedAt }: Props) {
   const filters = result.spec.filters
   const warnings = issues.filter((i) => i.severity === 'warning')
+  const summary = summaryPoints(result, measureKey, dataset)
   return (
     <article id="report" className="mx-auto grid w-full max-w-4xl gap-8 overflow-hidden rounded-3xl border border-line bg-surface shadow-float print:rounded-none print:border-0 print:shadow-none">
       <header className="brand-gradient relative px-6 py-8 text-white sm:px-10 print:border-b print:border-line print:bg-none print:px-0 print:text-ink">
@@ -45,6 +66,21 @@ export function ReportView({ dataset, issues, result, narrative, chartKind, meas
       </header>
 
       <div className="grid gap-8 px-6 pb-8 sm:px-10 print:px-0">
+        <section className="print-avoid-break rounded-2xl border border-line bg-surface-2/60 p-5" aria-labelledby="exec-summary">
+          <h2 id="exec-summary" className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
+            Executive summary
+          </h2>
+          <ul className="mt-3 grid gap-2 text-sm text-ink">
+            {summary.map((p) => (
+              <li key={p} className="flex items-start gap-2">
+                <span aria-hidden className="mt-2 size-1.5 shrink-0 rounded-full brand-gradient" />
+                <span className="tabular">{p}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-xs text-ink-muted">Observed figures from the uploaded file. They describe what happened, not why.</p>
+        </section>
+
         <section className="print-avoid-break">
           <SectionTitle>Scope</SectionTitle>
           <ul className="grid gap-1.5 text-sm text-ink-2">

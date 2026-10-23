@@ -17,13 +17,31 @@ interface Props {
 const GRAINS: TimeGrain[] = ['day', 'week', 'month', 'quarter', 'year']
 const SUGGESTION_ICONS: Record<SuggestedAnalysis['kind'], typeof ChartLine> = { trend: ChartLine, compare: ChartColumn, count: Rows3 }
 
-function Section({ icon: Icon, title, hint, children }: { icon: typeof Sigma; title: string; hint?: string; children: React.ReactNode }) {
+function Section({
+  icon: Icon,
+  step,
+  title,
+  hint,
+  optional = false,
+  children,
+}: {
+  icon: typeof Sigma
+  step: number
+  title: string
+  hint?: string
+  optional?: boolean
+  children: React.ReactNode
+}) {
   return (
     <fieldset className="grid gap-3 border-t border-line pt-5 first-of-type:border-t-0 first-of-type:pt-0">
       <legend className="sr-only">{title}</legend>
       <div className="flex items-center gap-2" aria-hidden>
+        <span className="tabular grid size-5 shrink-0 place-items-center rounded-md bg-accent-soft text-[11px] font-bold text-accent-text">{step}</span>
         <Icon className="size-4 text-accent" />
         <span className="text-sm font-semibold text-ink">{title}</span>
+        <span className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold ${optional ? 'bg-surface-2 text-ink-muted' : 'bg-accent-soft text-accent-text'}`}>
+          {optional ? 'Optional' : 'Required'}
+        </span>
       </div>
       {hint && <p className="-mt-1.5 text-xs text-ink-muted">{hint}</p>}
       {children}
@@ -113,7 +131,7 @@ export function AnalysisBuilder({ profile, spec, onChange, onRun, onApplySuggest
             if (errors.length === 0) onRun()
           }}
         >
-          <Section icon={Sigma} title="Measures" hint="What to calculate. Numeric columns are listed first.">
+          <Section icon={Sigma} step={1} title="Measures" hint="What to calculate. Numeric columns are listed first.">
             {spec.measures.map((m, i) => {
               const column = m.column ? byName.get(m.column) : undefined
               return (
@@ -182,7 +200,7 @@ export function AnalysisBuilder({ profile, spec, onChange, onRun, onApplySuggest
             </div>
           </Section>
 
-          <Section icon={Layers} title="Group results" hint="Break the numbers down by a category or over time.">
+          <Section icon={Layers} step={2} optional title="Group results" hint="Break the numbers down by a category or over time.">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
               <div>
                 <label className={labelClass} htmlFor={`${id}-group`}>
@@ -214,7 +232,7 @@ export function AnalysisBuilder({ profile, spec, onChange, onRun, onApplySuggest
             </div>
           </Section>
 
-          <Section icon={Funnel} title="Filters" hint="Optional: narrow the rows that are analysed.">
+          <Section icon={Funnel} step={3} optional title="Filters" hint="Narrow the rows that are analysed.">
             {spec.filters.map((f, i) => (
               <div key={`${f.column}-${i}`} className="animate-rise rounded-xl border border-line bg-surface-2/50 p-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
@@ -287,7 +305,7 @@ export function AnalysisBuilder({ profile, spec, onChange, onRun, onApplySuggest
             )}
           </Section>
 
-          <Section icon={Settings2} title="Cleaning options" hint="Off by default: nothing is removed or changed without your choice.">
+          <Section icon={Settings2} step={4} optional title="Cleaning options" hint="Off by default: nothing is removed or changed without your choice.">
             <Toggle
               checked={spec.remove_duplicates}
               onChange={(v) => update({ remove_duplicates: v })}
