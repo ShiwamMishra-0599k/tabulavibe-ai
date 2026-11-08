@@ -32,6 +32,8 @@ BOOLEAN_FALSE = frozenset({"false", "no"})
 _CURRENCY_PREFIX = re.compile(r"^([+-]?)\s*(?:₹|rs\.?|inr|\$|€|£)\s*", re.IGNORECASE)
 _NUMBER = re.compile(r"[+-]?(?:\d{1,3}(?:,\d{2,3})*,\d{3}|\d+)?(?:\.\d+)?(?:[eE][+-]?\d+)?")
 _HAS_DIGIT = re.compile(r"\d")
+_PERCENT_SUFFIX = re.compile(r"\s*%$")
+_WHITESPACE = re.compile(r"\s+")
 _ID_NAME = re.compile(r"(^|[_\s-])(id|no|code|zip|pin|pincode|phone|mobile)$|^id[_\s-]", re.IGNORECASE)
 _CAMEL_ID = re.compile(r"[a-z]I[dD]$")
 
@@ -86,18 +88,39 @@ class Dataset:
         return len(self.raw)
 
 
+def _per_unique(series: pd.Series, func: Any) -> np.ndarray:
+    """Apply func once per distinct value and spread the results back to every row.
+
+    Columns repeat values heavily (regions, dates, prices), so this is much faster than a
+    per-cell string operation on large files, with exactly the same result."""
+    codes, uniques = pd.factorize(series, use_na_sentinel=False)
+    return np.asarray([func(u) for u in uniques.tolist()] + [None], dtype=object)[codes]
+
+
+def _is_missing_token(value: Any) -> bool:
+    return isinstance(value, str) and value.lower() in MISSING_TOKENS
+
+
 def _missing_mask(series: pd.Series) -> pd.Series:
-    return series.str.lower().isin(MISSING_TOKENS)
+    return pd.Series(_per_unique(series, _is_missing_token).astype(bool), index=series.index)
+
+
+def _clean_number(value: Any) -> str | None:
+    """The number rules from the module docstring: the cleaned digits, or None when not a number."""
+    if not isinstance(value, str):
+        return None
+    text = _PERCENT_SUFFIX.sub("", _CURRENCY_PREFIX.sub(r"\1", value))
+    if _NUMBER.fullmatch(text) and _HAS_DIGIT.search(text):
+        return text.replace(",", "")
+    return None
 
 
 def parse_numbers(values: pd.Series) -> pd.Series:
-    """Vectorised number parsing. Unparseable values become NaN."""
-    text = values.astype(str)
-    text = text.str.replace(_CURRENCY_PREFIX, r"\1", regex=True)
-    text = text.str.replace(r"\s*%$", "", regex=True)
-    valid = text.str.fullmatch(_NUMBER) & text.str.contains(_HAS_DIGIT)
-    cleaned = text.where(valid).str.replace(",", "", regex=False)
-    return pd.to_numeric(cleaned, errors="coerce").astype("float64")
+    """Number parsing, one check per distinct value. Unparseable values become NaN."""
+    codes, uniques = pd.factorize(values, use_na_sentinel=False)
+    cleaned = pd.Series([_clean_number(u) for u in uniques.tolist()] + [None], dtype=object)
+    numbers = pd.to_numeric(cleaned, errors="coerce").astype("float64").to_numpy()
+    return pd.Series(numbers[codes], index=values.index, dtype="float64")
 
 
 def _parse_dates(values: pd.Series, fmt: str) -> pd.Series:
@@ -156,10 +179,10 @@ def build_dataset(table: RawTable) -> Dataset:
 
         # boolean
         if lowered.isin(BOOLEAN_TRUE | BOOLEAN_FALSE).mean() >= TYPE_THRESHOLD:
-            low_all = series.str.lower()
+            low_all = _per_unique(series, lambda v: v.lower() if isinstance(v, str) else None)
             typed = pd.Series(pd.NA, index=series.index, dtype="boolean")
-            typed[low_all.isin(BOOLEAN_TRUE)] = True
-            typed[low_all.isin(BOOLEAN_FALSE)] = False
+            typed[np.isin(low_all, list(BOOLEAN_TRUE))] = True
+            typed[np.isin(low_all, list(BOOLEAN_FALSE))] = False
             invalid = ~missing & typed.isna()
             typed_columns[name] = typed
             infos[name] = ColumnInfo(
@@ -178,7 +201,7 @@ def build_dataset(table: RawTable) -> Dataset:
             invalid = ~missing & numbers.isna()
             role = "identifier" if _is_identifier(name, numbers, unique, present) else "measure"
             notes = []
-            if series[~missing].str.contains(r"%$", regex=True).any():
+            if any(v.endswith("%") for v in present_values.unique().tolist()):
                 notes.append("Percent signs were removed; values are kept on their original scale (12% → 12).")
             typed_columns[name] = numbers
             infos[name] = ColumnInfo(
@@ -218,8 +241,7 @@ def build_dataset(table: RawTable) -> Dataset:
         typed_columns[name] = series.where(~missing, None).astype(object)
         is_category = unique <= 200 or unique / present <= 0.2
         notes = []
-        normalised = present_values.str.lower().str.replace(r"\s+", " ", regex=True)
-        variant_count = unique - int(normalised.nunique())
+        variant_count = unique - len({_WHITESPACE.sub(" ", v.lower()) for v in present_values.unique().tolist()})
         if variant_count > 0:
             notes.append(
                 f"{variant_count} value(s) differ from another value only by letter case or spacing "

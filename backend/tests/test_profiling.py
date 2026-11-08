@@ -22,6 +22,24 @@ def test_parse_numbers_handles_currency_grouping_and_rejects_ambiguous():
             assert got == want
 
 
+def test_parse_numbers_checks_each_distinct_value_once_and_keeps_row_order():
+    # Repeated values share one check; results must still line up with the original rows and index.
+    values = pd.Series(["10", "x", "10", "₹5", "x", "10", "", "₹5"], index=[7, 3, 9, 1, 0, 4, 8, 2])
+    out = parse_numbers(values)
+    assert out.index.tolist() == [7, 3, 9, 1, 0, 4, 8, 2]
+    assert out.dtype == "float64"
+    assert [None if math.isnan(v) else v for v in out.tolist()] == [10.0, None, 10.0, 5.0, None, 10.0, None, 5.0]
+
+
+def test_missing_and_percent_detection_on_repeated_values(settings):
+    ds = ds_from(settings, "share,region\n12%,North\nNA,north\n12%,N/A\n7%,North\n")
+    assert ds.columns["share"].missing_count == 1
+    assert ds.typed["share"].tolist()[0] == 12.0 and ds.typed["share"].tolist()[3] == 7.0
+    assert any("Percent signs" in n for n in ds.columns["share"].notes)
+    assert ds.columns["region"].missing_count == 1
+    assert any("letter case or spacing" in n for n in ds.columns["region"].notes)
+
+
 def test_type_inference_on_fixture(sales_ds):
     types = {name: info.inferred_type for name, info in sales_ds.columns.items()}
     assert types == {
