@@ -37,7 +37,7 @@ _Last updated: 2026-11-08 (design system v3 "editorial": TabulaView.ai brand col
 
 ## Upload size (measured 2026-10-22 on this 8 GB Windows laptop)
 
-Since 2026-10-24, type detection checks each distinct value once: building the dataset for a 300,000-row, 21 MB CSV dropped from ~7.4 s to ~4.2 s (profile + analysis ~10 s → ~7 s), with identical results. The times below predate that change.
+Since 2026-10-24, type detection checks each distinct value once, with identical results. A repeatable benchmark is in [BENCHMARKS.md](BENCHMARKS.md): on a seeded 300,000-row CSV, the median build time is roughly 2× faster. That run was noisy, so no precise figure is quoted until a quiet-machine re-run. The earlier ~7.4 s → ~4.2 s note came from a file that isn't in the repo. The times below predate that change.
 
 | File | Peak memory | Time |
 |---|---|---|

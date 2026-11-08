@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — 2026-11-08 (repeatable build benchmark)
+
+### Added
+- `backend/scripts/benchmark_build.py`: a seeded synthetic CSV, the median of N runs, the environment details, and a result fingerprint that proves two versions give identical output.
+- `docs/BENCHMARKS.md`: how to reproduce the benchmark and compare against `cef8c29`, plus the first run. The median is roughly 2× faster with identical results, but the run was noisy and needs a quiet-machine re-run before any figure is quoted.
+
 ## Unreleased — 2026-11-08 (design system v3 "editorial", TabulaView.ai)
 
 ### Changed
