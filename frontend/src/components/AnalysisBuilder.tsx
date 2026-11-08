@@ -36,10 +36,10 @@ function Section({
     <fieldset className="grid gap-3 border-t border-line pt-5 first-of-type:border-t-0 first-of-type:pt-0">
       <legend className="sr-only">{title}</legend>
       <div className="flex items-center gap-2" aria-hidden>
-        <span className="tabular grid size-5 shrink-0 place-items-center rounded-md bg-accent-soft text-[11px] font-bold text-accent-text">{step}</span>
-        <Icon className="size-4 text-accent" />
+        <span className="tabular grid size-5 shrink-0 place-items-center rounded-md bg-ink text-[11px] font-bold text-page">{step}</span>
+        <Icon className="size-4 text-ink-2" />
         <span className="text-sm font-semibold text-ink">{title}</span>
-        <span className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold ${optional ? 'bg-surface-2 text-ink-muted' : 'bg-accent-soft text-accent-text'}`}>
+        <span className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold ${optional ? 'bg-surface-2 text-ink-muted' : 'bg-surface text-ink ring-1 ring-inset ring-line-strong'}`}>
           {optional ? 'Optional' : 'Required'}
         </span>
       </div>
@@ -87,9 +87,9 @@ export function AnalysisBuilder({ profile, spec, onChange, onRun, onApplySuggest
     // min-w-0: stay inside the 340 px sidebar column instead of growing to fit long labels.
     <div className="grid min-w-0 gap-4">
       {suggestions.length > 0 && (
-        <section className="animate-rise gradient-border rounded-2xl p-4 shadow-card" aria-labelledby={`${id}-sugg`}>
+        <section className="animate-rise highlight-rule rounded-xl p-4" aria-labelledby={`${id}-sugg`}>
           <h2 id={`${id}-sugg`} className="flex items-center gap-2 text-sm font-semibold text-ink">
-            <WandSparkles aria-hidden className="size-4 text-accent" />
+            <WandSparkles aria-hidden className="size-4 text-ink-2" />
             Suggested for your data
           </h2>
           <p className="mt-0.5 text-xs text-ink-muted">One click to run. You can fine-tune it below.</p>
@@ -104,7 +104,7 @@ export function AnalysisBuilder({ profile, spec, onChange, onRun, onApplySuggest
                     onClick={() => onApplySuggestion(s.spec)}
                     className="group flex w-full items-center gap-3 rounded-xl border border-line bg-surface p-3 text-left transition hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-card disabled:opacity-50"
                   >
-                    <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent-text transition group-hover:brand-gradient group-hover:text-white">
+                    <span className="grid size-8 shrink-0 place-items-center rounded-md bg-surface-2 text-ink transition group-hover:bg-accent group-hover:text-accent-ink">
                       <Icon aria-hidden className="size-4" />
                     </span>
                     <span className="min-w-0 flex-1">

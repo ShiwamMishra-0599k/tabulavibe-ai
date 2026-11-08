@@ -76,7 +76,7 @@ describe('Accounts and saved reports', () => {
     expect(screen.getByRole('dialog', { name: 'Sign in' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Close sign in dialog' }))
     await user.click(screen.getByRole('button', { name: 'Create an account' }))
-    expect(screen.getByRole('heading', { name: 'Create your TabulaVibe account' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Create your TabulaView.ai account' })).toBeInTheDocument()
     expect(calls.some((c) => c.url === '/api/profile')).toBe(false)
   })
 
@@ -126,11 +126,11 @@ describe('Accounts and saved reports', () => {
 
     await user.click(screen.getByRole('button', { name: 'Close sign in dialog' }))
     await user.click(screen.getByRole('button', { name: 'Sign up' }))
-    expect(screen.getByRole('heading', { name: 'Create your TabulaVibe account' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Create your TabulaView.ai account' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Sign up with Google' }))
     expect(authMock.signIn).toHaveBeenLastCalledWith('google')
 
-    const signUp = screen.getByRole('region', { name: 'Create your TabulaVibe account' })
+    const signUp = screen.getByRole('region', { name: 'Create your TabulaView.ai account' })
     await user.click(within(signUp).getByRole('button', { name: 'Sign in' }))
     expect(screen.getByRole('dialog', { name: 'Sign in' })).toBeInTheDocument()
   })
@@ -165,7 +165,7 @@ describe('Accounts and saved reports', () => {
     const user = userEvent.setup()
     const calls = mockServer()
     render(<App />)
-    expect(await screen.findByText('Shiwam Mishra')).toBeInTheDocument() // name from the TabulaVibe profile
+    expect(await screen.findByText('Shiwam Mishra')).toBeInTheDocument() // name from the account profile
 
     await user.click(await screen.findByRole('button', { name: 'Load sample: Retail sales (CSV)' }))
     await user.click(await screen.findByRole('button', { name: 'Manual Analyst' }))

@@ -91,9 +91,9 @@ function FindingBrief({ f, rank, ev, onExplore, onAsk }: { f: Finding; rank: num
   const why = f.magnitude || [f.baseline, f.comparison].filter(Boolean).join(' → ')
   const next = [f.recommended_action, f.success_metric ? `Measure success by: ${f.success_metric}` : ''].filter(Boolean)
   return (
-    <article aria-label={`Key finding ${f.id}`} className={`print-avoid-break rounded-2xl p-4 shadow-card sm:p-5 ${rank === 1 ? 'gradient-border' : 'border border-line bg-surface'}`}>
+    <article aria-label={`Key finding ${f.id}`} className={`print-avoid-break rounded-xl p-4 sm:p-5 ${rank === 1 ? 'highlight-rule' : 'border border-line bg-surface'}`}>
       <div className="flex items-start gap-3">
-        <span aria-hidden className={`tabular grid size-8 shrink-0 place-items-center rounded-xl text-sm font-bold ${rank === 1 ? 'brand-gradient text-white' : 'bg-surface-2 text-ink-2'}`}>
+        <span aria-hidden className={`tabular grid size-8 shrink-0 place-items-center font-serif text-lg font-medium ${rank === 1 ? 'text-accent-text' : 'text-ink-muted'}`}>
           {rank}
         </span>
         <div className="min-w-0 flex-1">
@@ -301,7 +301,7 @@ export function OverviewPage({ report, ev, onExplore, onAsk }: PageProps) {
               {nextSteps.length === 0 && <li className="text-ink-muted">No open actions.</li>}
               {nextSteps.map((n) => (
                 <li key={n} className="flex items-start gap-2">
-                  <CircleCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-accent" />
+                  <CircleCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-ink-2" />
                   <span>{n}</span>
                 </li>
               ))}
@@ -831,7 +831,7 @@ export function InsightsPage({ report, onExplore, onAsk }: PageProps) {
                   </dd>
                 </dl>
               </section>
-              <section aria-label="Recommendation" className="rounded-xl bg-accent-soft/60 p-3">
+              <section aria-label="Recommendation" className="rounded-lg border-l-2 border-accent bg-surface-2 p-3">
                 <dl className="grid gap-2 text-sm">
                   <div>
                     <dt className="text-xs font-semibold text-accent-text">What action to consider?</dt>

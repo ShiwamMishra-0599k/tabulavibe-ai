@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import {
   ArrowRight,
   ChartColumn,
-  ChartNoAxesColumn,
   Check,
   Eye,
   FileDown,
@@ -63,7 +62,7 @@ const THEMES: { value: ThemeChoice; label: string; icon: LucideIcon }[] = [
 function ThemeToggle() {
   const [theme, setTheme] = useTheme()
   return (
-    <div role="group" aria-label="Colour theme" className="flex rounded-xl bg-surface-2 p-1 ring-1 ring-inset ring-line max-sm:rounded-lg max-sm:p-0.5">
+    <div role="group" aria-label="Colour theme" className="flex w-fit rounded-lg bg-rail-2 p-1 ring-1 ring-inset ring-rail-line max-sm:p-0.5">
       {THEMES.map(({ value, label, icon: Icon }) => (
         <button
           key={value}
@@ -72,7 +71,7 @@ function ThemeToggle() {
           aria-pressed={theme === value}
           title={label}
           onClick={() => setTheme(value)}
-          className={`grid size-8 place-items-center rounded-lg transition max-sm:size-7 ${theme === value ? 'bg-surface text-accent shadow-soft ring-1 ring-line' : 'text-ink-muted hover:text-ink'}`}
+          className={`grid size-8 place-items-center rounded-md transition max-sm:size-7 ${theme === value ? 'bg-rail text-accent ring-1 ring-rail-line' : 'text-rail-muted hover:text-rail-ink'}`}
         >
           <Icon aria-hidden className="size-4" />
         </button>
@@ -88,25 +87,25 @@ function AccountMenu({ auth, account, onReports, onSignOut }: { auth: Auth; acco
   const name = account?.full_name || meta.full_name || meta.name || user.email || 'Account'
   const avatar = account?.avatar_url || meta.avatar_url
   return (
-    <div className="flex items-center gap-2">
-      <Button size="sm" variant="soft" icon={FolderOpen} onClick={onReports}>
+    <div className="flex items-center gap-2 lg:flex-col lg:items-stretch">
+      <Button size="sm" variant="rail" icon={FolderOpen} onClick={onReports} className="lg:justify-start">
         My reports
       </Button>
-      <div className="flex items-center gap-2 rounded-xl border border-line bg-surface py-1 pl-1 pr-1 lg:pr-2" title={user.email ?? undefined}>
+      <div className="flex items-center gap-2 rounded-lg border border-rail-line bg-rail-2 py-1 pl-1 pr-1 lg:pr-2" title={user.email ?? undefined}>
         {avatar ? (
-          <img src={avatar} alt="" referrerPolicy="no-referrer" className="size-7 rounded-lg object-cover" />
+          <img src={avatar} alt="" referrerPolicy="no-referrer" className="size-7 rounded-md object-cover" />
         ) : (
-          <span aria-hidden className="grid size-7 place-items-center rounded-lg brand-gradient text-xs font-bold text-white">
+          <span aria-hidden className="grid size-7 place-items-center rounded-md bg-accent text-xs font-bold text-accent-ink">
             {name.slice(0, 1).toUpperCase()}
           </span>
         )}
-        <span className="hidden max-w-32 truncate text-sm font-medium text-ink lg:block">{name}</span>
+        <span className="hidden min-w-0 flex-1 truncate text-sm font-medium text-rail-ink lg:block">{name}</span>
         <button
           type="button"
           onClick={onSignOut}
           aria-label="Sign out"
           title="Sign out"
-          className="grid size-7 place-items-center rounded-lg text-ink-muted transition hover:bg-surface-2 hover:text-ink"
+          className="grid size-7 place-items-center rounded-md text-rail-muted transition hover:bg-rail hover:text-rail-ink"
         >
           <LogOut aria-hidden className="size-4" />
         </button>
@@ -115,12 +114,24 @@ function AccountMenu({ auth, account, onReports, onSignOut }: { auth: Auth; acco
   )
 }
 
+/** Logo mark: a cream tile on the ink rail with three ink bars, the tallest in Burnt Orange. */
+function LogoMark() {
+  return (
+    <svg aria-hidden viewBox="0 0 36 36" className="size-9 shrink-0 max-sm:size-8">
+      <rect width="36" height="36" rx="8" fill="var(--rail-ink)" />
+      <rect x="9" y="17" width="4.5" height="10" rx="1" fill="#111111" />
+      <rect x="15.75" y="9" width="4.5" height="18" rx="1" fill="#d9541e" />
+      <rect x="22.5" y="13" width="4.5" height="14" rx="1" fill="#111111" />
+    </svg>
+  )
+}
+
 function ModeBar({ mode, onSwitch }: { mode: AnalysisMode; onSwitch: () => void }) {
   const Icon = mode === 'ai' ? Sparkles : SlidersHorizontal
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
       <p className="flex items-center gap-2 text-sm font-semibold text-ink">
-        <Icon aria-hidden className="size-4 text-accent" />
+        <Icon aria-hidden className="size-4 text-ink-2" />
         {mode === 'ai' ? 'AI Analyst' : 'Manual Analyst'}
       </p>
       <Button size="sm" variant="ghost" icon={mode === 'ai' ? SlidersHorizontal : Sparkles} onClick={onSwitch}>
@@ -195,7 +206,7 @@ export default function App() {
       .catch((e) => setServerError(message(e)))
   }, [])
 
-  // Once signed in, the sign-up page is never shown; the TabulaVibe profile feeds the header.
+  // Once signed in, the sign-up page is never shown; the account profile feeds the header.
   const view: View = requestedView === 'sign-up' && signedIn ? 'workspace' : requestedView
   const userId = auth.state.status === 'signed-in' ? auth.state.session.user.id : null
   const account = accountState && accountState.userId === userId ? accountState.account : null
@@ -487,35 +498,39 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-3 z-30 mx-auto w-[calc(100%-2rem)] max-w-7xl min-w-0 print:hidden">
-        <div className="flex min-h-16 flex-wrap items-center justify-between gap-3 rounded-[2rem] border border-line bg-glass px-4 py-2 shadow-float backdrop-blur-xl max-sm:min-h-0 max-sm:gap-2 max-sm:rounded-2xl max-sm:px-3 sm:px-5">
+      {/*
+        One header element for every width (so accessible names exist once): an Ink Black top bar below lg,
+        a fixed 248 px Ink Black sidebar from lg (DESIGN.md §6.1).
+      */}
+      <header className="sticky top-0 z-30 bg-rail text-rail-ink print:hidden lg:fixed lg:inset-y-0 lg:left-0 lg:w-62 lg:border-r lg:border-rail-line">
+        <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 px-4 py-2 max-sm:gap-2 max-sm:px-3 sm:px-6 lg:h-full lg:flex-col lg:flex-nowrap lg:items-stretch lg:justify-start lg:gap-6 lg:overflow-y-auto lg:px-5 lg:py-6">
           <div className="flex min-w-0 items-center gap-3 max-sm:gap-2">
-            <span aria-hidden className="grid size-9 place-items-center rounded-xl brand-gradient text-white shadow-[0_8px_20px_-8px_rgb(79_70_229/0.8)] max-sm:size-8 max-sm:rounded-lg">
-              <ChartNoAxesColumn className="size-5" />
-            </span>
+            <LogoMark />
             <div className="min-w-0">
-              <p className="truncate text-base font-bold leading-tight tracking-tight text-ink max-sm:text-sm">
-                TabulaVibe <span className="brand-text">AI</span>
+              <p className="truncate font-serif text-lg font-medium leading-tight tracking-tight text-rail-ink max-sm:text-base">
+                TabulaView<span className="font-sans text-sm font-semibold text-accent">.ai</span>
               </p>
-              <p className="hidden text-xs text-ink-muted sm:block">Spreadsheets to dashboards and reports</p>
+              <p className="hidden text-xs text-rail-muted sm:block lg:hidden">Intelligent by function. Elegant by design.</p>
             </div>
           </div>
-          <div className="flex max-w-full flex-wrap items-center justify-end gap-2 max-sm:gap-1.5 sm:gap-3">
+          <p className="hidden text-xs leading-relaxed text-rail-muted lg:block">Intelligent by function. Elegant by design.</p>
+          <div className="flex max-w-full flex-wrap items-center justify-end gap-2 max-sm:gap-1.5 sm:gap-3 lg:flex-1 lg:flex-col lg:flex-nowrap lg:items-stretch lg:justify-start">
             {profile && (
-              <>
-                <div className="hidden min-w-0 items-center gap-2 rounded-xl border border-line bg-surface px-3 py-1.5 md:flex" title={profile.dataset.file_name}>
+              <div className="contents lg:grid lg:gap-2">
+                <p className="hidden text-[11px] font-medium uppercase tracking-[0.12em] text-rail-muted lg:block">Current file</p>
+                <div className="hidden min-w-0 items-center gap-2 rounded-lg border border-rail-line bg-rail-2 px-3 py-1.5 md:flex lg:flex-wrap" title={profile.dataset.file_name}>
                   <FileSpreadsheet aria-hidden className="size-4 shrink-0 text-accent" />
-                  <span className="max-w-48 truncate text-sm font-medium text-ink">{profile.dataset.file_name}</span>
-                  <span className="text-xs text-ink-muted">· {formatCount(profile.dataset.row_count)} rows</span>
+                  <span className="min-w-0 max-w-48 truncate text-sm font-medium text-rail-ink lg:max-w-none lg:flex-1">{profile.dataset.file_name}</span>
+                  <span className="text-xs text-rail-muted lg:w-full lg:pl-6">{formatCount(profile.dataset.row_count)} rows</span>
                 </div>
-                <Button size="sm" icon={RotateCcw} onClick={reset}>
+                <Button size="sm" variant="rail" icon={RotateCcw} onClick={reset} className="lg:justify-start">
                   <span className="max-[430px]:sr-only">New file</span>
                 </Button>
-              </>
+              </div>
             )}
             {!signedIn && (
-              <>
-                <Button size="sm" variant="secondary" icon={LogIn} onClick={() => setSignInOpen(true)}>
+              <div className="contents lg:grid lg:gap-2">
+                <Button size="sm" variant="rail" icon={LogIn} onClick={() => setSignInOpen(true)} className="lg:justify-start">
                   <span className="max-[430px]:sr-only">Sign in</span>
                 </Button>
                 {storageOn && (
@@ -523,13 +538,15 @@ export default function App() {
                     Sign up
                   </Button>
                 )}
-              </>
+              </div>
             )}
             <AccountMenu auth={auth} account={account} onReports={openReports} onSignOut={signOut} />
-            <div className="hidden sm:block">
-              <GitHubStars />
+            <div className="flex items-center gap-2 max-sm:gap-1.5 sm:gap-3 lg:mt-auto lg:flex-col lg:items-start lg:border-t lg:border-rail-line lg:pt-5">
+              <div className="hidden sm:block">
+                <GitHubStars />
+              </div>
+              <ThemeToggle />
             </div>
-            <ThemeToggle />
           </div>
         </div>
       </header>
@@ -541,7 +558,8 @@ export default function App() {
         hasOpenWork={!!profile}
       />
 
-      <main className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:py-8">
+      <div className="min-w-0 lg:pl-62">
+      <main className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:py-10">
         {serverError && (
           <Alert kind="error" title="The server is unavailable">
             {serverError}
@@ -564,7 +582,7 @@ export default function App() {
         {view === 'workspace' && !profile && (
           <>
             {busy === 'upload' ? (
-              <div className="grid gap-4 rounded-3xl border border-line bg-surface p-8 shadow-card">
+              <div className="grid gap-4 rounded-2xl border border-line bg-surface p-8">
                 <Hero signInRequired={signInRequired} />
                 <Spinner label={largeFile ? 'Reading and checking your file… large files can take up to a minute.' : 'Reading and checking your file…'} />
                 <Skeleton className="h-8 w-1/3" />
@@ -623,8 +641,8 @@ export default function App() {
                 </span>
                 <span className="tabular">{steps.filter((s) => isDone(s.id)).length} done</span>
               </div>
-              <div className="h-1 overflow-hidden rounded-full bg-surface-3" aria-hidden>
-                <div className="brand-gradient h-full rounded-full transition-[width] duration-300" style={{ width: `${((ORDER.indexOf(tab) + 1) / steps.length) * 100}%` }} />
+              <div className="h-0.5 overflow-hidden rounded-full bg-line" aria-hidden>
+                <div className="h-full rounded-full bg-ink transition-[width] duration-300" style={{ width: `${((ORDER.indexOf(tab) + 1) / steps.length) * 100}%` }} />
               </div>
             </div>
             <nav aria-label="Workflow steps" className="no-scrollbar -mt-3 overflow-x-auto pb-1 print:hidden">
@@ -643,14 +661,14 @@ export default function App() {
                       aria-controls={`panel-${step.id}`}
                       disabled={step.disabled}
                       onClick={() => goTo(step.id)}
-                      className={`relative flex w-32 shrink-0 items-center gap-2 rounded-xl border p-2 text-left transition disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto sm:min-w-0 sm:flex-col sm:gap-1.5 sm:rounded-2xl sm:text-center md:flex-row md:gap-3 md:p-3 md:text-left ${
-                        active ? 'border-transparent bg-surface shadow-card ring-2 ring-accent/60' : 'border-line bg-surface/60 hover:border-line-strong hover:bg-surface'
+                      className={`relative flex w-32 shrink-0 items-center gap-2 rounded-lg border p-2 text-left transition disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto sm:min-w-0 sm:flex-col sm:gap-1.5 sm:rounded-xl sm:text-center md:flex-row md:gap-3 md:p-3 md:text-left ${
+                        active ? 'highlight-rule' : 'border-line bg-surface/60 hover:border-line-strong hover:bg-surface'
                       }`}
                     >
                       <span
                         aria-hidden
-                        className={`grid size-9 shrink-0 place-items-center rounded-xl transition ${
-                          active ? 'brand-gradient text-white' : done ? 'bg-good-soft text-good' : 'bg-surface-2 text-ink-muted'
+                        className={`grid size-9 shrink-0 place-items-center rounded-full transition ${
+                          active ? 'bg-accent text-accent-ink' : done ? 'bg-good-soft text-good' : 'bg-surface-2 text-ink-muted'
                         }`}
                       >
                         {done && !active ? <Check className="size-4" /> : <step.icon className="size-4" />}
@@ -703,9 +721,9 @@ export default function App() {
                       </div>
                     )}
                     {!result && busy !== 'analyze' && (
-                      <div className="dot-grid grid place-items-center rounded-3xl border-2 border-dashed border-line-strong p-10 text-center">
+                      <div className="grid place-items-center rounded-2xl border border-dashed border-line-strong p-10 text-center">
                         <IconChip icon={ChartColumn} tone="brand" size="lg" />
-                        <h2 className="mt-4 text-lg font-semibold tracking-tight text-ink">Your dashboard will appear here</h2>
+                        <h2 className="mt-4 font-serif text-xl font-medium tracking-tight text-ink">Your dashboard will appear here</h2>
                         <p className="mt-1 max-w-sm text-sm text-ink-2">
                           Pick a suggestion, or choose your measures and grouping, then select <strong>Run analysis</strong>.
                         </p>
@@ -723,7 +741,7 @@ export default function App() {
               )}
               {tab === 'report' && result && (
                 <div className="animate-rise grid gap-5">
-                  <section className="rounded-2xl border border-line bg-surface p-5 shadow-card print:hidden" aria-labelledby="downloads-title">
+                  <section className="rounded-xl border border-line bg-surface p-5 sm:p-6 print:hidden" aria-labelledby="downloads-title">
                     <h2 id="downloads-title" className="text-base font-semibold tracking-tight text-ink">
                       Downloads
                     </h2>
@@ -732,7 +750,7 @@ export default function App() {
                       <Button variant="primary" size="lg" icon={FileText} busy={busy === 'report-pdf'} onClick={() => downloadReport('pdf')}>
                         Download PDF
                       </Button>
-                      <Button variant="primary" size="lg" icon={Presentation} busy={busy === 'report-pptx'} onClick={() => downloadReport('pptx')}>
+                      <Button size="lg" icon={Presentation} busy={busy === 'report-pptx'} onClick={() => downloadReport('pptx')}>
                         Download PowerPoint
                       </Button>
                       <Button size="lg" icon={FileDown} busy={busy === 'export-results'} onClick={exportResults}>
@@ -773,10 +791,11 @@ export default function App() {
         )}
       </main>
 
-      <footer className="mx-auto max-w-7xl px-4 pb-10 pt-4 text-center text-xs text-ink-muted print:hidden">
-        TabulaVibe AI is a demonstration tool. Uploaded files are processed in memory and never stored; only reports you choose to save are kept in
+      <footer className="mx-auto max-w-7xl border-t border-line px-4 pb-10 pt-6 text-xs text-ink-muted print:hidden sm:px-6">
+        TabulaView.ai is a demonstration tool. Uploaded files are processed in memory and never stored; only reports you choose to save are kept in
         your account. Sample data is synthetic.
       </footer>
+      </div>
     </div>
   )
 }

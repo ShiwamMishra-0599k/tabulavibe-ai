@@ -30,7 +30,7 @@ export function NarrativeText({ narrative }: { narrative: Narrative }) {
 export function AiNarrative({ config, narrative, error, busy, onGenerate }: Props) {
   const enabled = config?.ai.enabled ?? false
   return (
-    <section className={`rounded-2xl p-5 shadow-card ${enabled ? 'gradient-border' : 'border border-dashed border-line-strong bg-surface/70'}`} aria-labelledby="ai-title">
+    <section className={`rounded-xl p-5 sm:p-6 ${enabled ? 'highlight-rule' : 'border border-dashed border-line-strong bg-surface/70'}`} aria-labelledby="ai-title">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <IconChip icon={Bot} tone={enabled ? 'brand' : 'neutral'} />

@@ -53,7 +53,7 @@ export function ModeChoice({ profile, config, onChoose }: { profile: Profile; co
     <section className="animate-rise mx-auto grid w-full max-w-5xl gap-6" aria-labelledby="mode-title">
       <div className="text-center">
         <h1 id="mode-title" className="text-balance text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-          How would you like to analyse <span className="brand-text">{dataset.file_name || 'your file'}</span>?
+          How would you like to analyse <span className="brand-em">{dataset.file_name || 'your file'}</span>?
         </h1>
         <ul className="mt-3 flex flex-wrap justify-center gap-2" aria-label="File summary">
           <li>
@@ -74,10 +74,10 @@ export function ModeChoice({ profile, config, onChoose }: { profile: Profile; co
             type="button"
             aria-label={o.name}
             onClick={() => onChoose(o.mode)}
-            className="group flex min-w-0 flex-col rounded-3xl border border-line bg-surface p-5 text-left shadow-card transition hover:-translate-y-0.5 hover:border-accent/50 hover:shadow-float focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent sm:p-6"
+            className="group flex min-w-0 flex-col rounded-2xl border border-line bg-surface p-5 text-left transition hover:border-ink focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent sm:p-6"
           >
             <span className="flex flex-wrap items-start justify-between gap-3">
-              <span aria-hidden className={`grid size-12 place-items-center rounded-2xl ${o.mode === 'ai' ? 'brand-gradient text-white shadow-[0_10px_24px_-10px_rgb(79_70_229/0.8)]' : 'bg-accent-soft text-accent-text'}`}>
+              <span aria-hidden className={`grid size-12 place-items-center rounded-xl ${o.mode === 'ai' ? 'brand-solid' : 'bg-surface-2 text-ink'}`}>
                 <o.icon className="size-6" />
               </span>
               {o.mode === 'ai' &&
@@ -115,7 +115,7 @@ export function ModeChoice({ profile, config, onChoose }: { profile: Profile; co
                 </li>
               ))}
             </ul>
-            <span className="brand-gradient mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition group-hover:brightness-110 sm:w-fit">
+            <span className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-accent-ink transition group-hover:bg-accent-hover sm:w-fit">
               {o.cta}
               <ArrowRight aria-hidden className="size-4 transition group-hover:translate-x-0.5" />
             </span>

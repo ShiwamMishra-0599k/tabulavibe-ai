@@ -23,7 +23,7 @@ const BENEFITS = [
   { icon: ShieldCheck, text: 'No password to remember: Google or GitHub confirms who you are.' },
 ]
 
-/** Sign-up page. The first Google/GitHub sign-in creates the TabulaVibe profile (database trigger). */
+/** Sign-up page. The first Google/GitHub sign-in creates the account profile (database trigger). */
 export function SignUpPage({ onSignUp, onSignInInstead, onBack, hasOpenWork }: Props) {
   const [pending, setPending] = useState<OAuthProvider | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -40,18 +40,18 @@ export function SignUpPage({ onSignUp, onSignInInstead, onBack, hasOpenWork }: P
   }
 
   return (
-    <div className="animate-rise mx-auto grid w-full max-w-5xl overflow-hidden rounded-3xl border border-line bg-surface shadow-float lg:grid-cols-[1fr_1.1fr]">
-      <aside className="brand-gradient relative hidden flex-col justify-between gap-10 p-10 text-white lg:flex">
+    <div className="animate-rise mx-auto grid w-full max-w-5xl overflow-hidden rounded-2xl border border-line bg-surface lg:grid-cols-[1fr_1.1fr]">
+      <aside className="relative hidden flex-col justify-between gap-10 bg-rail p-10 text-rail-ink lg:flex">
         <div className="flex items-center gap-2 text-sm font-semibold">
-          <ChartNoAxesColumn aria-hidden className="size-5" />
-          TabulaVibe AI
+          <ChartNoAxesColumn aria-hidden className="size-5 text-accent" />
+          TabulaView.ai
         </div>
         <div>
-          <p className="text-3xl font-bold leading-tight tracking-tight">Your dashboards, saved and ready when you are.</p>
+          <p className="font-serif text-3xl font-medium leading-tight tracking-tight">Your dashboards, saved and ready when you are.</p>
           <ul className="mt-8 grid gap-4">
             {BENEFITS.map(({ icon: Icon, text }) => (
-              <li key={text} className="flex gap-3 text-sm text-white/90">
-                <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-lg bg-white/15">
+              <li key={text} className="flex gap-3 text-sm text-rail-ink/90">
+                <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-md bg-rail-2 text-accent ring-1 ring-rail-line">
                   <Icon className="size-4" />
                 </span>
                 {text}
@@ -59,7 +59,7 @@ export function SignUpPage({ onSignUp, onSignInInstead, onBack, hasOpenWork }: P
             ))}
           </ul>
         </div>
-        <p className="text-xs text-white/70">Analysing files never needs an account. Sign up only to save reports.</p>
+        <p className="text-xs text-rail-muted">Analysing files never needs an account. Sign up only to save reports.</p>
       </aside>
 
       <section className="grid content-center gap-6 p-6 sm:p-10" aria-labelledby="sign-up-title">
@@ -71,7 +71,7 @@ export function SignUpPage({ onSignUp, onSignInInstead, onBack, hasOpenWork }: P
         <div>
           <IconChip icon={UserRoundPlus} tone="brand" size="lg" />
           <h1 id="sign-up-title" className="mt-4 text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-            Create your TabulaVibe account
+            Create your TabulaView.ai account
           </h1>
           <p className="mt-1.5 text-sm text-ink-2">Use your Gmail (Google) or GitHub account. Your profile is created on your first sign-in.</p>
         </div>
@@ -106,7 +106,7 @@ export function SignUpPage({ onSignUp, onSignInInstead, onBack, hasOpenWork }: P
           </button>
         </p>
         <p className="text-center text-xs leading-relaxed text-ink-muted">
-          We receive only your name, email address and profile picture from the provider. No password is shared with TabulaVibe.
+          We receive only your name, email address and profile picture from the provider. No password is shared with TabulaView.ai.
         </p>
       </section>
     </div>

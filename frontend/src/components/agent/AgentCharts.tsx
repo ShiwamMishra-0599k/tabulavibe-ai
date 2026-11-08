@@ -26,7 +26,7 @@ export function Histogram({ bins, label }: { bins: Bin[]; label: string }) {
               const d = payload?.[0]?.payload as (typeof data)[number] | undefined
               if (!active || !d) return null
               return (
-                <div className="rounded-xl border border-line bg-glass px-3 py-2 text-xs shadow-float backdrop-blur-md">
+                <div className="rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-float">
                   <p className="tabular font-semibold text-ink">
                     {formatNumber(d.start)} to {formatNumber(d.end)}
                   </p>
@@ -35,7 +35,7 @@ export function Histogram({ bins, label }: { bins: Bin[]; label: string }) {
               )
             }}
           />
-          <Bar dataKey="count" fill={SERIES[0]} radius={[3, 3, 0, 0]} isAnimationActive={false} />
+          <Bar dataKey="count" fill="var(--chart-base)" radius={[2, 2, 0, 0]} isAnimationActive={false} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -86,12 +86,12 @@ export function BoxPlot({ stats, label }: { stats: BoxStats; label: string }) {
   )
 }
 
-/** Correlation heatmap: blue for positive, orange for negative, strength by intensity. */
+/** Correlation heatmap: ink for positive, rust for negative, strength by intensity (no blue, DESIGN.md §3.4). */
 export function CorrelationHeatmap({ columns, matrix, label }: { columns: string[]; matrix: (number | null)[][]; label: string }) {
   const cell = (r: number | null) => {
     if (r === null) return { background: 'var(--surface-2)' }
-    const colour = r >= 0 ? 'var(--series-1)' : 'var(--series-2)'
-    return { background: `color-mix(in oklab, ${colour} ${Math.round(Math.abs(r) * 85)}%, var(--surface))`, color: Math.abs(r) > 0.55 ? 'white' : 'var(--ink)' }
+    const colour = r >= 0 ? 'var(--ink)' : 'var(--series-2)'
+    return { background: `color-mix(in oklab, ${colour} ${Math.round(Math.abs(r) * 85)}%, var(--surface))`, color: Math.abs(r) > 0.55 ? 'var(--page)' : 'var(--ink)' }
   }
   return (
     <div className="overflow-x-auto">

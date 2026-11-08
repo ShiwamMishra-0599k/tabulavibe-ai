@@ -36,7 +36,7 @@ export function DataPreview({ profile }: { profile: Profile }) {
       <div className="max-h-[520px] overflow-auto rounded-xl border border-line" tabIndex={0} aria-label="Data preview table">
         <table className="w-full border-collapse text-left text-sm">
           <caption className="sr-only">First rows of the uploaded data</caption>
-          <thead className="sticky top-0 z-10 bg-surface-2/95 backdrop-blur">
+          <thead className="sticky top-0 z-10 bg-surface-2">
             <tr>
               <th scope="col" className="px-3 py-2.5 text-xs font-medium text-ink-muted">
                 #
@@ -58,7 +58,7 @@ export function DataPreview({ profile }: { profile: Profile }) {
           </thead>
           <tbody>
             {preview.rows.map((row, i) => (
-              <tr key={i} className="border-t border-line transition-colors hover:bg-accent-soft/40">
+              <tr key={i} className="border-t border-line transition-colors hover:bg-surface-2">
                 <td className="tabular px-3 py-2 text-xs text-ink-muted">{i + 1}</td>
                 {row.map((cell, j) => (
                   <td

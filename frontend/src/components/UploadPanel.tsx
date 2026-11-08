@@ -16,7 +16,6 @@ import {
 } from 'lucide-react'
 import type { AppConfig, SampleInfo } from '../lib/types'
 import { formatCount } from '../lib/format'
-import { SERIES } from '../lib/charts'
 import { Badge, Button, IconChip, Skeleton } from './ui'
 
 interface Props {
@@ -49,8 +48,8 @@ export function Hero({ signInRequired = false }: { signInRequired?: boolean }) {
           Files are never stored
         </Badge>
       </div>
-      <h1 className="text-balance text-3xl font-bold tracking-tight text-ink sm:text-4xl xl:text-5xl">
-        Turn a spreadsheet into a <span className="brand-text">verified dashboard</span>
+      <h1 className="text-balance font-serif text-4xl font-medium leading-[1.08] tracking-tight text-ink sm:text-5xl xl:text-6xl">
+        Turn a spreadsheet into a <span className="brand-em underline decoration-accent decoration-[3px] underline-offset-[6px]">verified dashboard</span>
       </h1>
       <p className="mx-auto mt-3 max-w-xl text-pretty text-base text-ink-2 lg:mx-0">
         Upload a CSV or Excel file to check its quality, get KPIs and charts, or let the AI analyst write a report. Every figure is calculated
@@ -74,15 +73,15 @@ function DashboardPreview() {
     <figure
       role="img"
       aria-label="Example dashboard from the Retail sales sample: total revenue ₹16.46 lakh across 725 rows and 5 categories; Household brings in 44.1% of revenue."
-      className="animate-rise group overflow-hidden rounded-3xl border border-line bg-surface shadow-float"
+      className="animate-rise group overflow-hidden rounded-2xl border border-line bg-surface shadow-card"
       style={{ animationDelay: '60ms' }}
     >
       <div aria-hidden>
         <div className="flex items-center gap-2 border-b border-line bg-surface-2/70 px-4 py-2.5">
           <span className="flex gap-1.5">
-            <span className="size-2.5 rounded-full bg-[#ff5f57]" />
-            <span className="size-2.5 rounded-full bg-[#febc2e]" />
-            <span className="size-2.5 rounded-full bg-[#28c840]" />
+            <span className="size-2.5 rounded-full bg-line-strong" />
+            <span className="size-2.5 rounded-full bg-line-strong" />
+            <span className="size-2.5 rounded-full bg-line-strong" />
           </span>
           <span className="ml-2 truncate text-xs font-medium text-ink-muted">retail_sales.csv · dashboard</span>
           <span className="ml-auto rounded-md bg-surface px-1.5 py-0.5 text-[10px] font-semibold text-ink-muted ring-1 ring-line">Example</span>
@@ -94,29 +93,30 @@ function DashboardPreview() {
               ['Rows analysed', '725', false],
               ['Categories', '5', false],
             ].map(([label, value, lead]) => (
-              <div key={label as string} className={`rounded-xl p-2.5 ${lead ? 'gradient-border' : 'border border-line bg-surface'}`}>
+              <div key={label as string} className={`rounded-lg p-2.5 ${lead ? 'highlight-rule' : 'border border-line bg-surface'}`}>
                 <p className="truncate text-[10px] font-medium text-ink-muted">{label}</p>
-                <p className="tabular mt-0.5 text-base font-bold tracking-tight text-ink">{value}</p>
+                <p className="tabular mt-0.5 text-base font-semibold tracking-tight text-ink">{value}</p>
               </div>
             ))}
           </div>
-          <div className="rounded-xl border border-line p-3">
+          <div className="rounded-lg border border-line p-3">
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs font-semibold text-ink">Revenue by category</p>
               <span className="flex gap-1 rounded-lg bg-surface-2 p-0.5 text-[10px] font-semibold text-ink-muted ring-1 ring-inset ring-line">
-                <span className="rounded-md bg-surface px-1.5 py-0.5 text-ink shadow-soft ring-1 ring-line">Bar</span>
+                <span className="rounded-md bg-surface px-1.5 py-0.5 text-ink ring-1 ring-line-strong">Bar</span>
                 <span className="px-1.5 py-0.5">Donut</span>
                 <span className="px-1.5 py-0.5">Table</span>
               </span>
             </div>
             <div className="mt-3 grid gap-1.5">
-              {bars.map((b) => (
+              {bars.map((b, i) => (
                 <div key={b.label} className="grid grid-cols-[5.5rem_1fr_2.5rem] items-center gap-2 text-[11px]">
                   <span className="truncate text-ink-2">{b.label}</span>
-                  <span className="h-3 overflow-hidden rounded-r-md bg-surface-2">
+                  <span className="h-3 overflow-hidden rounded-r-sm bg-surface-2">
                     <span
-                      className="block h-full rounded-r-md transition-[filter] group-hover:brightness-110"
-                      style={{ width: `${(b.value / max) * 100}%`, background: SERIES[0] }}
+                      className="block h-full rounded-r-sm"
+                      // v3 chart rule: ink bars, the top group in Burnt Orange.
+                      style={{ width: `${(b.value / max) * 100}%`, background: i === 0 ? 'var(--accent)' : 'var(--chart-base)' }}
                     />
                   </span>
                   <span className="tabular text-right font-semibold text-ink-2">{b.value}L</span>
@@ -124,7 +124,7 @@ function DashboardPreview() {
               ))}
             </div>
           </div>
-          <div className="flex items-start gap-2 rounded-xl bg-accent-soft/70 p-2.5 text-[11px] text-ink-2">
+          <div className="flex items-start gap-2 rounded-lg border-l-2 border-accent bg-surface-2 p-2.5 text-[11px] text-ink-2">
             <Bot className="mt-px size-3.5 shrink-0 text-accent-text" />
             <span>
               <span className="font-semibold text-ink">Household brings in 44.1% of revenue.</span> Every number is checked against its evidence.
@@ -149,7 +149,7 @@ function UploadZone({ config, busy, onFile, locked }: Pick<Props, 'config' | 'bu
   }
 
   return (
-    <section className="animate-rise gradient-border rounded-3xl p-2 shadow-float" aria-labelledby="upload-title" style={{ animationDelay: '30ms' }}>
+    <section className="animate-rise highlight-rule rounded-2xl p-2" aria-labelledby="upload-title" style={{ animationDelay: '30ms' }}>
       <div
         onDragOver={(e) => {
           e.preventDefault()
@@ -157,13 +157,13 @@ function UploadZone({ config, busy, onFile, locked }: Pick<Props, 'config' | 'bu
         }}
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
-        className={`dot-grid relative flex flex-col items-center justify-center gap-4 rounded-[1.25rem] border-2 border-dashed px-5 py-8 text-center transition sm:py-10 ${
-          dragging ? 'scale-[0.99] border-accent bg-accent-soft' : 'border-line-strong bg-surface-2/60'
+        className={`relative flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed px-5 py-8 text-center transition sm:py-10 ${
+          dragging ? 'border-accent bg-accent-soft' : 'border-line-strong bg-page/60'
         }`}
       >
         {locked ? (
           <>
-            <span className="grid size-14 place-items-center rounded-2xl brand-gradient text-white shadow-[0_12px_28px_-10px_rgb(79_70_229/0.8)]">
+            <span className="brand-solid grid size-14 place-items-center rounded-xl">
               <Lock aria-hidden className="size-7" />
             </span>
             <div>
@@ -185,7 +185,7 @@ function UploadZone({ config, busy, onFile, locked }: Pick<Props, 'config' | 'bu
           </>
         ) : (
           <>
-            <span className="grid size-14 place-items-center rounded-2xl brand-gradient text-white shadow-[0_12px_28px_-10px_rgb(79_70_229/0.8)]">
+            <span className="brand-solid grid size-14 place-items-center rounded-xl">
               <CloudUpload aria-hidden className="size-7" />
             </span>
             <div>
@@ -243,7 +243,7 @@ function SampleList({ samples, busy, onSample, locked }: Pick<Props, 'samples' |
   return (
     <section className="animate-rise grid content-start gap-2.5" aria-labelledby="samples-title" style={{ animationDelay: '90ms' }}>
       <div className="flex items-center gap-2 px-1">
-        <Zap aria-hidden className="size-4 text-accent" />
+        <Zap aria-hidden className="size-4 text-ink-2" />
         <h2 id="samples-title" className="text-sm font-semibold text-ink">
           No file? Try a sample
         </h2>
@@ -309,11 +309,11 @@ export function UploadPanel({ config, samples, busy, onFile, onSample, locked, h
         </h2>
         <ol className="grid grid-cols-[minmax(0,1fr)] gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {STEPS.map((step, i) => (
-            <li key={step.title} className="flex items-start gap-3 rounded-2xl border border-line bg-surface/70 p-3 backdrop-blur">
+            <li key={step.title} className="flex items-start gap-3 rounded-xl border border-line bg-surface/70 p-3">
               <IconChip icon={step.icon} tone="neutral" size="sm" />
               <div className="min-w-0">
                 <h3 className="text-sm font-semibold text-ink">
-                  <span className="text-ink-muted">{i + 1}. </span>
+                  <span className="font-serif text-accent-text">{i + 1}. </span>
                   {step.title}
                 </h3>
                 <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">{step.text}</p>

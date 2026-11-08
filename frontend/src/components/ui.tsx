@@ -1,20 +1,22 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { CircleCheck, CircleX, Info, LoaderCircle, TriangleAlert, type LucideIcon } from 'lucide-react'
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'soft'
+type Variant = 'primary' | 'secondary' | 'ghost' | 'soft' | 'rail'
 type Size = 'sm' | 'md' | 'lg'
 
 const VARIANTS: Record<Variant, string> = {
-  primary:
-    'brand-gradient text-white shadow-[0_8px_20px_-8px_rgb(79_70_229/0.7)] hover:brightness-110 hover:shadow-[0_10px_24px_-8px_rgb(79_70_229/0.8)] border border-transparent',
-  secondary: 'bg-surface text-ink border border-line-strong hover:border-accent/50 hover:bg-surface-2 shadow-soft',
+  // Ink label on Burnt Orange: white/cream on #D9541E fail AA contrast (DESIGN.md §3.2).
+  primary: 'bg-accent text-accent-ink border border-transparent hover:bg-accent-hover',
+  secondary: 'bg-surface text-ink border border-line-strong hover:border-ink',
   ghost: 'bg-transparent text-ink-2 border border-transparent hover:bg-surface-2 hover:text-ink',
-  soft: 'bg-accent-soft text-accent-text border border-transparent hover:brightness-95',
+  soft: 'bg-surface-2 text-ink border border-transparent hover:bg-surface-3',
+  // Secondary action on the Ink Black sidebar / top bar: cream outline on ink.
+  rail: 'bg-transparent text-rail-ink border border-rail-line hover:border-rail-muted hover:bg-rail-2',
 }
 const SIZES: Record<Size, string> = {
   sm: 'min-h-8 px-3 text-xs gap-1.5 rounded-lg',
-  md: 'min-h-10 px-4 text-sm gap-2 rounded-xl',
-  lg: 'min-h-12 px-6 text-base gap-2 rounded-xl',
+  md: 'min-h-10 px-4 text-sm gap-2 rounded-lg',
+  lg: 'min-h-12 px-6 text-base gap-2 rounded-lg',
 }
 
 export function Button({
@@ -60,7 +62,7 @@ export function Card({
 }) {
   return (
     <section
-      className={`rounded-2xl p-4 shadow-card sm:p-6 ${highlight ? 'gradient-border' : 'border border-line bg-surface'} ${className}`}
+      className={`rounded-xl p-5 sm:p-6 ${highlight ? 'highlight-rule' : 'border border-line bg-surface'} ${className}`}
     >
       {(title || actions) && (
         <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
@@ -81,14 +83,14 @@ export function Card({
 
 export function IconChip({ icon: Icon, tone = 'accent', size = 'md' }: { icon: LucideIcon; tone?: 'accent' | 'brand' | 'good' | 'warn' | 'bad' | 'neutral'; size?: 'sm' | 'md' | 'lg' }) {
   const tones = {
-    accent: 'bg-accent-soft text-accent-text',
-    brand: 'brand-gradient text-white shadow-[0_6px_16px_-6px_rgb(79_70_229/0.7)]',
+    accent: 'bg-surface-2 text-ink',
+    brand: 'brand-solid',
     good: 'bg-good-soft text-good',
     warn: 'bg-warn-soft text-warn',
     bad: 'bg-bad-soft text-bad',
     neutral: 'bg-surface-2 text-ink-2',
   }
-  const sizes = { sm: 'size-7 rounded-lg [&>svg]:size-3.5', md: 'size-9 rounded-xl [&>svg]:size-[18px]', lg: 'size-12 rounded-2xl [&>svg]:size-6' }
+  const sizes = { sm: 'size-7 rounded-md [&>svg]:size-3.5', md: 'size-9 rounded-lg [&>svg]:size-[18px]', lg: 'size-12 rounded-xl [&>svg]:size-6' }
   return (
     <span aria-hidden className={`grid shrink-0 place-items-center ${tones[tone]} ${sizes[size]}`}>
       <Icon />
@@ -99,14 +101,14 @@ export function IconChip({ icon: Icon, tone = 'accent', size = 'md' }: { icon: L
 const ALERT = {
   error: { box: 'border-bad/30 bg-bad-soft', icon: CircleX, color: 'text-bad' },
   warning: { box: 'border-warn/30 bg-warn-soft', icon: TriangleAlert, color: 'text-warn' },
-  info: { box: 'border-line bg-surface-2', icon: Info, color: 'text-accent-text' },
+  info: { box: 'border-line bg-surface-2', icon: Info, color: 'text-ink-2' },
   success: { box: 'border-good/30 bg-good-soft', icon: CircleCheck, color: 'text-good' },
 }
 
 export function Alert({ kind = 'info', title, children }: { kind?: keyof typeof ALERT; title?: string; children?: ReactNode }) {
   const { box, icon: Icon, color } = ALERT[kind]
   return (
-    <div role={kind === 'error' ? 'alert' : 'status'} className={`animate-rise flex gap-3 rounded-xl border p-3.5 text-sm ${box}`}>
+    <div role={kind === 'error' ? 'alert' : 'status'} className={`animate-rise flex gap-3 rounded-lg border p-3.5 text-sm ${box}`}>
       <Icon aria-hidden className={`mt-0.5 size-[18px] shrink-0 ${color}`} />
       <div className="min-w-0">
         {title && <p className="font-semibold text-ink">{title}</p>}
@@ -126,13 +128,13 @@ export function Spinner({ label }: { label?: string }) {
 }
 
 export function Skeleton({ className = '' }: { className?: string }) {
-  return <div aria-hidden className={`skeleton rounded-xl ${className}`} />
+  return <div aria-hidden className={`skeleton rounded-lg ${className}`} />
 }
 
 export function Badge({ children, tone = 'neutral', icon: Icon }: { children: ReactNode; tone?: 'neutral' | 'accent' | 'warn' | 'good' | 'bad'; icon?: LucideIcon }) {
   const tones = {
     neutral: 'bg-surface-2 text-ink-2 ring-line',
-    accent: 'bg-accent-soft text-accent-text ring-accent/20',
+    accent: 'bg-surface text-ink ring-line-strong',
     warn: 'bg-warn-soft text-warn ring-warn/20',
     good: 'bg-good-soft text-good ring-good/20',
     bad: 'bg-bad-soft text-bad ring-bad/20',
@@ -147,7 +149,7 @@ export function Badge({ children, tone = 'neutral', icon: Icon }: { children: Re
 
 export function Stat({ label, value, hint, icon, tone = 'accent' }: { label: string; value: ReactNode; hint?: ReactNode; icon: LucideIcon; tone?: 'accent' | 'good' | 'warn' | 'bad' | 'neutral' }) {
   return (
-    <div className="flex items-start gap-3 rounded-2xl border border-line bg-surface p-4 shadow-soft">
+    <div className="flex items-start gap-3 rounded-xl border border-line bg-surface p-4">
       <IconChip icon={icon} tone={tone} />
       <div className="min-w-0">
         <p className="text-xs font-medium text-ink-muted">{label}</p>
@@ -164,7 +166,7 @@ export function ProgressRing({ value, size = 120, label }: { value: number; size
   const radius = (size - stroke) / 2
   const circumference = 2 * Math.PI * radius
   const clamped = Math.max(0, Math.min(100, value))
-  const tone = clamped >= 95 ? 'var(--good)' : clamped >= 80 ? 'var(--accent)' : 'var(--warn)'
+  const tone = clamped >= 95 ? 'var(--good)' : clamped >= 80 ? 'var(--ink)' : 'var(--warn)'
   return (
     <div className="relative grid place-items-center" style={{ width: size, height: size }} role="img" aria-label={`${label}: ${clamped}%`}>
       <svg width={size} height={size} className="-rotate-90">
@@ -182,7 +184,7 @@ export function ProgressRing({ value, size = 120, label }: { value: number; size
           style={{ transition: 'stroke-dashoffset 0.8s cubic-bezier(0.2, 0.7, 0.2, 1)' }}
         />
       </svg>
-      <span className="absolute text-2xl font-bold tracking-tight text-ink">{clamped}%</span>
+      <span className="tabular absolute text-2xl font-semibold tracking-tight text-ink">{clamped}%</span>
     </div>
   )
 }
@@ -190,7 +192,7 @@ export function ProgressRing({ value, size = 120, label }: { value: number; size
 /** Thin horizontal bar for a 0–100 value computed by the server. */
 export function Meter({ value, label }: { value: number; label: string }) {
   const clamped = Math.max(0, Math.min(100, value))
-  const tone = clamped >= 95 ? 'bg-good' : clamped >= 80 ? 'bg-accent' : 'bg-warn'
+  const tone = clamped >= 95 ? 'bg-good' : clamped >= 80 ? 'bg-ink' : 'bg-warn'
   return (
     <div className="flex items-center gap-2" role="img" aria-label={`${label}: ${clamped}%`}>
       <div className="h-1.5 w-20 overflow-hidden rounded-full bg-surface-3">
@@ -203,7 +205,7 @@ export function Meter({ value, label }: { value: number; label: string }) {
 
 export function Toggle({ checked, onChange, label, description }: { checked: boolean; onChange: (checked: boolean) => void; label: string; description?: ReactNode }) {
   return (
-    <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-line p-3 transition hover:border-accent/40 hover:bg-surface-2">
+    <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-line p-3 transition hover:border-line-strong hover:bg-surface-2">
       {/* A real checkbox styled as a switch (see .switch in index.css), so it stays keyboard- and screen-reader-native. */}
       <input type="checkbox" className="switch mt-0.5" checked={checked} onChange={(e) => onChange(e.target.checked)} />
       <span className="min-w-0">
@@ -215,14 +217,19 @@ export function Toggle({ checked, onChange, label, description }: { checked: boo
 }
 
 export const selectClass =
-  'min-h-10 w-full rounded-xl border border-line-strong bg-surface px-3 text-sm text-ink shadow-soft transition hover:border-accent/50 focus:border-accent disabled:opacity-50'
+  'min-h-10 w-full rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink transition hover:border-ink focus:border-ink disabled:opacity-50'
 export const labelClass = 'mb-1.5 block text-xs font-semibold text-ink-2'
 export const inputClass =
-  'min-h-10 w-full rounded-xl border border-line-strong bg-surface px-3 text-sm text-ink shadow-soft transition placeholder:text-ink-muted hover:border-accent/50 focus:border-accent'
+  'min-h-10 w-full rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink transition placeholder:text-ink-muted hover:border-ink focus:border-ink'
 
-/** Small uppercase label above a section title. */
-export function Eyebrow({ children }: { children: ReactNode }) {
-  return <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">{children}</p>
+/** Small uppercase label above a section title; `rule` adds the short Burnt Orange rule before it. */
+export function Eyebrow({ children, rule = false }: { children: ReactNode; rule?: boolean }) {
+  return (
+    <p className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.12em] text-ink-muted">
+      {rule && <span aria-hidden className="h-0.5 w-4 bg-accent" />}
+      {children}
+    </p>
+  )
 }
 
 /** Heading for a group of cards inside a page (h2 by default). */
@@ -231,7 +238,7 @@ export function SectionHeading({ title, description, actions, level = 2, id }: {
   return (
     <div className="flex flex-wrap items-end justify-between gap-2">
       <div className="min-w-0">
-        <H id={id} className="text-base font-semibold tracking-tight text-ink sm:text-lg">
+        <H id={id} className="font-serif text-lg font-medium tracking-tight text-ink sm:text-xl">
           {title}
         </H>
         {description && <p className="mt-0.5 text-sm text-ink-muted">{description}</p>}
@@ -273,7 +280,7 @@ export function SegmentedControl<T extends string>({
     <div
       role="group"
       aria-label={label}
-      className={`rounded-xl bg-surface-2 p-1 ring-1 ring-inset ring-line ${stretch ? 'grid w-full sm:flex sm:w-auto' : 'flex w-fit max-w-full flex-wrap'}`}
+      className={`rounded-lg bg-surface-2 p-1 ring-1 ring-inset ring-line ${stretch ? 'grid w-full sm:flex sm:w-auto' : 'flex w-fit max-w-full flex-wrap'}`}
       style={stretch ? { gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` } : undefined}
     >
       {options.map((o) => {
@@ -286,8 +293,8 @@ export function SegmentedControl<T extends string>({
             aria-pressed={active}
             title={o.title}
             onClick={() => onChange(o.value)}
-            className={`flex min-h-8 items-center justify-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-35 sm:px-3 ${
-              active ? 'bg-surface text-ink shadow-soft ring-1 ring-line' : 'text-ink-muted hover:text-ink'
+            className={`flex min-h-8 items-center justify-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-35 sm:px-3 ${
+              active ? 'bg-surface text-ink ring-1 ring-line-strong' : 'text-ink-muted hover:text-ink'
             }`}
           >
             {o.icon && <o.icon aria-hidden className={`size-3.5 shrink-0 ${active ? 'text-accent' : ''}`} />}
@@ -303,7 +310,7 @@ export function SegmentedControl<T extends string>({
 export function TabBar<T extends string>({ label, tabs, value, onChange }: { label: string; tabs: { id: T; label: string; icon?: LucideIcon }[]; value: T; onChange: (id: T) => void }) {
   return (
     <nav aria-label={label} className="no-scrollbar overflow-x-auto print:hidden">
-      <div role="tablist" className="flex w-max min-w-full gap-1 rounded-2xl bg-surface-2 p-1 ring-1 ring-inset ring-line">
+      <div role="tablist" className="flex w-max min-w-full gap-1 border-b border-line">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -311,11 +318,11 @@ export function TabBar<T extends string>({ label, tabs, value, onChange }: { lab
             role="tab"
             aria-selected={value === t.id}
             onClick={() => onChange(t.id)}
-            className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold transition ${
-              value === t.id ? 'bg-surface text-ink shadow-soft ring-1 ring-line' : 'text-ink-muted hover:text-ink'
+            className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-semibold transition ${
+              value === t.id ? 'border-accent text-ink' : 'border-transparent text-ink-muted hover:border-line-strong hover:text-ink'
             }`}
           >
-            {t.icon && <t.icon aria-hidden className={`size-4 ${value === t.id ? 'text-accent' : ''}`} />}
+            {t.icon && <t.icon aria-hidden className="size-4" />}
             {t.label}
           </button>
         ))}
@@ -349,14 +356,14 @@ export function KpiTile({
 }) {
   return (
     <div
-      className={`animate-rise print-avoid-break flex min-w-0 flex-col rounded-2xl p-4 shadow-card sm:p-5 ${lead ? 'gradient-border' : 'border border-line bg-surface'}`}
+      className={`animate-rise print-avoid-break flex min-w-0 flex-col rounded-xl p-4 sm:p-5 ${lead ? 'highlight-rule' : 'border border-line bg-surface'}`}
       style={delay ? { animationDelay: `${delay}ms` } : undefined}
     >
       <div className="flex items-start justify-between gap-2">
         <p className="min-w-0 text-sm font-medium text-ink-2">{label}</p>
-        {icon && <IconChip icon={icon} tone={lead ? 'brand' : 'accent'} size="sm" />}
+        {icon && <IconChip icon={icon} tone={lead ? 'brand' : 'neutral'} size="sm" />}
       </div>
-      <p className="tabular mt-2 break-words text-2xl font-bold tracking-tight text-ink sm:text-3xl">{value}</p>
+      <p className="tabular mt-2 break-words text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{value}</p>
       {meta && <div className="mt-2 flex flex-wrap gap-1.5">{meta}</div>}
       {definition && (
         <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-ink-muted" title={definition}>

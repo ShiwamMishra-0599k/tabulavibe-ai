@@ -38,7 +38,7 @@ async function request(path: string, init?: RequestInit): Promise<Response> {
   try {
     response = await fetch(`${BASE_URL}${path}`, await withToken(init))
   } catch {
-    throw new ApiError('network_error', 'Could not reach the TabulaVibe server. Check your connection and try again.', 0)
+    throw new ApiError('network_error', 'Could not reach the TabulaView.ai server. Check your connection and try again.', 0)
   }
   if (!response.ok) {
     let code = 'http_error'

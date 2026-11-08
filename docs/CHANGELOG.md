@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased — 2026-11-08 (design system v3 "editorial", TabulaView.ai)
+
+### Changed
+- **New brand palette:** Cream `#F3EEE3` canvas (~60%), Ink Black `#111111` structure and type (~30%), Burnt Orange `#D9541E` for the primary action, active states and one highlight (~10%). No purple, blue, neon or gradients anywhere: background glows, glass/blur, gradient borders, gradient text, button glows and the skeleton shimmer are gone.
+- **Ink Black sidebar** (248 px from `lg`) replaces the floating header pill: logo, current file, New file, sign-in or account, GitHub and theme. Phones get a sticky ink top bar with the same controls. One header element for both, so accessible names are unchanged and appear once.
+- **Editorial type:** Fraunces Variable (self-hosted) for headlines, section headings, report titles and finding numbers; Inter stays for interface and numbers.
+- **Components:** primary buttons are orange with ink labels (white or cream on orange fails AA); the one key card per view gets a 3 px orange top rule instead of a gradient border; tabs use an orange underline; icon chips, badges and gauges are ink, not brand-tinted; tighter radii; borders instead of shadows; no hover lift.
+- **Charts:** ink bars with the largest group in orange; ink trend line with a flat 8% wash and the latest point in orange; correlation heatmap ink (positive) / rust (negative); new warm categorical palette, checked for protanopia, deuteranopia and tritanopia (minimum ΔE 13.9 light, 14.8 dark).
+- **PDF and PowerPoint:** flat Ink Black cover with an orange rule, cream slides, paper-coloured KPI cards and table cells, ink bars with the largest in orange, v3 confidence colours.
+- **Name:** visible brand is now **TabulaView.ai** (page title, favicon, header, sign-in, sign-up, report header and footers, GitHub badge label). Code identifiers, env vars, repo and storage keys still say TabulaVibe.
+- `DESIGN.md` rewritten as v3 with measured contrast ratios and a do/don't table.
+
+### Verified
+- 309 pytest, ruff clean; `tsc`, oxlint clean; 48 Vitest; production build OK; 10 Playwright E2E (desktop + Pixel 7, light + dark) passed serially. Parallel E2E runs fail intermittently, different tests each time, on this 8 GB PC; every test passes alone and the serial run is clean. Screenshots reviewed in light, dark and phone layouts. Generated PowerPoint checked: Ink Black cover, cream slides, largest bar orange. The PDF was not viewed (no PDF renderer on this machine); its tests pass.
+
+## Unreleased — 2026-10-24 (faster type detection for large files)
+
+### Changed
+- **Faster type detection** (`profiling.py`): missing-value, number, yes/no, percent-sign and label-variant checks now run once per distinct value instead of once per cell, and the number rules run in one pass instead of six string operations. Same rules and regexes; results unchanged.
+
+### Verified
+- Old and new number parsing and missing-value detection agree on 200,000 generated edge cases (currency prefixes, Indian and Western grouping, `1,2`, `5.`, `inf`, `1e999`, non-ASCII digits, placeholders). On a 300,000-row, 21 MB CSV the typed data, column info, profile response and analysis are identical to 0.8.0.
+- Same file, three runs each on the 8 GB laptop: building the dataset 7.2–7.7 s → 4.1–4.3 s (about 1.75× faster); profile + analysis end to end 9.9–10.2 s → 6.8–7.0 s. Columns where almost every value is different (IDs, amounts) still need one check per value and set the remaining time.
+- 309 pytest (2 new: row order and index kept for repeated values; missing, percent and label-variant detection on repeated values), ruff clean.
+
 ## 0.8.0 — 2026-10-23 (frontend: landing, BI workspace, live analyst timeline, decision-first report)
 
 ### Changed

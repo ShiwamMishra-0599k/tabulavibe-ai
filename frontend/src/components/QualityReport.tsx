@@ -48,7 +48,7 @@ export function QualityReport({ profile }: { profile: Profile }) {
     // minmax(0,1fr): wide tables scroll inside their cards instead of widening the page on phones.
     <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-        <section className="animate-rise gradient-border flex items-center gap-5 rounded-2xl p-5 shadow-card" aria-labelledby="health-title">
+        <section className="animate-rise highlight-rule flex items-center gap-5 rounded-xl p-5 sm:p-6" aria-labelledby="health-title">
           <ProgressRing value={dataset.valid_cell_pct} label="Data health" />
           <div className="min-w-0">
             <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-muted">

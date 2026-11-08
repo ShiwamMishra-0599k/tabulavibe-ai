@@ -39,7 +39,7 @@ describe('App', () => {
       '/api/github': () => jsonResponse({ repo: 'ShiwamMishra-0599k/tabulavibe-ai', url: 'https://github.com/ShiwamMishra-0599k/tabulavibe-ai', stars: 1234 }),
     })
     render(<App />)
-    const link = await screen.findByRole('link', { name: 'TabulaVibe AI on GitHub, 1,234 stars' })
+    const link = await screen.findByRole('link', { name: 'TabulaView.ai on GitHub, 1,234 stars' })
     expect(link).toHaveAttribute('href', 'https://github.com/ShiwamMishra-0599k/tabulavibe-ai')
     expect(link).toHaveAttribute('rel', 'noopener noreferrer')
     expect(link).toHaveTextContent('1.2K')

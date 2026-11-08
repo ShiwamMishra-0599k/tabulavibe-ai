@@ -98,7 +98,7 @@ function PhaseSteps({ phases, calculations }: { phases: Phase[]; calculations: M
           <li key={p.id} aria-label={`Phase ${p.id}: ${p.name}, ${PHASE_STATUS_LABEL[p.status]}`} className="relative flex gap-3 pb-3">
             {!last && <span aria-hidden className={`absolute left-[9px] top-6 bottom-0 w-px ${DONE.includes(p.status) ? 'bg-good/40' : 'bg-line'}`} />}
             <Icon aria-hidden className={`relative mt-0.5 size-[19px] shrink-0 rounded-full bg-surface ${className}`} />
-            <div className={`min-w-0 flex-1 ${p.status === 'running' ? 'rounded-xl bg-accent-soft/60 px-2.5 py-1.5 ring-1 ring-accent/20' : ''}`}>
+            <div className={`min-w-0 flex-1 ${p.status === 'running' ? 'rounded-lg border-l-2 border-accent bg-surface-2 px-2.5 py-1.5' : ''}`}>
               <p className={`text-sm ${p.status === 'pending' ? 'text-ink-muted' : 'font-semibold text-ink'}`}>
                 {p.id}. {p.name}
               </p>

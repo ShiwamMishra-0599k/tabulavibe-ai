@@ -25,7 +25,7 @@ export function GitHubStars() {
 
   if (!repo?.url) return null
   const label =
-    repo.stars === null ? 'TabulaVibe AI on GitHub' : `TabulaVibe AI on GitHub, ${formatCount(repo.stars)} ${repo.stars === 1 ? 'star' : 'stars'}`
+    repo.stars === null ? 'TabulaView.ai on GitHub' : `TabulaView.ai on GitHub, ${formatCount(repo.stars)} ${repo.stars === 1 ? 'star' : 'stars'}`
 
   return (
     <a
@@ -34,14 +34,14 @@ export function GitHubStars() {
       rel="noopener noreferrer"
       aria-label={label}
       title={repo.stars === null ? 'View on GitHub' : 'Star on GitHub'}
-      className="inline-flex min-h-8 items-center overflow-hidden rounded-lg border border-line-strong bg-surface text-xs font-semibold text-ink shadow-soft transition hover:border-accent/50 hover:bg-surface-2"
+      className="inline-flex min-h-8 items-center overflow-hidden rounded-lg border border-rail-line bg-rail-2 text-xs font-semibold text-rail-ink transition hover:border-rail-muted"
     >
       <span className="flex items-center gap-1.5 px-2 py-1">
         <GitHubMark />
         <span className="hidden sm:inline">GitHub</span>
       </span>
       {repo.stars !== null && (
-        <span className="flex items-center gap-1 self-stretch border-l border-line bg-surface-2 px-2 tabular">
+        <span className="flex items-center gap-1 self-stretch border-l border-rail-line bg-rail px-2 tabular">
           <Star aria-hidden className="size-3.5 fill-warn text-warn" />
           {starFormat.format(repo.stars)}
         </span>

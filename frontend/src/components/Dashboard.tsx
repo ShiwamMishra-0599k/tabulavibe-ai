@@ -85,7 +85,7 @@ export function ResultsTable({ result }: { result: AnalysisResult }) {
         </thead>
         <tbody>
           {result.rows.map((r) => (
-            <tr key={r.group} className="border-t border-line transition-colors hover:bg-accent-soft/40">
+            <tr key={r.group} className="border-t border-line transition-colors hover:bg-surface-2">
               <th scope="row" className="px-3 py-2 font-semibold text-ink">
                 {r.group}
               </th>
@@ -264,7 +264,7 @@ export function Dashboard({ result, chartKind, measureKey, onChartKind, onMeasur
         <details className="group rounded-2xl border border-line bg-surface shadow-card">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl px-4 py-3 sm:px-6 [&::-webkit-details-marker]:hidden">
             <span className="flex items-center gap-2 text-sm font-semibold text-ink">
-              <Table2 aria-hidden className="size-4 text-accent" />
+              <Table2 aria-hidden className="size-4 text-ink-2" />
               Results table
               <span className="font-normal text-ink-muted">· {formatCount(result.rows.length)} rows, every measure</span>
             </span>

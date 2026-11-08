@@ -60,7 +60,7 @@ def pdf_pages(content: bytes) -> int:
 def test_manual_pptx_has_kpis_native_chart_and_quality(manual_data):
     content = render_pptx(manual_doc(manual_data))
     text = slides_text(content)
-    assert text[0].startswith("TABULAVIBE AI") and "Sum of revenue by region" in text[0]
+    assert text[0].startswith("TABULAVIEW.AI") and "Sum of revenue by region" in text[0]
     assert "355" in text[1]  # hand-checked total revenue (conftest)
     chart = chart_of(content)
     # Native (editable) PowerPoint chart with the hand-checked group totals, largest first.

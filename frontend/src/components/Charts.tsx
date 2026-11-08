@@ -1,4 +1,3 @@
-import { useId } from 'react'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { ResultRow } from '../lib/types'
 import { SERIES } from '../lib/charts'
@@ -47,7 +46,7 @@ function ChartTooltip({ active, payload, measureLabel }: TooltipProps) {
   const datum = payload?.[0]?.payload as Datum | undefined
   if (!active || !datum) return null
   return (
-    <div className="rounded-xl border border-line bg-glass px-3 py-2 text-xs shadow-float backdrop-blur-md">
+    <div className="rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-float">
       <p className="font-semibold text-ink">{datum.group}</p>
       <p className="tabular mt-0.5 text-ink-2">
         {measureLabel}: <span className="font-semibold text-ink">{formatNumber(datum.value)}</span>
@@ -63,17 +62,11 @@ const axisTick = { fill: 'var(--ink-muted)', fontSize: 12 }
 
 export function TrendChart({ rows, measureKey, measureLabel, height = 320 }: ChartProps) {
   const data = toData(rows, measureKey)
-  const gradientId = `trend-${useId().replace(/:/g, '')}`
+  const last = data.length - 1
   return (
     <div role="img" aria-label={`Line chart of ${measureLabel} over time`} style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={data} margin={{ top: 12, right: 16, bottom: 4, left: 4 }}>
-          <defs>
-            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={SERIES[0]} stopOpacity={0.22} />
-              <stop offset="100%" stopColor={SERIES[0]} stopOpacity={0} />
-            </linearGradient>
-          </defs>
           <CartesianGrid stroke="var(--line)" vertical={false} />
           <XAxis dataKey="group" tick={axisTick} tickLine={false} axisLine={{ stroke: 'var(--line-strong)' }} minTickGap={16} />
           <YAxis tick={axisTick} tickLine={false} axisLine={false} tickFormatter={formatCompact} width={56} />
@@ -84,11 +77,19 @@ export function TrendChart({ rows, measureKey, measureLabel, height = 320 }: Cha
           <Area
             type="linear"
             dataKey="value"
-            stroke={SERIES[0]}
+            stroke="var(--ink)"
             strokeWidth={2}
-            fill={`url(#${gradientId})`}
-            dot={{ r: 4, fill: SERIES[0], stroke: 'var(--surface)', strokeWidth: 2 }}
-            activeDot={{ r: 6, fill: SERIES[0], stroke: 'var(--surface)', strokeWidth: 2 }}
+            // v3: flat 8% ink wash (no gradient); the latest period is the one Burnt Orange point.
+            fill="var(--ink)"
+            fillOpacity={0.08}
+            dot={(p: { cx?: number; cy?: number; index?: number }) =>
+              p.cx == null || p.cy == null ? (
+                <g key={`dot-${p.index}`} />
+              ) : (
+                <circle key={`dot-${p.index}`} cx={p.cx} cy={p.cy} r={p.index === last ? 5 : 3.5} fill={p.index === last ? 'var(--accent)' : 'var(--ink)'} stroke="var(--surface)" strokeWidth={2} />
+              )
+            }
+            activeDot={{ r: 6, fill: 'var(--accent)', stroke: 'var(--surface)', strokeWidth: 2 }}
             connectNulls={false}
             isAnimationActive={false}
           />
@@ -110,16 +111,21 @@ export function BarComparison({ rows, measureKey, measureLabel }: ChartProps) {
           <YAxis type="category" dataKey="group" tick={{ ...axisTick, fill: 'var(--ink-2)' }} tickLine={false} axisLine={{ stroke: 'var(--line-strong)' }} width={labelWidth(data)} />
           <Tooltip
             content={(props) => <ChartTooltip active={props.active} payload={props.payload} measureLabel={measureLabel} />}
-            cursor={{ fill: 'var(--surface-2)', radius: 8 }}
+            cursor={{ fill: 'var(--surface-2)', radius: 2 }}
           />
           <Bar
             dataKey="value"
-            fill={SERIES[0]}
-            maxBarSize={24}
-            radius={[0, 6, 6, 0]}
+            fill="var(--chart-base)"
+            maxBarSize={20}
+            radius={[0, 2, 2, 0]}
             isAnimationActive={false}
             label={{ position: 'right', fill: 'var(--ink-2)', fontSize: 12, fontWeight: 600, formatter: (v: unknown) => (typeof v === 'number' ? formatCompact(v) : '') }}
-          />
+          >
+            {/* Bars are sorted largest first: the top group is the one Burnt Orange mark, the rest ink. */}
+            {data.map((d, i) => (
+              <Cell key={d.group} fill={i === 0 ? 'var(--accent)' : 'var(--chart-base)'} />
+            ))}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>

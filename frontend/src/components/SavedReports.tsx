@@ -66,7 +66,7 @@ export function ReportsList({ reports, error, onOpen, onDelete, onNew, onExport 
         </div>
       )}
       {reports?.length === 0 && (
-        <div className="dot-grid grid place-items-center rounded-2xl border-2 border-dashed border-line-strong p-10 text-center">
+        <div className="grid place-items-center rounded-2xl border border-dashed border-line-strong p-10 text-center">
           <IconChip icon={BookmarkCheck} tone="brand" size="lg" />
           <h3 className="mt-4 text-base font-semibold text-ink">No saved reports yet</h3>
           <p className="mt-1 max-w-sm text-sm text-ink-2">

@@ -1,6 +1,6 @@
 # Project status
 
-_Last updated: 2026-10-23 (v0.8.0: landing, BI workspace, live analyst timeline, decision-first report)_
+_Last updated: 2026-11-08 (design system v3 "editorial": TabulaView.ai brand colours, ink sidebar; not yet deployed)_
 
 | Milestone | Status | Evidence |
 |---|---|---|
@@ -9,21 +9,22 @@ _Last updated: 2026-10-23 (v0.8.0: landing, BI workspace, live analyst timeline,
 | M3 GitHub / AWS deployment | **GitHub: done. AWS: prepared, not deployed** | Public repo <https://github.com/ShiwamMishra-0599k/tabulavibe-ai> (pushed and verified 2026-10-21). SAM template passes cfn-lint; the arm64 package was built and invoked in the official Lambda image; deploy script and checklist written. AWS blocker below |
 | v0.4 AI analyst (workflow phases 0–8) | **Built and tested locally; AI mode not live-tested** | Rules-based analyst verified end to end (pytest, Vitest, Playwright on both samples). AI mode (Groq → NVIDIA since 0.6.0) and Kumo forecasting tested against scripted fakes of the APIs only. See [AGENT_WORKFLOW.md](AGENT_WORKFLOW.md) |
 | v0.5 Choice screen + PDF/PowerPoint reports | **Built and tested locally** | Choice after upload (AI or Manual Analyst); reports rendered by ReportLab and python-pptx, opened in PowerPoint for visual review; E2E downloads real PDF and PPTX files on desktop and Pixel 7; all 13 screens measured to fit 320/360/412 px phones |
+| Design system v3 (TabulaView.ai) | **Built and tested locally, not committed or deployed** | Cream / Ink Black / Burnt Orange tokens, ink sidebar, Fraunces headlines, recoloured charts and report files; see `DESIGN.md` and the changelog. 309 pytest, 48 Vitest, 10 E2E (serial) |
 | Small-screen navigation | **Fixed locally** | Header is a compact toolbar with icon-only narrow-screen actions; workflow and analyst report tabs use horizontal touch scrolling; frontend build and 36 Vitest tests pass |
 | Vercel deployment | **Live: <https://tabulavibe-ai.vercel.app>** (2026-10-21) | Project `shiwam/tabulavibe-ai` (Hobby), built from GitHub `main`. Verified live: health, both samples, CSV + XLSX profile, analysis (same totals as local), both CSV exports, 413 above 3.5 MB, docs hidden, security headers, and all 8 Playwright journeys (desktop + Pixel 7) via `E2E_BASE_URL`. See [DEPLOYMENT_VERCEL.md](DEPLOYMENT_VERCEL.md) |
 | M4 Quality and handover | **Done** | See the check results below |
 | v0.3 Accounts + saved reports (Supabase) | **Live** (2026-10-21) | Project `xftrxawqcoygrzohaase`: tables and RLS created (anonymous access refused, verified), Google + GitHub providers on (OAuth hand-offs verified). Shiwam signed in and saved a report on the live site. `TABULAVIBE_REQUIRE_SIGN_IN=true` set in Vercel; effective from the next deployment. See [SUPABASE_SETUP.md](SUPABASE_SETUP.md) |
 
-## Check results (2026-10-22)
+## Check results (2026-11-08, after design v3)
 
 | Check | Result |
 |---|---|
-| Backend `pytest` | 307 passed |
+| Backend `pytest` | 309 passed |
 | Backend `ruff check` / `ruff format --check` | clean |
 | Frontend `tsc -b` | clean |
 | Frontend `oxlint` | 0 warnings, 0 errors |
 | Frontend `vitest run` | 48 passed |
-| Frontend `vite build` | OK (main JS 207 kB gzipped + lazy supabase-js chunk 54 kB gzipped; Inter Latin font 48 kB; Vite warns about chunk size) |
+| Frontend `vite build` | OK (Vite warns about chunk size, as before; Fraunces upright + italic fonts added, self-hosted) |
 | Playwright E2E (Chrome, desktop + Pixel 7 viewport, light + dark) | 10 passed (serially; parallel runs time out on this 8 GB PC) |
 | `cfn-lint infra/template.yaml` | clean |
 | `npm audit` / `pip-audit -r requirements.txt` | 0 known vulnerabilities |
@@ -35,6 +36,8 @@ _Last updated: 2026-10-23 (v0.8.0: landing, BI workspace, live analyst timeline,
 1. **AWS:** the AWS CLI and SAM CLI are not installed and there are no AWS credentials. The account plan, free-tier eligibility and credits are therefore unknown, so the ₹0 budget cannot be evaluated for a real account. Follow [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Upload size (measured 2026-10-22 on this 8 GB Windows laptop)
+
+Since 2026-10-24, type detection checks each distinct value once: building the dataset for a 300,000-row, 21 MB CSV dropped from ~7.4 s to ~4.2 s (profile + analysis ~10 s → ~7 s), with identical results. The times below predate that change.
 
 | File | Peak memory | Time |
 |---|---|---|

@@ -1,127 +1,149 @@
 @import 'tailwindcss';
 
 /*
- * TabulaVibe design tokens: see DESIGN.md for the full system.
- * Brand: indigo → violet gradient used sparingly. Chart series keep the validated dataviz palette.
- * Themes: light by default, dark via OS preference or the in-app toggle (html[data-theme]).
+ * TabulaView.ai design tokens (v3, "editorial"): see DESIGN.md for the full system.
+ * Brand: Cream #F3EEE3 (60%), Ink Black #111111 (30%), Burnt Orange #D9541E (10%).
+ * No purple, blue, neon or gradients. Text on orange is always ink (white/cream fail contrast).
+ * Themes: light by default, dark ("Ink") via OS preference or the in-app toggle (html[data-theme]).
  */
 :root {
   color-scheme: light;
-  --page: #f6f7fb;
-  --surface: #ffffff;
-  --surface-2: #f3f4f9;
-  --surface-3: #e9ebf4;
-  --glass: rgb(255 255 255 / 0.72);
-  --ink: #0f1222;
-  --ink-2: #474c63;
-  --ink-muted: #676c84;
-  --line: #e4e6ef;
-  --line-strong: #d0d4e1;
-  --accent: #4f46e5;
-  --accent-2: #7c3aed;
-  --accent-ink: #ffffff;
-  --accent-soft: #eef0ff;
-  --accent-text: #4338ca;
-  --good: #047857;
-  --good-soft: #e6f6ee;
-  --warn: #8a4b06;
-  --warn-soft: #fff4df;
-  --bad: #b42323;
-  --bad-soft: #fdecec;
-  --shadow-sm: 0 1px 2px rgb(15 18 34 / 0.06), 0 1px 1px rgb(15 18 34 / 0.04);
-  --shadow-md: 0 4px 16px -4px rgb(15 18 34 / 0.1), 0 2px 4px rgb(15 18 34 / 0.04);
-  --shadow-lg: 0 24px 48px -16px rgb(49 46 129 / 0.22);
-  --glow-1: rgb(99 102 241 / 0.16);
-  --glow-2: rgb(168 85 247 / 0.12);
-  --glow-3: rgb(14 165 233 / 0.1);
-  --series-1: #2a78d6;
-  --series-2: #eb6834;
-  --series-3: #1baf7a;
-  --series-4: #eda100;
-  --series-5: #e87ba4;
-  --series-6: #008300;
-  --series-7: #6250d6;
-  --series-8: #e34948;
+  --page: #f3eee3;
+  --surface: #fbf8f2;
+  --surface-2: #ece5d7;
+  --surface-3: #e2d9c7;
+  --glass: #fbf8f2;
+  --ink: #111111;
+  --ink-2: #3a3631;
+  --ink-muted: #6b645a;
+  --line: #ddd5c5;
+  --line-strong: #c7bda9;
+  --accent: #d9541e;
+  --accent-hover: #c2481a;
+  --accent-ink: #111111;
+  --accent-soft: #f7e1d4;
+  --accent-text: #a8400f;
+  --good: #2f6b3a;
+  --good-soft: #e3ebdd;
+  --warn: #8a5a00;
+  --warn-soft: #f4e7c8;
+  --bad: #a1271e;
+  --bad-soft: #f5dcd6;
+  --brand-tile: #111111;
+  --brand-tile-ink: #f3eee3;
+  --switch-on: #111111;
+  --knob: #ffffff;
+  --chart-base: #3a3631;
+  --rail: #111111;
+  --rail-2: #1f1e1c;
+  --rail-ink: #f3eee3;
+  --rail-muted: #a39c90;
+  --rail-line: #2a2825;
+  --shadow-sm: 0 1px 2px rgb(17 17 17 / 0.05);
+  --shadow-md: 0 1px 2px rgb(17 17 17 / 0.04), 0 4px 12px rgb(17 17 17 / 0.04);
+  --shadow-lg: 0 8px 24px rgb(17 17 17 / 0.1);
+  --series-1: #111111;
+  --series-2: #a8471f;
+  --series-3: #5a2814;
+  --series-4: #b8862b;
+  --series-5: #34503f;
+  --series-6: #8fa477;
+  --series-7: #7d6d5c;
+  --series-8: #c4a35a;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
-    --page: #0a0c16;
-    --surface: #121528;
-    --surface-2: #181c33;
-    --surface-3: #20253f;
-    --glass: rgb(18 21 40 / 0.72);
-    --ink: #eef0fb;
-    --ink-2: #b6bad3;
-    --ink-muted: #8d92b0;
-    --line: #252a47;
-    --line-strong: #353b60;
-    --accent: #818cf8;
-    --accent-2: #a78bfa;
-    --accent-ink: #0a0c16;
-    --accent-soft: #1d2046;
-    --accent-text: #a5b4fc;
-    --good: #34d399;
-    --good-soft: #0e2a21;
-    --warn: #fbbf24;
-    --warn-soft: #2c220c;
-    --bad: #f87171;
-    --bad-soft: #321517;
+    --page: #111111;
+    --surface: #1c1b19;
+    --surface-2: #252320;
+    --surface-3: #302d29;
+    --glass: #1c1b19;
+    --ink: #f3eee3;
+    --ink-2: #d6cfc2;
+    --ink-muted: #a8a196;
+    --line: #2e2b27;
+    --line-strong: #433f39;
+    --accent: #d9541e;
+    --accent-hover: #e8662f;
+    --accent-ink: #111111;
+    --accent-soft: #3a2116;
+    --accent-text: #e8662f;
+    --good: #6fb07a;
+    --good-soft: #1d2a1f;
+    --warn: #e0a93a;
+    --warn-soft: #2e2512;
+    --bad: #e8776c;
+    --bad-soft: #33201d;
+    --brand-tile: #f3eee3;
+    --brand-tile-ink: #111111;
+    --switch-on: #d9541e;
+    --knob: #f3eee3;
+    --chart-base: #d6cfc2;
+    --rail: #0a0a0a;
+    --rail-2: #1c1b19;
+    --rail-ink: #f3eee3;
+    --rail-muted: #a39c90;
+    --rail-line: #24221f;
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-    --shadow-md: 0 6px 20px -6px rgb(0 0 0 / 0.55);
-    --shadow-lg: 0 24px 48px -16px rgb(0 0 0 / 0.6);
-    --glow-1: rgb(99 102 241 / 0.18);
-    --glow-2: rgb(168 85 247 / 0.12);
-    --glow-3: rgb(14 165 233 / 0.08);
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --series-3: #199e70;
-    --series-4: #c98500;
-    --series-5: #d55181;
-    --series-6: #008300;
-    --series-7: #9085e9;
-    --series-8: #e66767;
+    --shadow-md: 0 1px 2px rgb(0 0 0 / 0.35), 0 4px 12px rgb(0 0 0 / 0.3);
+    --shadow-lg: 0 8px 24px rgb(0 0 0 / 0.5);
+    --series-1: #f3eee3;
+    --series-2: #c2552c;
+    --series-3: #8e3a1e;
+    --series-4: #d9b25a;
+    --series-5: #8fbf98;
+    --series-6: #a5856c;
+    --series-7: #6f5a48;
+    --series-8: #f0d9a0;
   }
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --page: #0a0c16;
-  --surface: #121528;
-  --surface-2: #181c33;
-  --surface-3: #20253f;
-  --glass: rgb(18 21 40 / 0.72);
-  --ink: #eef0fb;
-  --ink-2: #b6bad3;
-  --ink-muted: #8d92b0;
-  --line: #252a47;
-  --line-strong: #353b60;
-  --accent: #818cf8;
-  --accent-2: #a78bfa;
-  --accent-ink: #0a0c16;
-  --accent-soft: #1d2046;
-  --accent-text: #a5b4fc;
-  --good: #34d399;
-  --good-soft: #0e2a21;
-  --warn: #fbbf24;
-  --warn-soft: #2c220c;
-  --bad: #f87171;
-  --bad-soft: #321517;
+  --page: #111111;
+  --surface: #1c1b19;
+  --surface-2: #252320;
+  --surface-3: #302d29;
+  --glass: #1c1b19;
+  --ink: #f3eee3;
+  --ink-2: #d6cfc2;
+  --ink-muted: #a8a196;
+  --line: #2e2b27;
+  --line-strong: #433f39;
+  --accent: #d9541e;
+  --accent-hover: #e8662f;
+  --accent-ink: #111111;
+  --accent-soft: #3a2116;
+  --accent-text: #e8662f;
+  --good: #6fb07a;
+  --good-soft: #1d2a1f;
+  --warn: #e0a93a;
+  --warn-soft: #2e2512;
+  --bad: #e8776c;
+  --bad-soft: #33201d;
+  --brand-tile: #f3eee3;
+  --brand-tile-ink: #111111;
+  --switch-on: #d9541e;
+  --knob: #f3eee3;
+  --chart-base: #d6cfc2;
+  --rail: #0a0a0a;
+  --rail-2: #1c1b19;
+  --rail-ink: #f3eee3;
+  --rail-muted: #a39c90;
+  --rail-line: #24221f;
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-  --shadow-md: 0 6px 20px -6px rgb(0 0 0 / 0.55);
-  --shadow-lg: 0 24px 48px -16px rgb(0 0 0 / 0.6);
-  --glow-1: rgb(99 102 241 / 0.18);
-  --glow-2: rgb(168 85 247 / 0.12);
-  --glow-3: rgb(14 165 233 / 0.08);
-  --series-1: #3987e5;
-  --series-2: #d95926;
-  --series-3: #199e70;
-  --series-4: #c98500;
-  --series-5: #d55181;
-  --series-6: #008300;
-  --series-7: #9085e9;
-  --series-8: #e66767;
+  --shadow-md: 0 1px 2px rgb(0 0 0 / 0.35), 0 4px 12px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 8px 24px rgb(0 0 0 / 0.5);
+  --series-1: #f3eee3;
+  --series-2: #c2552c;
+  --series-3: #8e3a1e;
+  --series-4: #d9b25a;
+  --series-5: #8fbf98;
+  --series-6: #a5856c;
+  --series-7: #6f5a48;
+  --series-8: #f0d9a0;
 }
 
 @theme inline {
@@ -136,7 +158,7 @@
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
   --color-accent: var(--accent);
-  --color-accent-2: var(--accent-2);
+  --color-accent-hover: var(--accent-hover);
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
   --color-accent-text: var(--accent-text);
@@ -146,10 +168,16 @@
   --color-warn-soft: var(--warn-soft);
   --color-bad: var(--bad);
   --color-bad-soft: var(--bad-soft);
+  --color-rail: var(--rail);
+  --color-rail-2: var(--rail-2);
+  --color-rail-ink: var(--rail-ink);
+  --color-rail-muted: var(--rail-muted);
+  --color-rail-line: var(--rail-line);
   --shadow-soft: var(--shadow-sm);
   --shadow-card: var(--shadow-md);
   --shadow-float: var(--shadow-lg);
   --font-sans: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
 }
 
 html,
@@ -163,17 +191,16 @@ body {
   font-family: var(--font-sans);
   font-feature-settings: 'cv11', 'ss01';
   -webkit-font-smoothing: antialiased;
-  /* Soft brand glows behind the content. Decorative only. */
-  background-image:
-    radial-gradient(60rem 30rem at 10% -10%, var(--glow-1), transparent 60%),
-    radial-gradient(50rem 28rem at 95% 0%, var(--glow-2), transparent 60%),
-    radial-gradient(40rem 24rem at 50% 110%, var(--glow-3), transparent 60%);
-  background-attachment: fixed;
 }
 
-/* Keep scrolled-to content clear of the floating sticky navigation. */
+/* Keep scrolled-to content clear of the sticky top bar on phones and tablets. */
 html {
-  scroll-padding-top: 6rem;
+  scroll-padding-top: 5rem;
+}
+@media (min-width: 1024px) {
+  html {
+    scroll-padding-top: 1.5rem;
+  }
 }
 
 .tabular {
@@ -188,27 +215,29 @@ html {
   }
 }
 
-/* Registered as a Tailwind utility so variants like group-hover:brand-gradient work. */
-@utility brand-gradient {
-  background-image: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+/* Flat brand tile (logo mark, active step, empty states): ink on cream, cream on ink in dark mode. No gradient. */
+@utility brand-solid {
+  background-color: var(--brand-tile);
+  color: var(--brand-tile-ink);
 }
 
-.brand-text {
-  background-image: linear-gradient(120deg, var(--accent) 0%, var(--accent-2) 60%, #0ea5e9 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+/* Editorial emphasis inside a headline: serif italic, once per screen at most. */
+.brand-em {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 500;
 }
 
-/* Gradient hairline border for highlighted cards. */
-.gradient-border {
-  border: 1px solid transparent;
-  background:
-    linear-gradient(var(--surface), var(--surface)) padding-box,
-    linear-gradient(135deg, var(--accent), var(--accent-2), #0ea5e9) border-box;
+/* The one most important card in a view: normal hairline border plus a 3 px Burnt Orange top rule. */
+.highlight-rule {
+  border: 1px solid var(--line);
+  background-color: var(--surface);
+  box-shadow:
+    inset 0 3px 0 var(--accent),
+    var(--shadow-sm);
 }
 
-/* Native checkbox restyled as a switch: the knob is a radial gradient that slides on :checked. */
+/* Native checkbox restyled as a switch. The knob is drawn with a hard-edged radial image (a flat dot, not a visible gradient). */
 .switch {
   appearance: none;
   flex-shrink: 0;
@@ -217,7 +246,7 @@ html {
   border-radius: 999px;
   cursor: pointer;
   background-color: var(--surface-3);
-  background-image: radial-gradient(circle at 0.625rem 50%, #ffffff 0.4rem, transparent 0.43rem);
+  background-image: radial-gradient(circle at 0.625rem 50%, var(--knob) 0.4rem, transparent 0.43rem);
   background-repeat: no-repeat;
   box-shadow: inset 0 0 0 1px var(--line-strong);
   transition:
@@ -225,7 +254,7 @@ html {
     background-position 0.15s;
 }
 .switch:checked {
-  background-color: var(--accent);
+  background-color: var(--switch-on);
   background-position: 1rem 0;
   box-shadow: none;
 }
@@ -252,7 +281,7 @@ html {
 @keyframes rise-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -260,23 +289,23 @@ html {
   }
 }
 
-@keyframes shimmer {
-  from {
-    background-position: -400px 0;
+@keyframes pulse-flat {
+  0%,
+  100% {
+    opacity: 1;
   }
-  to {
-    background-position: 400px 0;
+  50% {
+    opacity: 0.55;
   }
 }
 
 .animate-rise {
-  animation: rise-in 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation: rise-in 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
 .skeleton {
-  background: linear-gradient(90deg, var(--surface-2) 0%, var(--surface-3) 50%, var(--surface-2) 100%);
-  background-size: 800px 100%;
-  animation: shimmer 1.4s linear infinite;
+  background-color: var(--surface-3);
+  animation: pulse-flat 1.4s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -295,11 +324,11 @@ html {
     color-scheme: light;
     --page: #ffffff;
     --surface: #ffffff;
-    --surface-2: #f4f4f6;
-    --ink: #000000;
-    --ink-2: #333333;
-    --ink-muted: #555555;
-    --line: #dddddd;
+    --surface-2: #f3eee3;
+    --ink: #111111;
+    --ink-2: #3a3631;
+    --ink-muted: #5c564d;
+    --line: #ddd5c5;
   }
   body {
     background-image: none;

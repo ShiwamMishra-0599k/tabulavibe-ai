@@ -90,17 +90,17 @@ export function SignInDialog({ open, onClose, onSignIn, onCreateAccount, hasOpen
   )
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/35 p-4 backdrop-blur-sm" role="presentation" onMouseDown={close}>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-[#111111]/50 p-4" role="presentation" onMouseDown={close}>
       <section
         role="dialog"
         aria-modal="true"
         aria-labelledby="sign-in-title"
-        className="w-full max-w-sm animate-rise rounded-2xl border border-line bg-surface p-6 shadow-float"
+        className="w-full max-w-sm animate-rise rounded-xl border border-line bg-surface p-6 shadow-float"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-text">TabulaVibe AI</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-text">TabulaView.ai</p>
             <h2 id="sign-in-title" className="mt-1 text-xl font-bold tracking-tight text-ink">Sign in</h2>
             <p className="mt-1 text-sm text-ink-muted">Continue with the account you use most.</p>
           </div>
@@ -130,7 +130,7 @@ export function SignInDialog({ open, onClose, onSignIn, onCreateAccount, hasOpen
         )}
         {onCreateAccount && (
           <p className="mt-5 text-center text-sm text-ink-muted">
-            New to TabulaVibe?{' '}
+            New to TabulaView.ai?{' '}
             <button type="button" onClick={onCreateAccount} className="font-semibold text-accent-text hover:underline">
               Create an account
             </button>

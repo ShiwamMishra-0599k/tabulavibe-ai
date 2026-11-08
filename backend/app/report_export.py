@@ -22,24 +22,30 @@ from . import __version__
 from .agent.workflow import fmt, fmt_p
 from .errors import DataError
 
-BRAND = (0x4F, 0x46, 0xE5)  # indigo, --accent
-BRAND_2 = (0x7C, 0x3A, 0xED)  # violet, --accent-2
-INK = (0x0F, 0x12, 0x22)
-INK_2 = (0x47, 0x4C, 0x63)
-MUTED = (0x67, 0x6C, 0x84)
-LINE = (0xE4, 0xE6, 0xEF)
-SURFACE_2 = (0xF3, 0xF4, 0xF9)
+# TabulaView.ai v3 palette (DESIGN.md §3, §6a): Cream / Ink Black / Burnt Orange. No blue, purple or gradients.
+BRAND = (0xD9, 0x54, 0x1E)  # Burnt Orange, --accent: rules, highlights, the one highlighted data point
+BRAND_TEXT = (0xA8, 0x40, 0x0F)  # --accent-text: orange text on cream (5.3:1)
+CREAM = (0xF3, 0xEE, 0xE3)  # --page
+PAPER = (0xFB, 0xF8, 0xF2)  # --surface
+INK = (0x11, 0x11, 0x11)
+INK_2 = (0x3A, 0x36, 0x31)
+MUTED = (0x6B, 0x64, 0x5A)
+RAIL_MUTED = (0xA3, 0x9C, 0x90)
+LINE = (0xDD, 0xD5, 0xC5)
+SURFACE_2 = (0xEC, 0xE5, 0xD7)
+CHART_BASE = INK_2
+# Warm categorical palette, checked for protan/deutan/tritan separation (min dE 13.9).
 SERIES = [
-    (0x2A, 0x78, 0xD6),
-    (0xEB, 0x68, 0x34),
-    (0x1B, 0xAF, 0x7A),
-    (0xED, 0xA1, 0x00),
-    (0xE8, 0x7B, 0xA4),
-    (0x00, 0x83, 0x00),
-    (0x62, 0x50, 0xD6),
-    (0xE3, 0x49, 0x48),
+    (0x11, 0x11, 0x11),
+    (0xA8, 0x47, 0x1F),
+    (0x5A, 0x28, 0x14),
+    (0xB8, 0x86, 0x2B),
+    (0x34, 0x50, 0x3F),
+    (0x8F, 0xA4, 0x77),
+    (0x7D, 0x6D, 0x5C),
+    (0xC4, 0xA3, 0x5A),
 ]
-CONFIDENCE_COLOUR = {"high": (0x04, 0x78, 0x57), "medium": BRAND, "low": (0x8A, 0x4B, 0x06)}
+CONFIDENCE_COLOUR = {"high": (0x2F, 0x6B, 0x3A), "medium": INK_2, "low": (0x8A, 0x5A, 0x00)}
 FONTS_DIR = Path(__file__).parent / "fonts"  # DejaVu Sans (see fonts/LICENSE_DEJAVU): covers ₹, →, η, ρ, accents
 _fonts_lock = threading.Lock()
 MAX_TEXT = 1200
@@ -238,7 +244,7 @@ def manual_doc(data: dict[str, Any], title: str | None = None) -> Doc:
         subtitle="Business report · Manual Analyst",
         meta=[f"Source: {source}", f"Prepared {_today()}", f"Rows analysed: {fmt(_num(result.get('rows_analyzed')), 0)}"],
         sections=sections,
-        footer=f"TabulaVibe AI {__version__} · Figures were calculated from the uploaded file; review before relying on them for decisions.",
+        footer=f"TabulaView.ai {__version__} · Figures were calculated from the uploaded file; review before relying on them for decisions.",
     )
 
 
@@ -472,7 +478,7 @@ def agent_doc(report: dict[str, Any]) -> Doc:
             f"{len(report.get('evidence') or [])} calculations recorded as evidence",
         ],
         sections=sections,
-        footer=f"TabulaVibe AI {__version__} · Findings describe associations in this file, not causes. Every figure was computed in Python.",
+        footer=f"TabulaView.ai {__version__} · Findings describe associations in this file, not causes. Every figure was computed in Python.",
     )
 
 
@@ -494,7 +500,7 @@ def render_pptx(doc: Doc) -> bytes:
     prs = Presentation()
     prs.slide_width, prs.slide_height = Inches(13.333), Inches(7.5)
     prs.core_properties.title = doc.title
-    prs.core_properties.author = "TabulaVibe AI"
+    prs.core_properties.author = "TabulaView.ai"
     blank = prs.slide_layouts[6]
     width = prs.slide_width
     margin = Inches(0.6)
@@ -515,7 +521,9 @@ def render_pptx(doc: Doc) -> bytes:
 
     def new_slide(title: str):
         slide = prs.slides.add_slide(blank)
-        bar = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, width, Inches(0.12))
+        slide.background.fill.solid()
+        slide.background.fill.fore_color.rgb = rgb(CREAM)
+        bar = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, margin, Inches(0.25), Inches(0.6), Inches(0.08))
         bar.fill.solid()
         bar.fill.fore_color.rgb = rgb(BRAND)
         bar.line.fill.background()
@@ -526,15 +534,17 @@ def render_pptx(doc: Doc) -> bytes:
     # cover
     slide = prs.slides.add_slide(blank)
     band = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, width, prs.slide_height)
-    band.fill.gradient()
-    band.fill.gradient_angle = 135
-    band.fill.gradient_stops[0].color.rgb = rgb(BRAND)
-    band.fill.gradient_stops[1].color.rgb = rgb(BRAND_2)
+    band.fill.solid()  # flat Ink Black cover, no gradient
+    band.fill.fore_color.rgb = rgb(INK)
     band.line.fill.background()
-    text(slide, margin, Inches(1.2), content_w, Inches(0.5), "TABULAVIBE AI", 14, (0xE0, 0xE7, 0xFF), bold=True)
-    text(slide, margin, Inches(2.0), content_w, Inches(2.0), doc.title, 40, (0xFF, 0xFF, 0xFF), bold=True)
-    text(slide, margin, Inches(4.1), content_w, Inches(0.6), doc.subtitle, 18, (0xE0, 0xE7, 0xFF))
-    text(slide, margin, Inches(5.0), content_w, Inches(1.2), "   ·   ".join(doc.meta), 14, (0xFF, 0xFF, 0xFF))
+    text(slide, margin, Inches(1.2), content_w, Inches(0.5), "TABULAVIEW.AI", 14, CREAM, bold=True)
+    text(slide, margin, Inches(2.0), content_w, Inches(2.0), doc.title, 40, CREAM, bold=True)
+    cover_rule = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, margin, Inches(3.95), Inches(0.6), Inches(0.06))
+    cover_rule.fill.solid()
+    cover_rule.fill.fore_color.rgb = rgb(BRAND)
+    cover_rule.line.fill.background()
+    text(slide, margin, Inches(4.2), content_w, Inches(0.6), doc.subtitle, 18, CREAM)
+    text(slide, margin, Inches(5.0), content_w, Inches(1.2), "   ·   ".join(doc.meta), 14, RAIL_MUTED)
 
     for section in doc.sections:
         blocks = list(section.blocks)
@@ -577,7 +587,7 @@ def render_pptx(doc: Doc) -> bytes:
                     card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, x, top, card_w, card_h)
                     card.adjustments[0] = 0.08
                     card.fill.solid()
-                    card.fill.fore_color.rgb = rgb((0xFF, 0xFF, 0xFF))
+                    card.fill.fore_color.rgb = rgb(PAPER)
                     card.line.color.rgb = rgb(LINE)
                     text(slide, x + Inches(0.2), top + Inches(0.15), card_w - Inches(0.4), Inches(0.35), label, 12, MUTED, bold=True)
                     text(slide, x + Inches(0.2), top + Inches(0.5), card_w - Inches(0.4), Inches(0.6), value, 28, INK, bold=True)
@@ -606,7 +616,12 @@ def render_pptx(doc: Doc) -> bytes:
                     series = plot.series[0]
                     if block.kind == "bar":
                         series.format.fill.solid()
-                        series.format.fill.fore_color.rgb = rgb(SERIES[0])
+                        series.format.fill.fore_color.rgb = rgb(CHART_BASE)
+                        numeric = [v for v in block.values if v is not None]
+                        if numeric:  # the largest group is the one Burnt Orange bar
+                            top = series.points[block.values.index(max(numeric))]
+                            top.format.fill.solid()
+                            top.format.fill.fore_color.rgb = rgb(BRAND)
                         plot.gap_width = 60
                         plot.has_data_labels = True
                         plot.data_labels.number_format = indian
@@ -614,7 +629,7 @@ def render_pptx(doc: Doc) -> bytes:
                         plot.data_labels.position = XL_LABEL_POSITION.OUTSIDE_END
                         chart.category_axis.reverse_order = True  # largest group on top, like the app
                     else:
-                        series.format.line.color.rgb = rgb(SERIES[0])
+                        series.format.line.color.rgb = rgb(INK)
                         series.format.line.width = Pt(2.25)
                         series.smooth = False
                     chart.value_axis.tick_labels.number_format = indian
@@ -648,7 +663,7 @@ def render_pptx(doc: Doc) -> bytes:
                         cell = table.cell(r, c)
                         cell.text = value
                         cell.fill.solid()
-                        cell.fill.fore_color.rgb = rgb((0xFF, 0xFF, 0xFF))
+                        cell.fill.fore_color.rgb = rgb(PAPER)
                         para = cell.text_frame.paragraphs[0]
                         para.runs[0].font.size, para.runs[0].font.color.rgb = Pt(11), rgb(INK)
                         para.alignment = PP_ALIGN.RIGHT if c in block.numeric else PP_ALIGN.LEFT
@@ -715,7 +730,7 @@ def render_pdf(doc: Doc) -> bytes:
 
     styles = {
         "h1": ParagraphStyle("h1", fontName="DejaVu-Bold", fontSize=22, leading=27, textColor=col(INK), spaceAfter=4),
-        "sub": ParagraphStyle("sub", fontName="DejaVu", fontSize=11, leading=15, textColor=col(BRAND)),
+        "sub": ParagraphStyle("sub", fontName="DejaVu", fontSize=11, leading=15, textColor=col(BRAND_TEXT)),
         "meta": ParagraphStyle("meta", fontName="DejaVu", fontSize=9, leading=13, textColor=col(MUTED)),
         "h2": ParagraphStyle(
             "h2", fontName="DejaVu-Bold", fontSize=14, leading=18, textColor=col(INK), spaceBefore=12, spaceAfter=6, keepWithNext=1
@@ -772,7 +787,10 @@ def render_pdf(doc: Doc) -> bytes:
                     chart.x, chart.y, chart.width, chart.height = 110, 15, page_w - 170, h - 25
                     chart.data = [list(reversed(values))]
                     chart.categoryAxis.categoryNames = list(reversed(cats))
-                    chart.bars[0].fillColor = col(SERIES[0])
+                    chart.bars[0].fillColor = col(CHART_BASE)
+                    numeric = [v for v in chart.data[0] if v is not None]
+                    if numeric:  # the largest group is the one Burnt Orange bar
+                        chart.bars[(0, chart.data[0].index(max(numeric)))].fillColor = col(BRAND)
                     chart.bars.strokeColor = None
                     chart.barLabelFormat = number_label
                     chart.barLabels.nudge = 20
@@ -788,7 +806,7 @@ def render_pdf(doc: Doc) -> bytes:
                         chart.categoryAxis.categoryNames = cats
                         chart.categoryAxis.labels.angle = 45 if len(cats) > 8 else 0
                         chart.categoryAxis.labels.boxAnchor = "ne" if len(cats) > 8 else "n"
-                        chart.lines[0].strokeColor = col(SERIES[0])
+                        chart.lines[0].strokeColor = col(INK)
                         chart.lines[0].strokeWidth = 2
                     else:
                         chart = Pie()
@@ -874,7 +892,7 @@ def render_pdf(doc: Doc) -> bytes:
         topMargin=16 * mm,
         bottomMargin=18 * mm,
         title=doc.title,
-        author="TabulaVibe AI",
+        author="TabulaView.ai",
         subject=doc.subtitle,
     ).build(story, onFirstPage=footer, onLaterPages=footer)
     return buf.getvalue()
